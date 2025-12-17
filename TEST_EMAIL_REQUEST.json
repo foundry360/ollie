@@ -1,0 +1,8 @@
+{
+  "parentEmail": "parent@example.com",
+  "token": "test-approval-token-12345",
+  "teenName": "Alex Johnson",
+  "teenAge": 15,
+  "approvalUrl": "http://localhost:8081/parent-approve?token=test-approval-token-12345"
+}
+
