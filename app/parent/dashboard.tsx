@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#374151',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
     color: '#000000',
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   errorText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 8,

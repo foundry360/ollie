@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { getPublicUserProfile } from '@/lib/api/users';
 import { getTeenCompletedTasks } from '@/lib/api/tasks';
+import { getAverageRating } from '@/lib/api/reviews';
 import { User } from '@/types';
 
 export default function PublicProfileScreen() {
@@ -45,22 +46,15 @@ export default function PublicProfileScreen() {
       }
       setProfile(userProfile);
 
-      // Fetch completed tasks to calculate rating (may fail due to RLS, that's okay)
+      // Fetch rating from reviews table
       try {
-        const completedTasks = await getTeenCompletedTasks(id);
-        setReviewCount(completedTasks.length);
-        
-        // Calculate average rating (placeholder - in real app, ratings would be stored separately)
-        // For now, we'll use a simple calculation based on completed tasks
-        if (completedTasks.length > 0) {
-          // Placeholder: assume 4.5 stars average for teens with completed tasks
-          // In production, this would come from a reviews/ratings table
-          const avgRating = 4.5;
-          setRating(avgRating);
-        }
-      } catch (taskError) {
-        // If we can't fetch tasks (due to RLS), that's okay - just show 0 reviews
-        console.log('Could not fetch completed tasks (may be RLS restricted):', taskError);
+        const ratingData = await getAverageRating(id);
+        setRating(ratingData.averageRating);
+        setReviewCount(ratingData.reviewCount);
+      } catch (ratingError) {
+        // If reviews table doesn't exist yet or there's an error, fall back to 0
+        console.log('Could not fetch ratings:', ratingError);
+        setRating(0);
         setReviewCount(0);
       }
     } catch (err: any) {
@@ -290,7 +284,7 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   errorText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 8,
@@ -337,7 +331,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#374151',
   },
   name: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
@@ -464,4 +458,8 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
+
+
+
+
 

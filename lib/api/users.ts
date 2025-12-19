@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { User } from '@/types';
 import { getWeekRange } from '@/lib/utils';
+import { getAverageRating } from './reviews';
 
 export interface UpdateProfileData {
   full_name?: string;
@@ -72,37 +73,95 @@ export async function getTeenStats(): Promise<TeenStats> {
 
   // Get completed tasks for rating calculation
   const { data: completedTasks, error: tasksError } = await supabase
-    .from('tasks')
+    .from('gigs')
     .select('id, pay')
     .eq('teen_id', user.id)
     .eq('status', 'completed');
 
   if (tasksError) throw tasksError;
 
-  // Calculate rating (placeholder - would need reviews table for actual rating)
-  // For now, use a simple calculation based on completed tasks
   const tasksCompleted = completedTasks?.length || 0;
-  const rating = tasksCompleted > 0 ? 4.5 : 0; // Placeholder rating
-  const reviewCount = tasksCompleted; // Placeholder - would come from reviews table
 
-  // Get weekly earnings
+  // Get actual rating and review count from reviews table
+  let rating = 0;
+  let reviewCount = 0;
+  try {
+    const ratingData = await getAverageRating(user.id);
+    rating = ratingData.averageRating;
+    reviewCount = ratingData.reviewCount;
+  } catch (ratingError) {
+    // If reviews table doesn't exist yet or there's an error, fall back to 0
+    console.log('Could not fetch ratings:', ratingError);
+    rating = 0;
+    reviewCount = 0;
+  }
+
+  // Get weekly earnings - calculate from completed gigs this week
+  // This is more reliable than relying on earnings table which depends on triggers
   const { start, end } = getWeekRange();
-  const { data: weeklyEarningsData, error: earningsError } = await supabase
-    .from('earnings')
-    .select('amount')
+  const { data: weeklyGigs, error: weeklyGigsError } = await supabase
+    .from('gigs')
+    .select('pay, updated_at')
     .eq('teen_id', user.id)
-    .gte('created_at', start.toISOString())
-    .lte('created_at', end.toISOString());
+    .eq('status', 'completed')
+    .gte('updated_at', start.toISOString())
+    .lte('updated_at', end.toISOString());
 
-  if (earningsError) throw earningsError;
+  if (weeklyGigsError) throw weeklyGigsError;
 
-  const weeklyEarnings = weeklyEarningsData?.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0) || 0;
+  // Calculate total earnings from completed gigs this week
+  const weeklyEarnings = weeklyGigs?.reduce((sum, gig) => sum + parseFloat(gig.pay.toString()), 0) || 0;
 
   return {
     rating,
     reviewCount,
     tasksCompleted,
     weeklyEarnings,
+  };
+}
+
+// Get neighbor (poster) statistics
+export interface NeighborStats {
+  totalGigsPosted: number;
+  activeGigs: number; // open + accepted + in_progress
+  completedGigs: number;
+  totalSpent: number; // sum of completed gig payments
+}
+
+export async function getNeighborStats(): Promise<NeighborStats> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Get all gigs posted by this user
+  const { data: allGigs, error: allGigsError } = await supabase
+    .from('gigs')
+    .select('id, status, pay')
+    .eq('poster_id', user.id);
+
+  if (allGigsError) throw allGigsError;
+
+  const totalGigsPosted = allGigs?.length || 0;
+  
+  // Count active gigs (open, accepted, in_progress)
+  const activeGigs = allGigs?.filter(
+    gig => ['open', 'accepted', 'in_progress'].includes(gig.status)
+  ).length || 0;
+
+  // Count completed gigs
+  const completedGigs = allGigs?.filter(
+    gig => gig.status === 'completed'
+  ).length || 0;
+
+  // Calculate total spent (sum of completed gig payments)
+  const totalSpent = allGigs
+    ?.filter(gig => gig.status === 'completed')
+    .reduce((sum, gig) => sum + parseFloat(gig.pay.toString()), 0) || 0;
+
+  return {
+    totalGigsPosted,
+    activeGigs,
+    completedGigs,
+    totalSpent,
   };
 }
 

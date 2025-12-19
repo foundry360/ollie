@@ -1,15 +1,17 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 import { useUpcomingTasks } from '@/hooks/useTasks';
 import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
+import { GigDetailModal } from '@/components/tasks/GigDetailModal';
+import { useState } from 'react';
 
 export function UpcomingTasks() {
-  const router = useRouter();
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
   const { data: upcomingTasks = [], isLoading } = useUpcomingTasks();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   if (isLoading) {
     return (
@@ -25,7 +27,13 @@ export function UpcomingTasks() {
   }
 
   const handleTaskPress = (taskId: string) => {
-    router.push(`/tasks/${taskId}`);
+    setSelectedTaskId(taskId);
+    setShowDetailModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowDetailModal(false);
+    setSelectedTaskId(null);
   };
 
   const getApprovalBadgeStyle = (status?: string) => {
@@ -49,7 +57,9 @@ export function UpcomingTasks() {
     <View style={[styles.container, containerStyle]}>
       <Text style={[styles.sectionTitle, titleStyle]}>Upcoming Gigs</Text>
       {upcomingTasks.map((task) => {
-        const taskDate = new Date(task.created_at);
+        // Use scheduled_date if available, otherwise fall back to created_at
+        const dateToUse = task.scheduled_date || task.created_at;
+        const taskDate = new Date(dateToUse);
         const dateStr = format(taskDate, 'MMM d');
         
         return (
@@ -59,20 +69,15 @@ export function UpcomingTasks() {
             onPress={() => handleTaskPress(task.id)}
             android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
           >
-            <View style={styles.taskHeader}>
-              <View style={[styles.dateBadge, isDark && styles.dateBadgeDark]}>
-                <Text style={[styles.dateText, isDark && styles.dateTextDark]}>
-                  {dateStr}
-                </Text>
-              </View>
-              {task.parent_approval_status && (
+            {task.parent_approval_status && (
+              <View style={styles.taskHeader}>
                 <View style={getApprovalBadgeStyle(task.parent_approval_status)}>
                   <Text style={styles.approvalText}>
                     {getApprovalText(task.parent_approval_status)}
                   </Text>
                 </View>
-              )}
-            </View>
+              </View>
+            )}
             <Text style={[styles.taskTitle, titleStyle]} numberOfLines={2}>
               {task.title}
             </Text>
@@ -89,10 +94,20 @@ export function UpcomingTasks() {
                   ${task.pay.toFixed(2)}
                 </Text>
               </View>
+              <View style={[styles.dateBadge, isDark && styles.dateBadgeDark]}>
+                <Text style={[styles.dateText, isDark && styles.dateTextDark]}>
+                  {dateStr}
+                </Text>
+              </View>
             </View>
           </Pressable>
         );
       })}
+      <GigDetailModal
+        visible={showDetailModal}
+        taskId={selectedTaskId}
+        onClose={handleCloseModal}
+      />
     </View>
   );
 }
@@ -138,21 +153,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   dateBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    marginLeft: 'auto',
+    flexShrink: 0,
   },
   dateBadgeDark: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#7C2D12',
   },
   dateText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: '#F97316',
   },
   dateTextDark: {
-    color: '#93C5FD',
+    color: '#FB923C',
   },
   badgePending: {
     backgroundColor: '#FEF3C7',
@@ -185,6 +202,8 @@ const styles = StyleSheet.create({
   },
   taskDetails: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 16,
   },
   detailRow: {
@@ -204,4 +223,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 });
+
+
+
+
 

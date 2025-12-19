@@ -41,7 +41,7 @@ export default function TasksLayout() {
       <Stack.Screen 
         name="create" 
         options={{ 
-          title: 'Create Task',
+          title: 'Create Gig',
         }} 
       />
     </Stack>

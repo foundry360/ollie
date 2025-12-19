@@ -28,6 +28,189 @@ function toRad(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
 
+// Format address to standard format: address on first line, city state zip on second line
+export function formatAddress(address: string): { street: string; cityStateZip: string } {
+  if (!address) {
+    return { street: '', cityStateZip: '' };
+  }
+
+  // First, normalize the address to ensure it has commas
+  const normalizedAddress = normalizeAddress(address);
+
+  // Split by comma and trim each part
+  const parts = normalizedAddress.split(',').map(p => p.trim()).filter(p => p);
+  
+  if (parts.length >= 3) {
+    // Format: "Street, City, State Zip" or "Street, City, State, Zip"
+    const street = parts[0];
+    const city = parts[1];
+    // Combine remaining parts (state and zip, which might be separate)
+    const stateZip = parts.slice(2).join(' ').trim();
+    return { street, cityStateZip: `${city}, ${stateZip}` };
+  } else if (parts.length === 2) {
+    // Format: "Street, City State Zip"
+    const street = parts[0];
+    const cityStateZip = parts[1];
+    return { street, cityStateZip };
+  } else if (parts.length === 1) {
+    // Single part address - try to split intelligently
+    const addressStr = parts[0];
+    
+    // Try to find a zip code (5 digits) and work backwards
+    const zipMatch = addressStr.match(/\b(\d{5}(?:-\d{4})?)\b/);
+    if (zipMatch) {
+      const zipIndex = zipMatch.index!;
+      const zip = zipMatch[1];
+      const beforeZip = addressStr.substring(0, zipIndex).trim();
+      
+      // Look for state abbreviation (2 uppercase letters) before zip
+      const stateMatch = beforeZip.match(/\b([A-Z]{2})\s*$/);
+      if (stateMatch) {
+        const stateIndex = stateMatch.index!;
+        const state = stateMatch[1];
+        const beforeState = beforeZip.substring(0, stateIndex).trim();
+        
+        // Find the last word before state (likely the city)
+        const words = beforeState.split(/\s+/);
+        if (words.length > 1) {
+          const city = words[words.length - 1];
+          const street = beforeState.substring(0, beforeState.lastIndexOf(city)).trim();
+          return { 
+            street: street || addressStr, 
+            cityStateZip: `${city}, ${state} ${zip}` 
+          };
+        }
+      }
+      
+      // If we found zip but couldn't parse state, try to split at common street suffixes
+      const streetSuffixPattern = /\b(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Court|Ct|Place|Pl|Way|Circle|Cir)\b/i;
+      const suffixMatch = beforeZip.match(streetSuffixPattern);
+      if (suffixMatch) {
+        const suffixEnd = suffixMatch.index! + suffixMatch[0].length;
+        const street = addressStr.substring(0, suffixEnd).trim();
+        const cityStateZip = addressStr.substring(suffixEnd, zipIndex + zip.length).trim();
+        return { street, cityStateZip: `${cityStateZip} ${zip}` };
+      }
+    }
+    
+    // Fallback: look for street suffix and split there
+    const streetSuffixPattern = /\b(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Court|Ct|Place|Pl|Way|Circle|Cir)\b/i;
+    const suffixMatch = addressStr.match(streetSuffixPattern);
+    if (suffixMatch) {
+      const suffixEnd = suffixMatch.index! + suffixMatch[0].length;
+      const street = addressStr.substring(0, suffixEnd).trim();
+      const cityStateZip = addressStr.substring(suffixEnd).trim();
+      if (cityStateZip) {
+        return { street, cityStateZip };
+      }
+    }
+    
+    // Last resort: return entire address as street
+    return { street: addressStr, cityStateZip: '' };
+  } else {
+    // Single part - try to intelligently split
+    // Look for zip code pattern (5 digits) and work backwards
+    const zipMatch = address.match(/\b(\d{5})\b/);
+    if (zipMatch) {
+      const zipIndex = zipMatch.index!;
+      const afterZip = address.substring(zipIndex + 5).trim();
+      const zip = zipMatch[1];
+      const beforeZip = address.substring(0, zipIndex).trim();
+      
+      // Try to find state abbreviation (2 uppercase letters) before zip
+      const stateMatch = beforeZip.match(/\b([A-Z]{2})\s*$/);
+      if (stateMatch) {
+        const stateIndex = stateMatch.index!;
+        const city = beforeZip.substring(0, stateIndex).trim();
+        const state = stateMatch[1];
+        // Find where the street address ends (look for last occurrence of city)
+        const cityIndex = address.lastIndexOf(city);
+        if (cityIndex > 0) {
+          const street = address.substring(0, cityIndex).trim().replace(/,\s*$/, '');
+          return { street, cityStateZip: `${city}, ${state} ${zip}` };
+        }
+      }
+      
+      // If we found zip but no clear state, try to split at common street suffixes
+      const streetSuffixPattern = /\b(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Court|Ct|Place|Pl|Way|Circle|Cir)\b/i;
+      const suffixMatch = beforeZip.match(streetSuffixPattern);
+      if (suffixMatch) {
+        const suffixEnd = suffixMatch.index! + suffixMatch[0].length;
+        const street = address.substring(0, suffixEnd).trim();
+        const cityStateZip = address.substring(suffixEnd, zipIndex + 5).trim();
+        return { street, cityStateZip };
+      }
+    }
+    
+    // Fallback: look for street suffix and split there
+    const streetSuffixPattern = /\b(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Court|Ct|Place|Pl|Way|Circle|Cir)\b/i;
+    const suffixMatch = address.match(streetSuffixPattern);
+    if (suffixMatch) {
+      const suffixEnd = suffixMatch.index! + suffixMatch[0].length;
+      const street = address.substring(0, suffixEnd).trim();
+      const cityStateZip = address.substring(suffixEnd).trim();
+      if (cityStateZip) {
+        return { street, cityStateZip };
+      }
+    }
+    
+    // Last resort: return entire address as street
+    return { street: address, cityStateZip: '' };
+  }
+}
+
+// Normalize address format to ensure it has commas: "Street, City, State Zip"
+export function normalizeAddress(address: string): string {
+  if (!address) return '';
+  
+  // If address already has commas, return as is (assuming it's properly formatted)
+  if (address.includes(',')) {
+    return address;
+  }
+  
+  // Try to parse and reformat address without commas
+  // Look for zip code pattern (5 digits)
+  const zipMatch = address.match(/\b(\d{5}(?:-\d{4})?)\b/);
+  if (zipMatch) {
+    const zipIndex = zipMatch.index!;
+    const zip = zipMatch[1];
+    const beforeZip = address.substring(0, zipIndex).trim();
+    
+    // Look for state abbreviation (2 uppercase letters) before zip
+    const stateMatch = beforeZip.match(/\b([A-Z]{2})\s*$/);
+    if (stateMatch) {
+      const stateIndex = stateMatch.index!;
+      const state = stateMatch[1];
+      const beforeState = beforeZip.substring(0, stateIndex).trim();
+      
+      // Find the last word before state (likely the city)
+      const words = beforeState.split(/\s+/);
+      if (words.length > 1) {
+        const city = words[words.length - 1];
+        const street = beforeState.substring(0, beforeState.lastIndexOf(city)).trim();
+        if (street) {
+          return `${street}, ${city}, ${state} ${zip}`;
+        } else {
+          return `${beforeState}, ${state} ${zip}`;
+        }
+      }
+    }
+    
+    // If we found zip but couldn't parse properly, try to split at common street suffixes
+    const streetSuffixPattern = /\b(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Court|Ct|Place|Pl|Way|Circle|Cir)\b/i;
+    const suffixMatch = beforeZip.match(streetSuffixPattern);
+    if (suffixMatch) {
+      const suffixEnd = suffixMatch.index! + suffixMatch[0].length;
+      const street = address.substring(0, suffixEnd).trim();
+      const cityStateZip = address.substring(suffixEnd, zipIndex + zip.length).trim();
+      return `${street}, ${cityStateZip} ${zip}`;
+    }
+  }
+  
+  // If we can't parse it, return as is (user will need to format manually)
+  return address;
+}
+
 // Get time-based greeting
 export function getGreeting(): string {
   const hour = new Date().getHours();

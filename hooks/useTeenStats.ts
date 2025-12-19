@@ -10,7 +10,12 @@ export function useTeenStats() {
   return useQuery<TeenStats>({
     queryKey: teenStatsKeys.stats(),
     queryFn: getTeenStats,
-    staleTime: 60000, // 1 minute
+    staleTime: 30000, // 30 seconds - shorter to ensure updates show quickly
+    refetchOnMount: true,
   });
 }
+
+
+
+
 

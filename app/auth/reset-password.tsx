@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#000000',
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   errorTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginTop: 24,
     marginBottom: 12,

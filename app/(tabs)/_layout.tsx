@@ -71,24 +71,26 @@ function HeaderRight() {
 
   // Get the current route name from segments
   const currentRoute = segments[segments.length - 1];
-  const isHome = currentRoute === 'home';
+  // Show notification bell on all screens except profile, settings, and qr-code
+  const hideNotificationRoutes = ['profile', 'settings', 'qr-code'];
+  const showNotification = !hideNotificationRoutes.includes(currentRoute);
 
   // #region agent log
   useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/_layout.tsx:66',message:'HeaderRight render/segment change',data:{currentRoute,isHome,segments:segments.join('/')},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
-  }, [segments, isHome]);
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/_layout.tsx:66',message:'HeaderRight render/segment change',data:{currentRoute,showNotification,segments:segments.join('/')},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
+  }, [segments, showNotification]);
   // #endregion
 
-  // Always render a container to prevent layout shifts, but hide content when not home
+  // Always render a container to prevent layout shifts, but hide content when not on main screens
   return (
-    <View style={{ marginRight: 16, width: isHome ? 'auto' : 0, opacity: isHome ? 1 : 0 }}>
+    <View style={{ marginRight: 16, width: showNotification ? 'auto' : 0, opacity: showNotification ? 1 : 0 }}>
       <Pressable
         onPress={() => {
           // TODO: Navigate to notifications screen
           console.log('Notifications pressed');
         }}
         style={{ padding: 4 }}
-        disabled={!isHome}
+        disabled={!showNotification}
       >
         <Ionicons name="notifications-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
       </Pressable>
@@ -99,8 +101,12 @@ function HeaderRight() {
 
 export default function TabLayout() {
   const { colorScheme } = useThemeStore();
+  const { user } = useAuthStore();
   const isDark = colorScheme === 'dark';
   const segments = useSegments();
+  
+  // Check if user is a neighbor (poster) - they shouldn't see the Marketplace
+  const isNeighbor = user?.role === 'poster';
 
   // #region agent log
   useEffect(() => {
@@ -188,7 +194,7 @@ export default function TabLayout() {
         options={{ 
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <Ionicons name="home-outline" size={size} color={color} />
           ),
           tabBarLabelStyle,
         }} 
@@ -198,7 +204,7 @@ export default function TabLayout() {
         options={{ 
           title: 'My Gigs',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="checkmark-circle" size={size} color={color} />
+            <Ionicons name="briefcase-outline" size={size} color={color} />
           ),
           tabBarLabelStyle,
         }} 
@@ -208,9 +214,10 @@ export default function TabLayout() {
         options={{ 
           title: 'Marketplace',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="storefront" size={size} color={color} />
+            <Ionicons name="storefront-outline" size={size} color={color} />
           ),
           tabBarLabelStyle,
+          href: isNeighbor ? null : undefined, // Hide Marketplace tab for neighbors
         }} 
       />
       <Tabs.Screen 
@@ -218,7 +225,7 @@ export default function TabLayout() {
         options={{ 
           title: 'Wallet',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet" size={size} color={color} />
+            <Ionicons name="wallet-outline" size={size} color={color} />
           ),
           tabBarLabelStyle,
         }} 
@@ -228,7 +235,7 @@ export default function TabLayout() {
         options={{ 
           title: 'Messages',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble" size={size} color={color} />
+            <Ionicons name="chatbubble-outline" size={size} color={color} />
           ),
           tabBarLabelStyle,
         }} 

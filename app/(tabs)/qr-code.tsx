@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111111',
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
     marginTop: 0,

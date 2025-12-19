@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --go",
+    "start:dev": "expo start --dev-client",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
@@ -20,11 +21,13 @@
     "expo-av": "^16.0.8",
     "expo-constants": "~18.0.12",
     "expo-crypto": "^15.0.8",
+    "expo-dev-client": "~6.0.20",
     "expo-device": "^8.0.10",
     "expo-image-picker": "~17.0.10",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.10",
     "expo-location": "~19.0.8",
+    "expo-maps": "~0.12.10",
     "expo-notifications": "~0.32.15",
     "expo-router": "~6.0.19",
     "expo-status-bar": "~3.0.9",

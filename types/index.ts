@@ -55,13 +55,16 @@ export interface Task {
   required_skills?: string[];
   estimated_hours?: number;
   photos?: string[];
+  scheduled_date?: string; // ISO date string (YYYY-MM-DD)
+  scheduled_start_time?: string; // 24-hour format (HH:MM)
+  scheduled_end_time?: string; // 24-hour format (HH:MM)
   created_at: string;
   updated_at: string;
 }
 
 export interface Message {
   id: string;
-  task_id: string;
+  gig_id: string;
   sender_id: string;
   recipient_id: string;
   content: string;

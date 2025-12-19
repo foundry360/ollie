@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 import { useTasksNearUser } from '@/hooks/useTasks';
+import { GigDetailModal } from '@/components/tasks/GigDetailModal';
 
 export function TasksNearYou() {
   const router = useRouter();
@@ -14,6 +15,9 @@ export function TasksNearYou() {
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     // Get user's current location
@@ -21,28 +25,40 @@ export function TasksNearYou() {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
-          const location = await Location.getCurrentPositionAsync({});
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
           setUserLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           });
+          setLocationError(null);
+        } else {
+          setLocationError('Location permission denied');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error getting location:', error);
+        setLocationError(error.message || 'Failed to get location');
       }
     };
 
     getUserLocation();
   }, []);
 
-  const { data: tasks = [], isLoading } = useTasksNearUser(userLocation, 10);
+  const { data: tasks = [], isLoading, error: tasksError } = useTasksNearUser(userLocation, 10);
 
   const handleSeeAll = () => {
-    router.push('/tasks');
+    router.push('/(tabs)/'); // Navigate to marketplace
   };
 
   const handleTaskPress = (taskId: string) => {
-    router.push(`/tasks/${taskId}`);
+    setSelectedTaskId(taskId);
+    setShowDetailModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowDetailModal(false);
+    setSelectedTaskId(null);
   };
 
   const containerStyle = isDark ? styles.containerDark : styles.containerLight;
@@ -50,13 +66,57 @@ export function TasksNearYou() {
   const cardStyle = isDark ? styles.cardDark : styles.cardLight;
   const textStyle = isDark ? styles.textDark : styles.textLight;
 
-  if (isLoading) {
+  if (isLoading || !userLocation) {
     return (
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
           <Text style={[styles.sectionTitle, titleStyle]}>Gigs Near You</Text>
         </View>
-        <Text style={[styles.loadingText, textStyle]}>Loading nearby gigs...</Text>
+        <Text style={[styles.loadingText, textStyle]}>
+          {!userLocation ? 'Getting your location...' : 'Loading nearby gigs...'}
+        </Text>
+      </View>
+    );
+  }
+
+  if (locationError) {
+    return (
+      <View style={[styles.container, containerStyle]}>
+        <View style={styles.header}>
+          <Text style={[styles.sectionTitle, titleStyle]}>Gigs Near You</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Ionicons
+            name="location-outline"
+            size={48}
+            color={isDark ? '#6B7280' : '#9CA3AF'}
+          />
+          <Text style={[styles.emptyText, textStyle]}>Location unavailable</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
+            {locationError}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (tasksError) {
+    return (
+      <View style={[styles.container, containerStyle]}>
+        <View style={styles.header}>
+          <Text style={[styles.sectionTitle, titleStyle]}>Gigs Near You</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Ionicons
+            name="alert-circle-outline"
+            size={48}
+            color={isDark ? '#6B7280' : '#9CA3AF'}
+          />
+          <Text style={[styles.emptyText, textStyle]}>Error loading gigs</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
+            Please try again later
+          </Text>
+        </View>
       </View>
     );
   }
@@ -91,11 +151,7 @@ export function TasksNearYou() {
         </Pressable>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <View style={styles.cardsContainer}>
         {tasks.map((task) => (
           <Pressable
             key={task.id}
@@ -103,24 +159,37 @@ export function TasksNearYou() {
             onPress={() => handleTaskPress(task.id)}
             android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
           >
-            {task.photos && task.photos.length > 0 && (
-              <Image source={{ uri: task.photos[0] }} style={styles.taskImage} />
+            {task.photos && task.photos.length > 0 ? (
+              <Image 
+                source={{ uri: task.photos[0] }} 
+                style={styles.taskImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.taskImagePlaceholder}>
+                <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
+              </View>
             )}
             <View style={styles.taskContent}>
               <Text style={[styles.taskTitle, titleStyle]} numberOfLines={2}>
                 {task.title}
               </Text>
               <View style={styles.taskMeta}>
-                <View style={styles.metaRow}>
-                  <Ionicons name="cash" size={14} color="#73af17" />
-                  <Text style={[styles.metaText, textStyle]}>${task.pay.toFixed(2)}</Text>
+                <View style={styles.metaLeft}>
+                  <View style={styles.metaRow}>
+                    <Ionicons name="cash" size={14} color="#73af17" />
+                    <Text style={[styles.metaText, textStyle]}>${task.pay.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Ionicons name="location" size={14} color="#73af17" />
+                    <Text style={[styles.metaText, textStyle]} numberOfLines={1}>
+                      {task.distance.toFixed(1)} mi
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.metaRow}>
-                  <Ionicons name="location" size={14} color="#73af17" />
-                  <Text style={[styles.metaText, textStyle]} numberOfLines={1}>
-                    {task.distance.toFixed(1)} mi
-                  </Text>
-                </View>
+                <Text style={[styles.timeText, textStyle]}>
+                  {formatTimeAgo(task.created_at)}
+                </Text>
               </View>
               {task.required_skills && task.required_skills.length > 0 && (
                 <View style={styles.skillsContainer}>
@@ -133,20 +202,22 @@ export function TasksNearYou() {
                   ))}
                 </View>
               )}
-              <Text style={[styles.timeText, textStyle]}>
-                {formatTimeAgo(task.created_at)}
-              </Text>
             </View>
           </Pressable>
         ))}
-      </ScrollView>
+      </View>
+      <GigDetailModal
+        visible={showDetailModal}
+        taskId={selectedTaskId}
+        onClose={handleCloseModal}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: 8,
     paddingVertical: 8,
     paddingHorizontal: 0,
   },
@@ -177,40 +248,57 @@ const styles = StyleSheet.create({
     color: '#73af17',
     fontWeight: '600',
   },
-  scrollContent: {
+  cardsContainer: {
     paddingHorizontal: 16,
     gap: 12,
   },
   taskCard: {
-    width: 200,
+    width: '100%',
+    flexDirection: 'row',
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     backgroundColor: '#FFFFFF',
     borderColor: '#E5E7EB',
+    minHeight: 120,
   },
   cardDark: {
     backgroundColor: '#1F2937',
     borderColor: '#374151',
   },
   taskImage: {
-    width: '100%',
-    height: 120,
+    width: 120,
+    alignSelf: 'stretch',
     backgroundColor: '#F3F4F6',
   },
+  taskImagePlaceholder: {
+    width: 120,
+    alignSelf: 'stretch',
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   taskContent: {
+    flex: 1,
     padding: 12,
   },
   taskTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 6,
     color: '#000000',
   },
   taskMeta: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 12,
     marginBottom: 8,
+  },
+  metaLeft: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
   },
   metaRow: {
     flexDirection: 'row',
@@ -273,4 +361,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 });
+
+
+
+
 

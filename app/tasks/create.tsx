@@ -53,7 +53,7 @@ export default function CreateTaskScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is required to create a task.');
+        Alert.alert('Permission Denied', 'Location permission is required to create a gig.');
         return;
       }
 
@@ -137,7 +137,7 @@ export default function CreateTaskScreen() {
         photos: photos.length > 0 ? photos : undefined,
       });
 
-      Alert.alert('Success', 'Task created successfully!', [
+      Alert.alert('Success', 'Gig created successfully!', [
         { text: 'OK', onPress: () => router.back() }
       ]);
     } catch (error: any) {
@@ -152,9 +152,19 @@ export default function CreateTaskScreen() {
   return (
     <SafeAreaView style={[styles.container, containerStyle]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <Text style={[styles.title, titleStyle]}>Create New Task</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, titleStyle]}>Create New Gig</Text>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.cancelButton}
+          >
+            <Text style={[styles.cancelButtonText, isDark && styles.cancelButtonTextDark]}>
+              Cancel
+            </Text>
+          </Pressable>
+        </View>
         <Text style={[styles.subtitle, subtitleStyle]}>
-          Post a task for teens in your neighborhood
+          Post a gig for teens in your neighborhood
         </Text>
 
         <Controller
@@ -187,7 +197,7 @@ export default function CreateTaskScreen() {
                   value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
-                  placeholder="Describe the task in detail..."
+                  placeholder="Describe the gig in detail..."
                   placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
                   multiline
                   numberOfLines={4}
@@ -306,7 +316,7 @@ export default function CreateTaskScreen() {
         </View>
 
         <Button
-          title="Create Task"
+          title="Create Gig"
           onPress={handleSubmit(onSubmit)}
           loading={createTaskMutation.isPending}
           disabled={createTaskMutation.isPending || !location}
@@ -333,10 +343,28 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  cancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: '#73af17',
+    fontWeight: '500',
+  },
+  cancelButtonTextDark: {
+    color: '#73af17',
   },
   titleLight: {
     color: '#000000',

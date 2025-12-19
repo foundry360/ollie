@@ -201,7 +201,7 @@ export default function ProfileScreen() {
   const labelStyle = isDark ? styles.labelDark : styles.labelLight;
 
   return (
-    <SafeAreaView style={[styles.container, containerStyle]}>
+    <SafeAreaView style={[styles.container, containerStyle]} edges={['bottom', 'left', 'right']}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -266,7 +266,6 @@ export default function ProfileScreen() {
         <View style={[styles.section, cardStyle]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
-              <Ionicons name="person-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
               <Text style={[styles.sectionTitle, titleStyle]}>Account Info</Text>
             </View>
             <Pressable onPress={() => {
@@ -277,7 +276,7 @@ export default function ProfileScreen() {
                 phone: user?.phone || '',
               });
             }}>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
             </Pressable>
           </View>
 
@@ -298,14 +297,13 @@ export default function ProfileScreen() {
         <View style={[styles.section, cardStyle]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
-              <Ionicons name="location-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
               <Text style={[styles.sectionTitle, titleStyle]}>Location</Text>
             </View>
             <Pressable onPress={() => {
               setEditingSection('location');
               setLocationData(parseAddress(user?.address));
             }}>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
             </Pressable>
           </View>
 
@@ -338,14 +336,13 @@ export default function ProfileScreen() {
         <View style={[styles.section, cardStyle]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
-              <Ionicons name="document-text-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
               <Text style={[styles.sectionTitle, titleStyle]}>Bio</Text>
             </View>
             <Pressable onPress={() => {
               setEditingSection('bio');
               setBioData(user?.bio || '');
             }}>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
             </Pressable>
           </View>
 
@@ -357,7 +354,6 @@ export default function ProfileScreen() {
         <View style={[styles.section, cardStyle]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
-              <Ionicons name="checkmark-circle-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
               <Text style={[styles.sectionTitle, titleStyle]}>Gigs</Text>
             </View>
             <Pressable onPress={() => {
@@ -367,7 +363,7 @@ export default function ProfileScreen() {
                 availability: tasksData.availability,
               });
             }}>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
             </Pressable>
           </View>
 
@@ -393,7 +389,6 @@ export default function ProfileScreen() {
         <View style={[styles.section, cardStyle]}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
-              <Ionicons name="time-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
               <Text style={[styles.sectionTitle, titleStyle]}>Availability</Text>
             </View>
             <Pressable onPress={() => {
@@ -418,7 +413,7 @@ export default function ProfileScreen() {
                 });
               }
             }}>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
             </Pressable>
           </View>
 
@@ -949,13 +944,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingTop: 0,
+    paddingTop: 16,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
-    marginTop: 4,
+    marginTop: 0,
   },
   profileHeader: {
     flexDirection: 'row',

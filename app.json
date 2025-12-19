@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Ollie",
-    "slug": "Ollie",
+    "slug": "ollie",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,7 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.foundry360.ollie",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +26,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.foundry360.ollie"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,7 +35,15 @@
     "plugins": [
       "expo-router",
       "expo-video",
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      "expo-maps"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "19b6fc14-58c5-4f3d-a0bb-aa6981d4722e"
+      }
+    },
+    "owner": "foundry360"
   }
 }

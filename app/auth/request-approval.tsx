@@ -205,7 +205,7 @@ export default function RequestApprovalScreen() {
 
         <View style={styles.logoContainer}>
           <Image 
-            source={require('@/assets/logo.png')} 
+            source={isDark ? require('@/assets/logo.png') : require('@/assets/logo-dark.png')} 
             style={styles.logo}
             resizeMode="contain"
           />

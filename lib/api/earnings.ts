@@ -10,7 +10,7 @@ export interface EarningsSummary {
 
 export interface EarningsRecord {
   id: string;
-  task_id: string;
+  gig_id: string;
   task_title: string;
   amount: number;
   status: 'pending' | 'paid' | 'cancelled';
@@ -19,14 +19,27 @@ export interface EarningsRecord {
 }
 
 // Get earnings summary for a teen
-export async function getEarningsSummary(): Promise<EarningsSummary> {
+export async function getEarningsSummary(filters?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<EarningsSummary> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('earnings')
     .select('amount, status')
     .eq('teen_id', user.id);
+
+  if (filters?.startDate) {
+    query = query.gte('created_at', filters.startDate);
+  }
+
+  if (filters?.endDate) {
+    query = query.lte('created_at', filters.endDate);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -52,6 +65,8 @@ export async function getEarningsSummary(): Promise<EarningsSummary> {
 // Get earnings history
 export async function getEarningsHistory(filters?: {
   status?: 'pending' | 'paid' | 'cancelled';
+  startDate?: string; // ISO date string
+  endDate?: string; // ISO date string
   limit?: number;
   offset?: number;
 }): Promise<EarningsRecord[]> {
@@ -62,18 +77,26 @@ export async function getEarningsHistory(filters?: {
     .from('earnings')
     .select(`
       id,
-      task_id,
+      gig_id,
       amount,
       status,
       created_at,
       paid_at,
-      task:tasks!inner(id, title)
+      gigs(id, title)
     `)
     .eq('teen_id', user.id)
     .order('created_at', { ascending: false });
 
   if (filters?.status) {
     query = query.eq('status', filters.status);
+  }
+
+  if (filters?.startDate) {
+    query = query.gte('created_at', filters.startDate);
+  }
+
+  if (filters?.endDate) {
+    query = query.lte('created_at', filters.endDate);
   }
 
   if (filters?.limit) {
@@ -88,8 +111,8 @@ export async function getEarningsHistory(filters?: {
 
   return (data || []).map((item: any) => ({
     id: item.id,
-    task_id: item.task_id,
-    task_title: item.task?.title || 'Unknown Task',
+    gig_id: item.gig_id,
+    task_title: item.gigs?.title || 'Unknown Task',
     amount: parseFloat(item.amount.toString()),
     status: item.status,
     created_at: item.created_at,

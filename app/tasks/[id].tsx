@@ -155,9 +155,9 @@ export default function TaskDetailScreen() {
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {
       case 'open':
-        return '#10B981';
+        return '#73af17';
       case 'accepted':
-        return '#3B82F6';
+        return '#F97316';
       case 'in_progress':
         return '#F59E0B';
       case 'completed':
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 12,
     color: '#000000',
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   payAmount: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   section: {

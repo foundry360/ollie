@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const { user, setUser, loading, setLoading } = useAuthStore();
   const { colorScheme, initializeTheme } = useThemeStore();
+  const [isNavigating, setIsNavigating] = useState(false);
 
   useEffect(() => {
     // Initialize theme
@@ -271,13 +272,61 @@ export default function RootLayout() {
       }
       
       // Protect main app (tabs) - only allow if user is logged in
+      // BUT: Check for active session first - if session exists but no profile, check for pending application
       if (inTabs) {
-        if (!user) {
-          // User not logged in trying to access main app - redirect to splash
-          router.replace('/splash');
+        if (!user && !isNavigating) {
+          setIsNavigating(true);
+          // Check if there's an active session but no profile (neighbor signup in progress)
+          supabase.auth.getSession().then(async ({ data: { session } }) => {
+            if (session?.user) {
+              // User has session but no profile - check for pending application
+              try {
+                const application = await getNeighborApplicationByUserId(session.user.id);
+                if (application) {
+                  if (application.status === 'pending') {
+                    router.replace({
+                      pathname: '/auth/pending-neighbor-approval',
+                      params: { applicationId: application.id }
+                    });
+                    setIsNavigating(false);
+                    return;
+                  } else if (application.status === 'rejected') {
+                    router.replace({
+                      pathname: '/auth/neighbor-rejected',
+                      params: { 
+                        applicationId: application.id,
+                        reason: application.rejection_reason || 'No reason provided'
+                      }
+                    });
+                    setIsNavigating(false);
+                    return;
+                  }
+                }
+                // No application or approved - redirect to splash to complete signup
+                router.replace('/splash');
+                setIsNavigating(false);
+              } catch (appError) {
+                // No application found or error - redirect to splash
+                router.replace('/splash');
+                setIsNavigating(false);
+              }
+            } else {
+              // No session - redirect to splash
+              router.replace('/splash');
+              setIsNavigating(false);
+            }
+          });
         }
         // User is logged in and in tabs - allow access
+        if (user) {
+          setIsNavigating(false);
+        }
         return;
+      }
+      
+      // Reset navigating flag when not in tabs
+      if (!inTabs && isNavigating) {
+        setIsNavigating(false);
       }
       
       // For any other route, allow it (no restrictions)

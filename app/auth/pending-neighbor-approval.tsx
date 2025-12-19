@@ -98,7 +98,7 @@ export default function PendingNeighborApprovalScreen() {
         >
           <View style={styles.logoContainer}>
             <Image 
-              source={require('@/assets/logo.png')} 
+              source={isDark ? require('@/assets/logo.png') : require('@/assets/logo-dark.png')} 
               style={styles.logo}
               resizeMode="contain"
             />
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 12,
     textAlign: 'center',

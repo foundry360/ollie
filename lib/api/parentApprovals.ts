@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 export interface ParentApproval {
   id: string;
   teen_id: string;
-  task_id: string;
+  gig_id: string;
   task_title: string;
   parent_id: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -31,7 +31,7 @@ export async function getParentApprovals(): Promise<ParentApproval[]> {
   return (data || []).map((item: any) => ({
     id: item.id,
     teen_id: item.teen_id,
-    task_id: item.task_id,
+    gig_id: item.gig_id,
     task_title: item.task?.title || 'Unknown Task',
     parent_id: item.parent_id,
     status: item.status,

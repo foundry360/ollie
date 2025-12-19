@@ -252,7 +252,7 @@ export default function SignupAdultScreen() {
       setEmailError(undefined);
       setPhoneError(undefined);
       
-      // For other errors, show generic alert
+      // For other errors, show generic alert with more details
       let errorMessage = 'Failed to create account. Please try again.';
       
       if (error.message) {
@@ -260,10 +260,22 @@ export default function SignupAdultScreen() {
           errorMessage = 'An account with this email or phone already exists. Please log in instead.';
         } else if (error.message.includes('password')) {
           errorMessage = 'Password must be at least 8 characters long.';
+        } else if (error.message.includes('function') && error.message.includes('not found')) {
+          errorMessage = 'Database function not found. Please contact support.';
+        } else if (error.code === '42883') {
+          errorMessage = 'Database function not found. Please ensure all migrations have been run.';
         } else {
-          errorMessage = error.message;
+          // Show the actual error message for debugging
+          errorMessage = error.message || 'An unexpected error occurred. Please try again.';
         }
       }
+      
+      console.error('Signup error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
       
       Alert.alert('Signup Failed', errorMessage);
       setIsSubmitting(false);

@@ -10,9 +10,10 @@ interface ButtonProps {
   disabled?: boolean;
   className?: string;
   fullWidth?: boolean;
+  align?: 'left' | 'center' | 'right';
 }
 
-export function Button({ title, onPress, variant = 'primary', loading = false, disabled = false, className, fullWidth = false }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', loading = false, disabled = false, className, fullWidth = false, align = 'center' }: ButtonProps) {
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
   const buttonStyle = [
@@ -35,6 +36,13 @@ export function Button({ title, onPress, variant = 'primary', loading = false, d
     
     // Start with base button style
     styleArray.push(styles.button);
+    
+    // Apply alignment
+    if (align === 'left') {
+      styleArray.push(styles.alignLeft);
+    } else if (align === 'right') {
+      styleArray.push(styles.alignRight);
+    }
     
     // Apply variant background color
     if (variant === 'primary') {
@@ -98,6 +106,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 120,
+  },
+  alignLeft: {
+    alignItems: 'flex-start',
+    paddingLeft: 0,
+  },
+  alignRight: {
+    alignItems: 'flex-end',
+    paddingRight: 0,
   },
   primary: {
     backgroundColor: '#73af17',

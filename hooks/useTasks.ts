@@ -13,12 +13,18 @@ import {
   getActiveTask,
   getUpcomingTasks,
   getTasksNearUser,
+  saveGig,
+  unsaveGig,
+  isGigSaved,
+  getSavedGigs,
   CreateTaskData,
   UpdateTaskData,
   type UpcomingTask,
   type TaskWithDistance,
 } from '@/lib/api/tasks';
 import { Task, TaskStatus } from '@/types';
+import { teenStatsKeys } from '@/hooks/useTeenStats';
+import { activityKeys } from '@/hooks/useRecentActivity';
 
 // Query keys
 export const taskKeys = {
@@ -34,6 +40,8 @@ export function useOpenTasks(filters?: {
   minPay?: number;
   maxPay?: number;
   skills?: string[];
+  radius?: number;
+  userLocation?: { latitude: number; longitude: number };
   limit?: number;
   offset?: number;
 }) {
@@ -106,6 +114,7 @@ export function useAcceptTask() {
       queryClient.setQueryData(taskKeys.detail(data.id), data);
       queryClient.invalidateQueries({ queryKey: taskKeys.open() });
       queryClient.invalidateQueries({ queryKey: taskKeys.user() });
+      queryClient.invalidateQueries({ queryKey: teenStatsKeys.all });
     },
   });
 }
@@ -119,6 +128,7 @@ export function useStartTask() {
     onSuccess: (data) => {
       queryClient.setQueryData(taskKeys.detail(data.id), data);
       queryClient.invalidateQueries({ queryKey: taskKeys.user() });
+      queryClient.invalidateQueries({ queryKey: teenStatsKeys.all });
     },
   });
 }
@@ -133,6 +143,8 @@ export function useCompleteTask() {
       queryClient.setQueryData(taskKeys.detail(data.id), data);
       queryClient.invalidateQueries({ queryKey: taskKeys.user() });
       queryClient.invalidateQueries({ queryKey: ['earnings'] });
+      queryClient.invalidateQueries({ queryKey: teenStatsKeys.all });
+      queryClient.invalidateQueries({ queryKey: activityKeys.all });
     },
   });
 }
@@ -147,6 +159,7 @@ export function useCancelTask() {
       queryClient.setQueryData(taskKeys.detail(data.id), data);
       queryClient.invalidateQueries({ queryKey: taskKeys.open() });
       queryClient.invalidateQueries({ queryKey: taskKeys.user() });
+      queryClient.invalidateQueries({ queryKey: teenStatsKeys.all });
     },
   });
 }
@@ -192,5 +205,50 @@ export function useTasksNearUser(
     queryFn: () => userLocation ? getTasksNearUser(userLocation, limit) : Promise.resolve([]),
     enabled: !!userLocation,
     staleTime: 60000,
+  });
+}
+
+// Check if a gig is saved
+export function useIsGigSaved(gigId: string | null) {
+  return useQuery<boolean>({
+    queryKey: [...taskKeys.detail(gigId || ''), 'saved'],
+    queryFn: () => isGigSaved(gigId!),
+    enabled: !!gigId,
+    staleTime: 30000,
+  });
+}
+
+// Save gig mutation
+export function useSaveGig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (gigId: string) => saveGig(gigId),
+    onSuccess: (_, gigId) => {
+      queryClient.invalidateQueries({ queryKey: [...taskKeys.detail(gigId), 'saved'] });
+      queryClient.invalidateQueries({ queryKey: ['savedGigs'] });
+    },
+  });
+}
+
+// Unsave gig mutation
+export function useUnsaveGig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (gigId: string) => unsaveGig(gigId),
+    onSuccess: (_, gigId) => {
+      queryClient.invalidateQueries({ queryKey: [...taskKeys.detail(gigId), 'saved'] });
+      queryClient.invalidateQueries({ queryKey: ['savedGigs'] });
+    },
+  });
+}
+
+// Get saved gigs for the current user
+export function useSavedGigs() {
+  return useQuery<Task[]>({
+    queryKey: ['savedGigs'],
+    queryFn: getSavedGigs,
+    staleTime: 30000, // 30 seconds
   });
 }

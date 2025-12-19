@@ -257,7 +257,7 @@ export default function NeighborApplicationScreen() {
 
           <View style={styles.logoContainer}>
             <Image 
-              source={require('@/assets/logo.png')} 
+              source={isDark ? require('@/assets/logo.png') : require('@/assets/logo-dark.png')} 
               style={styles.logo}
               resizeMode="contain"
             />
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     height: 120,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
     textAlign: 'center',

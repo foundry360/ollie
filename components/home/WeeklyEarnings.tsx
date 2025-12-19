@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#A8D574',
     borderRadius: 4,
     minHeight: 2,
   },
@@ -162,4 +162,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 });
+
+
+
+
 

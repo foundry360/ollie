@@ -405,7 +405,7 @@ export default function LoginScreen() {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={[styles.welcomeText, titleStyle]}>Welcome back{lastEmail ? `, ${lastEmail}!` : '!'}</Text>
+          <Text style={[styles.welcomeText, isDark ? styles.welcomeTextDark : styles.welcomeTextLight]}>Welcome back{lastEmail ? `, ${lastEmail}!` : '!'}</Text>
         </View>
 
         {!showEmailField && lastEmail && (
@@ -416,7 +416,7 @@ export default function LoginScreen() {
               reset({ email: '', password: '' });
             }}
           >
-            <Text style={[styles.notMeText, linkTextStyle]}>This is not me</Text>
+            <Text style={[styles.notMeText, linkTextStyle]}>(This is not me)</Text>
           </Pressable>
         )}
 
@@ -524,13 +524,19 @@ const styles = StyleSheet.create({
     height: 120,
   },
   welcomeText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
     marginTop: 16,
     textAlign: 'center',
   },
+  welcomeTextLight: {
+    color: '#000000',
+  },
+  welcomeTextDark: {
+    color: '#FFFFFF',
+  },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 12,
   },

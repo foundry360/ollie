@@ -7,6 +7,8 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { Loading } from '@/components/ui/Loading';
+import { GigDetailModal } from '@/components/tasks/GigDetailModal';
+import { DateFilter, DateFilterOption } from '@/components/earnings/DateFilter';
 
 export default function EarningsScreen() {
   const { user } = useAuthStore();
@@ -20,16 +22,88 @@ export default function EarningsScreen() {
   }, [insets.top, insets.bottom]);
   // #endregion
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid'>('all');
+  const [dateFilter, setDateFilter] = useState<DateFilterOption>('all-time');
+  const [selectedGigId, setSelectedGigId] = useState<string | null>(null);
+  const [showGigModal, setShowGigModal] = useState(false);
 
-  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useEarningsSummary();
+  // Calculate date range based on filter
+  const getDateRange = (filter: typeof dateFilter): { startDate?: string; endDate?: string } => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (filter) {
+      case 'this-week': {
+        // Get Monday of this week (day 0 = Sunday, so we adjust)
+        const dayOfWeek = today.getDay();
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const start = new Date(today);
+        start.setDate(today.getDate() - daysFromMonday);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: start.toISOString(), endDate: end.toISOString() };
+      }
+      case 'last-week': {
+        // Get Monday of last week
+        const dayOfWeek = today.getDay();
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const end = new Date(today);
+        end.setDate(today.getDate() - daysFromMonday - 1);
+        end.setHours(23, 59, 59, 999);
+        const start = new Date(end);
+        start.setDate(end.getDate() - 6);
+        start.setHours(0, 0, 0, 0);
+        return { startDate: start.toISOString(), endDate: end.toISOString() };
+      }
+      case 'this-month': {
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: start.toISOString(), endDate: end.toISOString() };
+      }
+      case 'last-month': {
+        const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(today.getFullYear(), today.getMonth(), 0);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: start.toISOString(), endDate: end.toISOString() };
+      }
+      case 'last-6-months': {
+        const start = new Date(today);
+        start.setMonth(today.getMonth() - 6);
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: start.toISOString(), endDate: end.toISOString() };
+      }
+      case 'last-year': {
+        const start = new Date(today);
+        start.setFullYear(today.getFullYear() - 1);
+        start.setMonth(0, 1);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+        return { startDate: start.toISOString(), endDate: end.toISOString() };
+      }
+      case 'all-time':
+      default:
+        return {};
+    }
+  };
+
+  const dateRange = getDateRange(dateFilter);
+  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useEarningsSummary(dateRange);
   const {
     data: history = [],
     isLoading: historyLoading,
     isRefetching,
     refetch: refetchHistory,
-  } = useEarningsHistory(
-    statusFilter === 'all' ? undefined : { status: statusFilter }
-  );
+  } = useEarningsHistory({
+    ...(statusFilter === 'all' ? {} : { status: statusFilter }),
+    ...dateRange,
+  });
 
   const handleRefresh = () => {
     refetchSummary();
@@ -58,42 +132,57 @@ export default function EarningsScreen() {
     );
   }
 
+  const handleEarningPress = (gigId: string) => {
+    setSelectedGigId(gigId);
+    setShowGigModal(true);
+  };
+
+  const handleCloseGigModal = () => {
+    setShowGigModal(false);
+    setSelectedGigId(null);
+  };
+
   const renderEarningItem = ({ item }: { item: any }) => (
-    <View style={[styles.earningItem, cardStyle]}>
-      <View style={styles.earningHeader}>
-        <View style={styles.earningInfo}>
-          <Text style={[styles.earningTitle, titleStyle]} numberOfLines={1}>
-            {item.task_title}
-          </Text>
-          <Text style={[styles.earningDate, labelStyle]}>
-            {format(new Date(item.created_at), 'MMM d, yyyy')}
-          </Text>
-        </View>
-        <View style={styles.earningAmount}>
-          <Text style={[styles.amountText, titleStyle]}>${item.amount.toFixed(2)}</Text>
-          <View
-            style={[
-              styles.statusBadge,
-              item.status === 'paid' && styles.statusBadgePaid,
-              item.status === 'pending' && styles.statusBadgePending,
-            ]}
-          >
-            <Text style={styles.statusText}>
-              {item.status === 'paid' ? 'Paid' : 'Pending'}
+    <Pressable
+      onPress={() => handleEarningPress(item.gig_id)}
+      android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
+    >
+      <View style={[styles.earningItem, cardStyle]}>
+        <View style={styles.earningHeader}>
+          <View style={styles.earningInfo}>
+            <Text style={[styles.earningTitle, titleStyle]} numberOfLines={1}>
+              {item.task_title}
+            </Text>
+            <Text style={[styles.earningDate, labelStyle]}>
+              {format(new Date(item.created_at), 'MMM d, yyyy')}
             </Text>
           </View>
+          <View style={styles.earningAmount}>
+            <Text style={[styles.amountText, titleStyle]}>${item.amount.toFixed(2)}</Text>
+            <View
+              style={[
+                styles.statusBadge,
+                item.status === 'paid' && styles.statusBadgePaid,
+                item.status === 'pending' && styles.statusBadgePending,
+              ]}
+            >
+              <Text style={styles.statusText}>
+                {item.status === 'paid' ? 'Paid' : 'Pending'}
+              </Text>
+            </View>
+          </View>
         </View>
+        {item.paid_at && (
+          <Text style={[styles.paidDate, labelStyle]}>
+            Paid on {format(new Date(item.paid_at), 'MMM d, yyyy')}
+          </Text>
+        )}
       </View>
-      {item.paid_at && (
-        <Text style={[styles.paidDate, labelStyle]}>
-          Paid on {format(new Date(item.paid_at), 'MMM d, yyyy')}
-        </Text>
-      )}
-    </View>
+    </Pressable>
   );
 
   return (
-    <SafeAreaView style={[styles.container, containerStyle]}>
+    <SafeAreaView style={[styles.container, containerStyle]} edges={['bottom', 'left', 'right']}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -109,8 +198,12 @@ export default function EarningsScreen() {
           <Loading />
         ) : (
           <>
+            <Text style={[styles.screenTitle, titleStyle]}>Wallet</Text>
             <View style={styles.summarySection}>
-              <Text style={[styles.sectionTitle, titleStyle]}>Wallet Summary</Text>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, titleStyle]}>Earnings Summary</Text>
+                <DateFilter value={dateFilter} onChange={setDateFilter} />
+              </View>
               <View style={styles.summaryGrid}>
                 <View style={[styles.summaryCard, cardStyle]}>
                   <Ionicons name="cash" size={32} color="#73af17" />
@@ -127,14 +220,14 @@ export default function EarningsScreen() {
                   </Text>
                 </View>
                 <View style={[styles.summaryCard, cardStyle]}>
-                  <Ionicons name="checkmark-circle" size={32} color={isDark ? '#10B981' : '#10B981'} />
+                  <Ionicons name="checkmark-circle" size={32} color="#73af17" />
                   <Text style={[styles.summaryLabel, labelStyle]}>Paid</Text>
                   <Text style={[styles.summaryValue, titleStyle]}>
                     ${summary?.paid_earnings.toFixed(2) || '0.00'}
                   </Text>
                 </View>
                 <View style={[styles.summaryCard, cardStyle]}>
-                  <Ionicons name="list" size={32} color={isDark ? '#8B5CF6' : '#8B5CF6'} />
+                  <Ionicons name="briefcase-outline" size={32} color="#F59E0B" />
                   <Text style={[styles.summaryLabel, labelStyle]}>Gigs</Text>
                   <Text style={[styles.summaryValue, titleStyle]}>
                     {summary?.completed_tasks || 0}
@@ -145,6 +238,8 @@ export default function EarningsScreen() {
 
             <View style={styles.filtersSection}>
               <Text style={[styles.sectionTitle, titleStyle]}>History</Text>
+              
+              {/* Status Filter */}
               <View style={styles.filters}>
                 <View
                   style={[
@@ -231,6 +326,11 @@ export default function EarningsScreen() {
           </>
         )}
       </ScrollView>
+      <GigDetailModal
+        visible={showGigModal}
+        taskId={selectedGigId}
+        onClose={handleCloseGigModal}
+      />
     </SafeAreaView>
   );
 }
@@ -252,14 +352,29 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 16,
   },
+  screenTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    marginTop: 0,
+  },
   summarySection: {
     marginBottom: 24,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     marginBottom: 16,
     marginTop: 0,
+    color: '#000000',
+  },
+  titleLight: {
     color: '#000000',
   },
   titleDark: {
@@ -417,7 +532,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   errorText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 8,

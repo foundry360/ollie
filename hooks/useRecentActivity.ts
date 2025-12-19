@@ -11,6 +11,11 @@ export function useRecentActivity(limit: number = 5) {
     queryKey: activityKeys.recent(limit),
     queryFn: () => getRecentActivity(limit),
     staleTime: 30000, // 30 seconds
+    refetchOnMount: true,
   });
 }
+
+
+
+
 

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { useUserTasks } from '@/hooks/useTasks';
 import { useAuthStore } from '@/stores/authStore';
 import { Task, TaskStatus } from '@/types';
 import { TaskCard } from '@/components/tasks/TaskCard';
+import { CreateGigModal } from '@/components/tasks/CreateGigModal';
+import { GigDetailModal } from '@/components/tasks/GigDetailModal';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -19,11 +20,13 @@ const STATUS_FILTERS: { label: string; value: TaskStatus | 'all' }[] = [
 ];
 
 export default function TasksScreen() {
-  const router = useRouter();
   const { user } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const role = user?.role === 'poster' ? 'poster' : 'teen';
 
@@ -45,26 +48,36 @@ export default function TasksScreen() {
     refetch();
   };
 
+  const handleGigPress = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setShowDetailModal(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedTaskId(null);
+  };
+
   const renderTask = ({ item }: { item: Task }) => (
-    <TaskCard task={item} />
+    <TaskCard task={item} onPress={handleGigPress} />
   );
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <Ionicons
-        name="list-outline"
+        name="briefcase-outline"
         size={64}
         color={isDark ? '#6B7280' : '#9CA3AF'}
       />
       <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>
-        {isLoading ? 'Loading tasks...' : 'No tasks found'}
+        {isLoading ? 'Loading gigs...' : 'No gigs found'}
       </Text>
       <Text style={[styles.emptySubtext, isDark && styles.emptySubtextDark]}>
         {isLoading
-          ? 'Please wait while we fetch your tasks'
+          ? 'Please wait while we fetch your gigs'
           : statusFilter === 'all'
-          ? 'You don\'t have any tasks yet'
-          : `You don't have any ${statusFilter.replace('_', ' ')} tasks`}
+          ? 'You don\'t have any gigs yet'
+          : `You don't have any ${statusFilter.replace('_', ' ')} gigs`}
       </Text>
     </View>
   );
@@ -92,24 +105,34 @@ export default function TasksScreen() {
       </View>
 
       <View style={[styles.filtersContainer, isDark && styles.filtersContainerDark]}>
-        <FlatList
-          horizontal
-          data={STATUS_FILTERS}
-          keyExtractor={(item) => item.value}
-          renderItem={({ item }) => {
-            const isActive = statusFilter === item.value;
-            return (
-              <Pressable
-                style={filterButtonStyle(isActive)}
-                onPress={() => setStatusFilter(item.value)}
-              >
-                <Text style={filterButtonTextStyle(isActive)}>{item.label}</Text>
-              </Pressable>
-            );
-          }}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
-        />
+        <View style={styles.filtersContent}>
+          {role === 'poster' && (
+            <Pressable
+              style={[styles.createButton, isDark && styles.createButtonDark]}
+              onPress={() => setShowCreateModal(true)}
+            >
+              <Ionicons name="add" size={24} color="#FFFFFF" />
+            </Pressable>
+          )}
+          <FlatList
+            horizontal
+            data={STATUS_FILTERS}
+            keyExtractor={(item) => item.value}
+            renderItem={({ item }) => {
+              const isActive = statusFilter === item.value;
+              return (
+                <Pressable
+                  style={filterButtonStyle(isActive)}
+                  onPress={() => setStatusFilter(item.value)}
+                >
+                  <Text style={filterButtonTextStyle(isActive)}>{item.label}</Text>
+                </Pressable>
+              );
+            }}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersListContent}
+          />
+        </View>
       </View>
 
       <FlatList
@@ -129,6 +152,15 @@ export default function TasksScreen() {
           />
         }
         showsVerticalScrollIndicator={false}
+      />
+      <CreateGigModal 
+        visible={showCreateModal} 
+        onClose={() => setShowCreateModal(false)} 
+      />
+      <GigDetailModal
+        visible={showDetailModal}
+        taskId={selectedTaskId}
+        onClose={handleCloseDetailModal}
       />
     </SafeAreaView>
   );
@@ -156,12 +188,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
   },
   headerTitleDark: {
     color: '#FFFFFF',
+  },
+  createButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#73af17',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  createButtonDark: {
+    backgroundColor: '#73af17',
   },
   filtersContainer: {
     paddingVertical: 12,
@@ -175,6 +219,11 @@ const styles = StyleSheet.create({
   },
   filtersContent: {
     paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filtersListContent: {
     gap: 8,
   },
   filterButton: {

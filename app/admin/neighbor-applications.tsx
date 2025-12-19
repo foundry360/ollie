@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#374151',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
   },

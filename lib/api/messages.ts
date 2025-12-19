@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Message } from '@/types';
 
 export interface CreateMessageData {
-  task_id: string;
+  gig_id: string;
   recipient_id: string;
   content: string;
 }
@@ -34,7 +34,7 @@ export async function getTaskMessages(taskId: string): Promise<Message[]> {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
-    .eq('task_id', taskId)
+    .eq('gig_id', taskId)
     .order('created_at', { ascending: true });
 
   if (error) throw error;
@@ -43,7 +43,7 @@ export async function getTaskMessages(taskId: string): Promise<Message[]> {
 
 // Get conversations (grouped by task)
 export async function getConversations(): Promise<Array<{
-  task_id: string;
+  gig_id: string;
   task_title: string;
   other_user_id: string;
   other_user_name: string;
@@ -58,7 +58,7 @@ export async function getConversations(): Promise<Array<{
     .from('messages')
     .select(`
       *,
-      task:tasks!inner(id, title, poster_id, teen_id)
+      task:gigs!inner(id, title, poster_id, teen_id)
     `)
     .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
     .order('created_at', { ascending: false });
@@ -67,7 +67,7 @@ export async function getConversations(): Promise<Array<{
 
   // Group by task_id
   const conversationsMap = new Map<string, {
-    task_id: string;
+    gig_id: string;
     task_title: string;
     other_user_id: string;
     other_user_name: string;
@@ -91,7 +91,7 @@ export async function getConversations(): Promise<Array<{
         .single();
 
       conversationsMap.set(key, {
-        task_id: task.id,
+        gig_id: task.id,
         task_title: task.title,
         other_user_id: otherUserId,
         other_user_name: otherUser?.full_name || 'Unknown',
@@ -124,7 +124,7 @@ export async function markMessagesAsRead(taskId: string, senderId: string): Prom
   const { error } = await supabase
     .from('messages')
     .update({ read: true })
-    .eq('task_id', taskId)
+    .eq('gig_id', taskId)
     .eq('sender_id', senderId)
     .eq('recipient_id', user.id)
     .eq('read', false);

@@ -9,11 +9,13 @@ interface TaskFiltersProps {
     minPay?: number;
     maxPay?: number;
     skills?: string[];
+    radius?: number;
   };
   onFiltersChange: (filters: {
     minPay?: number;
     maxPay?: number;
     skills?: string[];
+    radius?: number;
   }) => void;
 }
 
@@ -30,6 +32,8 @@ const COMMON_SKILLS = [
   'Other',
 ];
 
+const RADIUS_OPTIONS = [25, 50, 75, 100, 150, 200];
+
 export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
@@ -42,7 +46,7 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
   };
 
   const clearFilters = () => {
-    const cleared = { minPay: undefined, maxPay: undefined, skills: [] };
+    const cleared = { minPay: undefined, maxPay: undefined, skills: [], radius: undefined };
     setLocalFilters(cleared);
     onFiltersChange(cleared);
     setShowModal(false);
@@ -56,7 +60,7 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
     setLocalFilters({ ...localFilters, skills: newSkills });
   };
 
-  const hasActiveFilters = filters.minPay || filters.maxPay || (filters.skills && filters.skills.length > 0);
+  const hasActiveFilters = filters.minPay || filters.maxPay || (filters.skills && filters.skills.length > 0) || filters.radius;
 
   const containerStyle = isDark ? styles.containerDark : styles.containerLight;
   const buttonStyle = isDark ? styles.buttonDark : styles.buttonLight;
@@ -71,19 +75,21 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
         onPress={() => setShowModal(true)}
       >
         <Ionicons
-          name="filter"
-          size={20}
-          color={hasActiveFilters ? '#FFFFFF' : (isDark ? '#D1D5DB' : '#374151')}
+          name="options"
+          size={18}
+          color={hasActiveFilters ? '#73af17' : (isDark ? '#D1D5DB' : '#374151')}
         />
-        <Text style={[styles.filterButtonText, hasActiveFilters && styles.filterButtonTextActive]}>
-          Filters
-        </Text>
-        {hasActiveFilters && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {(filters.skills?.length || 0) + (filters.minPay ? 1 : 0) + (filters.maxPay ? 1 : 0)}
-            </Text>
-          </View>
+        {hasActiveFilters ? (
+          <Text style={[styles.filterButtonText, { color: '#73af17' }]}>
+            {(() => {
+              const filterCount = (filters.skills?.length || 0) + (filters.minPay ? 1 : 0) + (filters.maxPay ? 1 : 0) + (filters.radius ? 1 : 0);
+              return `${filterCount} ${filterCount === 1 ? 'filter' : 'filters'}`;
+            })()}
+          </Text>
+        ) : (
+          <Text style={[styles.filterButtonText, buttonTextStyle]}>
+            All
+          </Text>
         )}
       </Pressable>
 
@@ -130,6 +136,42 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
                       placeholder="1000"
                     />
                   </View>
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, titleStyle]}>Distance Radius</Text>
+                <View style={styles.radiusGrid}>
+                  {RADIUS_OPTIONS.map((radius) => {
+                    const isSelected = localFilters.radius === radius;
+                    return (
+                      <Pressable
+                        key={radius}
+                        style={[
+                          styles.radiusChip,
+                          isSelected && styles.radiusChipSelected,
+                          isDark && styles.radiusChipDark,
+                          isSelected && isDark && styles.radiusChipSelectedDark,
+                        ]}
+                        onPress={() => {
+                          setLocalFilters({ 
+                            ...localFilters, 
+                            radius: isSelected ? undefined : radius 
+                          });
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.radiusChipText,
+                            isSelected && styles.radiusChipTextSelected,
+                            isDark && !isSelected && styles.radiusChipTextDark,
+                          ]}
+                        >
+                          {radius} mi
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
 
@@ -190,23 +232,20 @@ const styles = StyleSheet.create({
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 36,
   },
   filterButtonActive: {
-    backgroundColor: '#73af17',
-    borderColor: '#73af17',
+    // No background or border when active
   },
   buttonLight: {
-    backgroundColor: '#F3F4F6',
-    borderColor: '#D1D5DB',
+    // No background or border
   },
   buttonDark: {
-    backgroundColor: '#374151',
-    borderColor: '#4B5563',
+    // No background or border
   },
   filterButtonText: {
     fontSize: 14,
@@ -215,6 +254,12 @@ const styles = StyleSheet.create({
   },
   filterButtonTextActive: {
     color: '#FFFFFF',
+  },
+  buttonTextLight: {
+    color: '#374151',
+  },
+  buttonTextDark: {
+    color: '#D1D5DB',
   },
   badge: {
     backgroundColor: '#FFFFFF',
@@ -316,6 +361,42 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   skillChipTextDark: {
+    color: '#D1D5DB',
+  },
+  radiusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  radiusChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F3F4F6',
+  },
+  radiusChipSelected: {
+    backgroundColor: '#73af17',
+    borderColor: '#73af17',
+  },
+  radiusChipDark: {
+    backgroundColor: '#374151',
+    borderColor: '#4B5563',
+  },
+  radiusChipSelectedDark: {
+    backgroundColor: '#73af17',
+    borderColor: '#73af17',
+  },
+  radiusChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  radiusChipTextSelected: {
+    color: '#FFFFFF',
+  },
+  radiusChipTextDark: {
     color: '#D1D5DB',
   },
   modalFooter: {

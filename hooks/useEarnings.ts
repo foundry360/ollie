@@ -4,15 +4,18 @@ import { getEarningsSummary, getEarningsHistory } from '@/lib/api/earnings';
 // Query keys
 export const earningsKeys = {
   all: ['earnings'] as const,
-  summary: () => [...earningsKeys.all, 'summary'] as const,
-  history: (filters?: { status?: string }) => [...earningsKeys.all, 'history', filters] as const,
+  summary: (filters?: { startDate?: string; endDate?: string }) => [...earningsKeys.all, 'summary', filters] as const,
+  history: (filters?: { status?: string; startDate?: string; endDate?: string }) => [...earningsKeys.all, 'history', filters] as const,
 };
 
 // Get earnings summary
-export function useEarningsSummary() {
+export function useEarningsSummary(filters?: {
+  startDate?: string;
+  endDate?: string;
+}) {
   return useQuery({
-    queryKey: earningsKeys.summary(),
-    queryFn: getEarningsSummary,
+    queryKey: earningsKeys.summary(filters),
+    queryFn: () => getEarningsSummary(filters),
     staleTime: 60000, // 1 minute
   });
 }
@@ -20,6 +23,8 @@ export function useEarningsSummary() {
 // Get earnings history
 export function useEarningsHistory(filters?: {
   status?: 'pending' | 'paid' | 'cancelled';
+  startDate?: string;
+  endDate?: string;
   limit?: number;
   offset?: number;
 }) {
