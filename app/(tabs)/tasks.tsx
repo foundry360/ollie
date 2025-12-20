@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserTasks } from '@/hooks/useTasks';
@@ -9,8 +9,19 @@ import { CreateGigModal } from '@/components/tasks/CreateGigModal';
 import { GigDetailModal } from '@/components/tasks/GigDetailModal';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
+import { useTeenApplications } from '@/hooks/useGigApplications';
 
-const STATUS_FILTERS: { label: string; value: TaskStatus | 'all' }[] = [
+const STATUS_FILTERS_TEEN: { label: string; value: TaskStatus | 'all' | 'applied' }[] = [
+  { label: 'All', value: 'all' },
+  { label: 'Applied', value: 'applied' },
+  { label: 'Open', value: 'open' },
+  { label: 'Accepted', value: 'accepted' },
+  { label: 'In Progress', value: 'in_progress' },
+  { label: 'Completed', value: 'completed' },
+  { label: 'Cancelled', value: 'cancelled' },
+];
+
+const STATUS_FILTERS_POSTER: { label: string; value: TaskStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
   { label: 'Open', value: 'open' },
   { label: 'Accepted', value: 'accepted' },
@@ -23,7 +34,7 @@ export default function TasksScreen() {
   const { user } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all' | 'applied'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -35,14 +46,90 @@ export default function TasksScreen() {
     fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/tasks.tsx:22',message:'TasksScreen mount',data:{role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
   }, [role]);
   // #endregion
-  const filters = statusFilter === 'all' ? { role } : { role, status: statusFilter };
 
+  // Reset filter if neighbor has 'applied' selected (not applicable to neighbors)
+  useEffect(() => {
+    if (role === 'poster' && statusFilter === 'applied') {
+      setStatusFilter('all');
+    }
+  }, [role, statusFilter]);
+
+  // Get teen applications if viewing applied gigs
+  const { data: teenApplications = [], isLoading: applicationsLoading } = useTeenApplications();
+  const appliedGigIds = useMemo(() => {
+    if (role === 'teen' && statusFilter === 'applied') {
+      return new Set(teenApplications.map(app => app.gig_id));
+    }
+    return new Set<string>();
+  }, [teenApplications, role, statusFilter]);
+
+  // Get all tasks for filtering (always fetch, filter client-side)
+  const allTasksFilters = { role };
   const {
-    data: tasks = [],
-    isLoading,
+    data: allTasks = [],
+    isLoading: allTasksLoading,
     isRefetching,
     refetch,
-  } = useUserTasks(filters);
+  } = useUserTasks(allTasksFilters);
+
+  // For applied filter, we need to fetch the actual gigs by their IDs
+  // Since applied gigs aren't assigned yet, they won't be in useUserTasks
+  // We'll use the gig data from applications and create Task-like objects for display
+  // Also need this for "All" filter to show applied gigs
+  const appliedTasks = useMemo(() => {
+    if (role === 'teen') {
+      // Map applications to Task-like objects for display
+      return teenApplications
+        .filter(app => app.status === 'pending' || app.status === 'approved')
+        .map(app => ({
+          id: app.gig_id,
+          title: app.gig_title || 'Unknown Gig',
+          description: app.gig_description || '',
+          pay: app.gig_pay || 0,
+          status: (app.status === 'approved' ? 'accepted' : 'open') as TaskStatus,
+          poster_id: '', // We don't have this in the application data
+          teen_id: app.status === 'approved' ? app.teen_id : null,
+          location: app.gig_location || { latitude: 0, longitude: 0 },
+          address: app.gig_address || '',
+          required_skills: app.gig_required_skills || [],
+          estimated_hours: app.gig_estimated_hours || null,
+          photos: app.gig_photos || [],
+          created_at: app.gig_created_at || app.created_at,
+          updated_at: app.gig_updated_at || app.updated_at,
+        })) as Task[];
+    }
+    return [];
+  }, [teenApplications, role]);
+
+  // Filter tasks based on selected filter
+  const tasks = useMemo(() => {
+    if (statusFilter === 'all') {
+      // For "All", combine assigned tasks with applied gigs (for teenlancers)
+      if (role === 'teen') {
+        // Combine assigned tasks with applied gigs, removing duplicates
+        const assignedTaskIds = new Set(allTasks.map(t => t.id));
+        const uniqueAppliedTasks = appliedTasks.filter(appTask => !assignedTaskIds.has(appTask.id));
+        return [...allTasks, ...uniqueAppliedTasks];
+      }
+      return allTasks;
+    } else if (statusFilter === 'applied') {
+      // For applied filter, show gigs from applications
+      return appliedTasks;
+    } else {
+      // For other status filters, use the standard filter
+      // Also include applied gigs that match the status (for teenlancers)
+      if (role === 'teen') {
+        const filteredAssigned = allTasks.filter(task => task.status === statusFilter);
+        const filteredApplied = appliedTasks.filter(task => task.status === statusFilter);
+        const assignedTaskIds = new Set(filteredAssigned.map(t => t.id));
+        const uniqueApplied = filteredApplied.filter(appTask => !assignedTaskIds.has(appTask.id));
+        return [...filteredAssigned, ...uniqueApplied];
+      }
+      return allTasks.filter(task => task.status === statusFilter);
+    }
+  }, [allTasks, statusFilter, appliedTasks, role]);
+
+  const isLoading = statusFilter === 'applied' ? applicationsLoading : allTasksLoading;
 
   const handleRefresh = () => {
     refetch();
@@ -76,7 +163,13 @@ export default function TasksScreen() {
         {isLoading
           ? 'Please wait while we fetch your gigs'
           : statusFilter === 'all'
-          ? 'You don\'t have any gigs yet'
+          ? role === 'poster' 
+            ? 'You haven\'t posted any gigs yet'
+            : 'You don\'t have any gigs yet'
+          : statusFilter === 'applied'
+          ? 'You haven\'t applied to any gigs yet'
+          : role === 'poster'
+          ? `You don't have any ${statusFilter.replace('_', ' ')} gigs posted`
           : `You don't have any ${statusFilter.replace('_', ' ')} gigs`}
       </Text>
     </View>
@@ -116,7 +209,7 @@ export default function TasksScreen() {
           )}
           <FlatList
             horizontal
-            data={STATUS_FILTERS}
+            data={role === 'poster' ? STATUS_FILTERS_POSTER : STATUS_FILTERS_TEEN}
             keyExtractor={(item) => item.value}
             renderItem={({ item }) => {
               const isActive = statusFilter === item.value;

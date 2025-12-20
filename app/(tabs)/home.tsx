@@ -140,8 +140,8 @@ export default function HomeScreen() {
             <HomeHeader />
             <ActiveTaskCard />
             <WeeklyEarnings />
-            <RecentActivity />
             <TasksNearYou />
+            <RecentActivity />
             <UpcomingTasks />
             <TipsCarousel />
           </>

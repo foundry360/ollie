@@ -1,8 +1,10 @@
-import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Task, TaskStatus } from '@/types';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsGigSaved, useSaveGig, useUnsaveGig } from '@/hooks/useTasks';
 
 interface TaskCardProps {
   task: Task;
@@ -12,7 +14,15 @@ interface TaskCardProps {
 export function TaskCard({ task, onPress }: TaskCardProps) {
   const router = useRouter();
   const { colorScheme } = useThemeStore();
+  const { user } = useAuthStore();
   const isDark = colorScheme === 'dark';
+  const isTeenlancer = user?.role === 'teen';
+  const isOpen = task.status === 'open';
+
+  // Check if gig is saved (only for teenlancers viewing open gigs)
+  const { data: isSaved = false } = useIsGigSaved(isTeenlancer && isOpen ? task.id : null);
+  const saveGigMutation = useSaveGig();
+  const unsaveGigMutation = useUnsaveGig();
 
   const handlePress = () => {
     if (onPress) {
@@ -21,6 +31,17 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
       router.push(`/tasks/${task.id}`);
     }
   };
+
+  const handleSavePress = (e: any) => {
+    e.stopPropagation(); // Prevent card press
+    if (isSaved) {
+      unsaveGigMutation.mutate(task.id);
+    } else {
+      saveGigMutation.mutate(task.id);
+    }
+  };
+
+  const canSave = isTeenlancer && isOpen;
 
   const cardStyle = isDark ? styles.cardDark : styles.cardLight;
   const titleStyle = isDark ? styles.titleDark : styles.titleLight;
@@ -99,21 +120,47 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
             <Ionicons name="cash" size={14} color="#73af17" />
             <Text style={[styles.metaText, metaStyle]}>${task.pay.toFixed(2)}</Text>
           </View>
+          {/* Status - dot and text only, no background */}
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDotInline, { backgroundColor: getStatusColor(task.status) }]} />
+            <Text style={[styles.statusTextInline, { color: getStatusColor(task.status) }, metaStyle]}>
+              {getStatusLabel(task.status)}
+            </Text>
+          </View>
         </View>
       </View>
 
       {/* Right side: Title, description, and address */}
       <View style={styles.content}>
-        <Text 
-          style={[
-            styles.title, 
-            titleStyle,
-            task.status === 'cancelled' && styles.titleCancelled
-          ]} 
-          numberOfLines={2}
-        >
-          {task.title}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text 
+            style={[
+              styles.title, 
+              titleStyle,
+              task.status === 'cancelled' && styles.titleCancelled
+            ]} 
+            numberOfLines={2}
+          >
+            {task.title}
+          </Text>
+          {canSave && (
+            <Pressable
+              onPress={handleSavePress}
+              style={styles.heartButton}
+              disabled={saveGigMutation.isPending || unsaveGigMutation.isPending}
+            >
+              {saveGigMutation.isPending || unsaveGigMutation.isPending ? (
+                <ActivityIndicator size="small" color="#F97316" />
+              ) : (
+                <Ionicons 
+                  name={isSaved ? "heart" : "heart-outline"} 
+                  size={20} 
+                  color="#F97316" 
+                />
+              )}
+            </Pressable>
+          )}
+        </View>
         <Text style={[
           styles.description, 
           descriptionStyle,
@@ -201,10 +248,21 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
   title: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
+    flex: 1,
+  },
+  heartButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   titleLight: {
     color: '#111827',
@@ -299,6 +357,22 @@ const styles = StyleSheet.create({
   },
   moreSkills: {
     fontSize: 12,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 2,
+  },
+  statusDotInline: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  statusTextInline: {
+    fontSize: 9,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
 });
 

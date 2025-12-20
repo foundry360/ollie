@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native';
-import { useTask, useAcceptTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig } from '@/hooks/useTasks';
+import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig } from '@/hooks/useTasks';
+import { applyForGig } from '@/lib/api/tasks';
 import { useAuthStore } from '@/stores/authStore';
 import { TaskStatus } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +15,7 @@ import { format } from 'date-fns';
 import { CreateGigModal } from '@/components/tasks/CreateGigModal';
 import { ProfileModal } from '@/components/profile/ProfileModal';
 import { getPublicUserProfile } from '@/lib/api/users';
+import { useGigApplications, useHasAppliedForGig, useApproveGigApplication, useRejectGigApplication } from '@/hooks/useGigApplications';
 
 interface GigDetailModalProps {
   visible: boolean;
@@ -28,16 +30,25 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const isDark = colorScheme === 'dark';
   const queryClient = useQueryClient();
   const { data: task, isLoading } = useTask(taskId || '');
-  const acceptTaskMutation = useAcceptTask();
   const startTaskMutation = useStartTask();
   const completeTaskMutation = useCompleteTask();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedTeenId, setSelectedTeenId] = useState<string | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
   
   // Check if gig is saved (only for teenlancers)
   const { data: isSaved = false } = useIsGigSaved(taskId);
   const saveGigMutation = useSaveGig();
   const unsaveGigMutation = useUnsaveGig();
+  
+  // Check if teen has already applied
+  const { data: hasApplied = false } = useHasAppliedForGig(taskId);
+  
+  // Get applications for this gig (for neighbors)
+  const { data: applications = [] } = useGigApplications(isNeighbor ? taskId : null);
+  const approveMutation = useApproveGigApplication();
+  const rejectMutation = useRejectGigApplication();
 
   // Fetch teenlancer profile if gig is assigned
   const { data: teenProfile } = useQuery({
@@ -52,35 +63,88 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const isTeenlancer = user?.role === 'teen';
   const isNeighbor = user?.role === 'poster';
   const isOpen = task?.status === 'open';
-  const canAccept = task && isOpen && !isPoster && !isTeen && isTeenlancer;
+  const canApply = task && isOpen && !isPoster && !isTeen && isTeenlancer && !hasApplied;
   const canStart = task && isTeen && task.status === 'accepted';
   const canComplete = task && isTeen && task.status === 'in_progress';
   const canEdit = task && isPoster && isNeighbor && ['open', 'cancelled'].includes(task.status);
   const canSave = task && isOpen && isTeenlancer && !isPoster && !isTeen;
+  const pendingApplications = applications.filter(app => app.status === 'pending');
 
-  const handleAccept = async () => {
+  const handleApply = async () => {
     if (!task) return;
     
     Alert.alert(
-      'Accept Gig',
-      `Are you sure you want to accept "${task.title}"?`,
+      'Apply for Gig',
+      `Are you sure you want to apply for "${task.title}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Accept',
+          text: 'Apply',
           onPress: async () => {
             try {
-              await acceptTaskMutation.mutateAsync(task.id);
+              setIsApplying(true);
+              await applyForGig(task.id);
               queryClient.invalidateQueries({ queryKey: ['tasks'] });
-              Alert.alert('Success', 'Gig accepted! Waiting for parent approval if required.', [
+              queryClient.invalidateQueries({ queryKey: ['gigApplications'] });
+              Alert.alert('Success', 'Application submitted! The neighbor will review your application.', [
                 { text: 'OK', onPress: onClose }
               ]);
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to accept gig');
+              Alert.alert('Error', error.message || 'Failed to apply for gig');
+            } finally {
+              setIsApplying(false);
             }
           },
         },
       ]
+    );
+  };
+
+  const handleApproveApplication = async (applicationId: string) => {
+    Alert.alert(
+      'Approve Application',
+      'Are you sure you want to approve this teenlancer for this gig?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          onPress: async () => {
+            try {
+              await approveMutation.mutateAsync(applicationId);
+              queryClient.invalidateQueries({ queryKey: ['tasks'] });
+              queryClient.invalidateQueries({ queryKey: ['gigApplications'] });
+              Alert.alert('Success', 'Application approved! The teenlancer has been assigned to this gig.');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to approve application');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRejectApplication = async (applicationId: string) => {
+    Alert.prompt(
+      'Reject Application',
+      'Enter a reason for rejection (optional):',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async (reason) => {
+            try {
+              await rejectMutation.mutateAsync({ applicationId, reason });
+              queryClient.invalidateQueries({ queryKey: ['tasks'] });
+              queryClient.invalidateQueries({ queryKey: ['gigApplications'] });
+              Alert.alert('Success', 'Application rejected.');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to reject application');
+            }
+          },
+        },
+      ],
+      'plain-text'
     );
   };
 
@@ -429,16 +493,93 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                   </Pressable>
                 </View>
 
+                {isNeighbor && isOpen && pendingApplications.length > 0 && (
+                  <View style={[styles.section, sectionStyle]}>
+                    <Text style={[styles.sectionTitle, titleStyle]}>Applications ({pendingApplications.length})</Text>
+                    {pendingApplications.map((application) => (
+                      <View key={application.id} style={[styles.applicationCard, isDark && styles.applicationCardDark]}>
+                        <Pressable
+                          style={styles.applicationHeader}
+                          onPress={() => {
+                            setSelectedTeenId(application.teen_id);
+                            setShowProfileModal(true);
+                          }}
+                        >
+                          <View style={styles.applicationTeenInfo}>
+                            {application.teen_photo ? (
+                              <Image
+                                source={{ uri: application.teen_photo }}
+                                style={styles.applicationAvatar}
+                              />
+                            ) : (
+                              <View style={[styles.applicationAvatarPlaceholder, isDark && styles.applicationAvatarPlaceholderDark]}>
+                                <Ionicons name="person" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                              </View>
+                            )}
+                            <View style={styles.applicationTeenDetails}>
+                              <Text style={[styles.applicationTeenName, textStyle]}>
+                                {application.teen_name || 'Unknown'}
+                              </Text>
+                              {application.teen_age && (
+                                <Text style={[styles.applicationTeenAge, labelStyle]}>
+                                  Age {application.teen_age}
+                                </Text>
+                              )}
+                            </View>
+                          </View>
+                          <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                        </Pressable>
+                        <View style={styles.applicationActions}>
+                          <Pressable
+                            style={[styles.approveButton, isDark && styles.approveButtonDark]}
+                            onPress={() => handleApproveApplication(application.id)}
+                            disabled={approveMutation.isPending}
+                          >
+                            {approveMutation.isPending ? (
+                              <ActivityIndicator size="small" color="#73af17" />
+                            ) : (
+                              <Text style={styles.approveButtonText}>Approve</Text>
+                            )}
+                          </Pressable>
+                          <Pressable
+                            style={[styles.rejectButton, isDark && styles.rejectButtonDark]}
+                            onPress={() => handleRejectApplication(application.id)}
+                            disabled={rejectMutation.isPending}
+                          >
+                            {rejectMutation.isPending ? (
+                              <ActivityIndicator size="small" color="#EF4444" />
+                            ) : (
+                              <Text style={[styles.rejectButtonText, isDark && styles.rejectButtonTextDark]}>Reject</Text>
+                            )}
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
                 <View style={styles.actions}>
-                  {(canSave || canAccept) && (
+                  {(canSave || canApply || hasApplied) && (
                     <View style={styles.actionRow}>
-                      {canAccept && (
+                      {canApply && (
                         <View style={styles.acceptButtonContainer}>
                           <View style={styles.acceptButtonWrapper}>
                             <Button
-                              title="Accept Gig"
-                              onPress={handleAccept}
-                              loading={acceptTaskMutation.isPending}
+                              title="Apply"
+                              onPress={handleApply}
+                              loading={isApplying}
+                              fullWidth
+                            />
+                          </View>
+                        </View>
+                      )}
+                      {hasApplied && (
+                        <View style={styles.acceptButtonContainer}>
+                          <View style={styles.acceptButtonWrapper}>
+                            <Button
+                              title="Applied"
+                              onPress={() => {}}
+                              disabled
                               fullWidth
                             />
                           </View>
@@ -510,8 +651,11 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
       />
       <ProfileModal
         visible={showProfileModal}
-        userId={task?.teen_id || null}
-        onClose={() => setShowProfileModal(false)}
+        userId={selectedTeenId || task?.teen_id || null}
+        onClose={() => {
+          setShowProfileModal(false);
+          setSelectedTeenId(null);
+        }}
       />
     </Modal>
   );
@@ -905,6 +1049,109 @@ const styles = StyleSheet.create({
   teenLabel: {
     fontSize: 12,
     color: '#6B7280',
+  },
+  applicationCard: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 12,
+  },
+  applicationCardDark: {
+    backgroundColor: '#111827',
+    borderColor: '#374151',
+  },
+  applicationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  applicationTeenInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  applicationAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#73af17',
+  },
+  applicationAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#73af17',
+  },
+  applicationAvatarPlaceholderDark: {
+    backgroundColor: '#374151',
+  },
+  applicationTeenDetails: {
+    flex: 1,
+  },
+  applicationTeenName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#000000',
+  },
+  applicationTeenAge: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  applicationActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  approveButton: {
+    flex: 1,
+    backgroundColor: '#73af17',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  approveButtonDark: {
+    backgroundColor: '#73af17',
+  },
+  approveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  rejectButton: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#EF4444',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  rejectButtonDark: {
+    backgroundColor: 'transparent',
+    borderColor: '#EF4444',
+  },
+  rejectButtonText: {
+    color: '#EF4444',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  rejectButtonTextDark: {
+    color: '#EF4444',
   },
 });
 

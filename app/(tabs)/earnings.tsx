@@ -132,7 +132,11 @@ export default function EarningsScreen() {
     );
   }
 
-  const handleEarningPress = (gigId: string) => {
+  const handleEarningPress = (gigId: string | null | undefined) => {
+    if (!gigId) {
+      console.warn('Cannot open gig details: gig_id is missing');
+      return;
+    }
     setSelectedGigId(gigId);
     setShowGigModal(true);
   };
@@ -142,11 +146,16 @@ export default function EarningsScreen() {
     setSelectedGigId(null);
   };
 
-  const renderEarningItem = ({ item }: { item: any }) => (
-    <Pressable
-      onPress={() => handleEarningPress(item.gig_id)}
-      android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
-    >
+  const renderEarningItem = ({ item }: { item: any }) => {
+    const hasGigId = !!item.gig_id;
+    
+    return (
+      <Pressable
+        onPress={() => hasGigId && handleEarningPress(item.gig_id)}
+        disabled={!hasGigId}
+        android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
+        style={!hasGigId && styles.earningItemDisabled}
+      >
       <View style={[styles.earningItem, cardStyle]}>
         <View style={styles.earningHeader}>
           <View style={styles.earningInfo}>
@@ -179,7 +188,8 @@ export default function EarningsScreen() {
         )}
       </View>
     </Pressable>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, containerStyle]} edges={['bottom', 'left', 'right']}>
@@ -224,13 +234,6 @@ export default function EarningsScreen() {
                   <Text style={[styles.summaryLabel, labelStyle]}>Paid</Text>
                   <Text style={[styles.summaryValue, titleStyle]}>
                     ${summary?.paid_earnings.toFixed(2) || '0.00'}
-                  </Text>
-                </View>
-                <View style={[styles.summaryCard, cardStyle]}>
-                  <Ionicons name="briefcase-outline" size={32} color="#F59E0B" />
-                  <Text style={[styles.summaryLabel, labelStyle]}>Gigs</Text>
-                  <Text style={[styles.summaryValue, titleStyle]}>
-                    {summary?.completed_tasks || 0}
                   </Text>
                 </View>
               </View>
@@ -309,9 +312,9 @@ export default function EarningsScreen() {
                     size={64}
                     color={isDark ? '#6B7280' : '#9CA3AF'}
                   />
-                  <Text style={[styles.emptyText, titleStyle]}>No earnings yet</Text>
+                  <Text style={[styles.emptyText, titleStyle]}>No payments received</Text>
                   <Text style={[styles.emptySubtext, textStyle]}>
-                    Complete tasks to start earning!
+                    Complete gigs to start earning!
                   </Text>
                 </View>
               ) : (
@@ -387,7 +390,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    minWidth: '45%',
+    minWidth: '30%',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -452,6 +455,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     backgroundColor: '#FFFFFF',
+  },
+  earningItemDisabled: {
+    opacity: 0.6,
   },
   earningHeader: {
     flexDirection: 'row',

@@ -435,25 +435,26 @@ export async function updateTask(taskId: string, data: UpdateTaskData): Promise<
   return updatedTask;
 }
 
-// Accept a task (teen)
-export async function acceptTask(taskId: string): Promise<Task> {
+// Apply for a gig (teen) - creates an application that needs neighbor approval
+export async function applyForGig(taskId: string): Promise<{ id: string; gig_id: string; teen_id: string; status: string; created_at: string; updated_at: string }> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  // Attempt to accept the gig using the database function (bypasses RLS)
-  const { data: acceptedGig, error: rpcError } = await supabase.rpc('accept_gig', {
+  // Attempt to apply for the gig using the database function (bypasses RLS)
+  const { data: application, error: rpcError } = await supabase.rpc('apply_for_gig', {
     p_gig_id: taskId,
   });
 
   if (rpcError) {
     // Log the full error for debugging
-    console.error('Accept gig RPC error:', rpcError);
+    console.error('Apply for gig RPC error:', rpcError);
     
     // If the error is a specific database exception (e.g., from RAISE EXCEPTION in the function)
     if (rpcError.message?.includes('Gig not found') || 
         rpcError.message?.includes('Gig is not available') ||
-        rpcError.message?.includes('Only teens can accept gigs') ||
-        rpcError.message?.includes('Failed to accept gig') ||
+        rpcError.message?.includes('Only teens can apply') ||
+        rpcError.message?.includes('already applied') ||
+        rpcError.message?.includes('cannot apply for your own gig') ||
         rpcError.message?.includes('User not authenticated')) {
       throw new Error(rpcError.message);
     }
@@ -461,26 +462,40 @@ export async function acceptTask(taskId: string): Promise<Task> {
     // If function not found, provide helpful error message
     if (rpcError.message?.includes('could not find') || 
         rpcError.message?.includes('function') && rpcError.message?.includes('does not exist')) {
-      throw new Error('Database function not found. Please ensure migration 022_allow_teens_to_accept_gigs.sql has been applied.');
+      throw new Error('Database function not found. Please ensure migration 027_create_gig_applications.sql has been applied.');
     }
     
     throw rpcError; // Re-throw other RPC errors
   }
 
-  if (!acceptedGig) {
-    throw new Error('Failed to accept gig through database function. Unknown error.');
+  if (!application) {
+    throw new Error('Failed to apply for gig through database function. Unknown error.');
   }
   
-  // The RPC function returns a table-like structure, so we need to ensure it matches our Task interface.
-  // Supabase RPC functions that return TABLE typically return an array
-  if (Array.isArray(acceptedGig) && acceptedGig.length > 0) {
-    return acceptedGig[0] as Task;
-  } else if (acceptedGig && typeof acceptedGig === 'object' && !Array.isArray(acceptedGig)) {
-    // If it returns a single object directly (depends on Supabase RPC return types)
-    return acceptedGig as Task;
+  // The RPC function returns a table-like structure
+  if (Array.isArray(application) && application.length > 0) {
+    return application[0] as { id: string; gig_id: string; teen_id: string; status: string; created_at: string; updated_at: string };
+  } else if (application && typeof application === 'object' && !Array.isArray(application)) {
+    return application as { id: string; gig_id: string; teen_id: string; status: string; created_at: string; updated_at: string };
   }
   
-  throw new Error('Failed to accept gig. Invalid response from database function.');
+  throw new Error('Failed to apply for gig. Invalid response from database function.');
+}
+
+// Legacy function name for backward compatibility - now calls applyForGig
+export async function acceptTask(taskId: string): Promise<Task> {
+  // Apply for the gig (creates application)
+  await applyForGig(taskId);
+  
+  // Return the gig (it will still be 'open' until neighbor approves)
+  const { data: gig, error } = await supabase
+    .from('gigs')
+    .select('*')
+    .eq('id', taskId)
+    .single();
+  
+  if (error) throw error;
+  return gig as Task;
 }
 
 // Start a task (teen)

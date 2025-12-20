@@ -6,7 +6,8 @@ import { Task } from '@/types';
 import { formatTimeAgo } from '@/lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 import { GigDetailModal } from '@/components/tasks/GigDetailModal';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { usePendingApplicationsForNeighbor } from '@/hooks/useGigApplications';
 
 export function NeighborActiveGigs() {
   const router = useRouter();
@@ -19,6 +20,19 @@ export function NeighborActiveGigs() {
   const { data: activeGigs = [], isLoading } = useUserTasks({
     role: 'poster',
   });
+
+  // Get pending applications for neighbor's gigs
+  const { data: pendingApplications = [] } = usePendingApplicationsForNeighbor();
+  
+  // Create a map of gig_id to application count
+  const applicationCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    pendingApplications.forEach(app => {
+      const current = counts.get(app.gig_id) || 0;
+      counts.set(app.gig_id, current + 1);
+    });
+    return counts;
+  }, [pendingApplications]);
 
   const filteredGigs = activeGigs.filter(
     gig => ['open', 'accepted', 'in_progress'].includes(gig.status)
@@ -136,12 +150,19 @@ export function NeighborActiveGigs() {
                     </Text>
                   </View>
                 </View>
-                {item.teen_id && (
-                  <View style={styles.assignedRow}>
-                    <Ionicons name="person" size={14} color="#73af17" />
-                    <Text style={[styles.assignedText, textStyle]}>Assigned</Text>
-                  </View>
-                )}
+                <View style={styles.applicationsRow}>
+                  {item.status === 'open' && applicationCounts.has(item.id) && (
+                    <Text style={[styles.applicationsText, textStyle]}>
+                      Applications ({applicationCounts.get(item.id)})
+                    </Text>
+                  )}
+                  {item.teen_id && (
+                    <View style={styles.assignedRow}>
+                      <Ionicons name="person" size={14} color="#F97316" />
+                      <Text style={[styles.assignedText, textStyle]}>Assigned</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </Pressable>
           ))}
@@ -268,6 +289,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 6,
   },
+  applicationsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  applicationsText: {
+    fontSize: 14,
+    color: '#73af17',
+    fontWeight: '500',
+  },
   assignedRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -275,7 +307,7 @@ const styles = StyleSheet.create({
   },
   assignedText: {
     fontSize: 14,
-    color: '#73af17',
+    color: '#F97316',
     fontWeight: '500',
   },
   statusDot: {
