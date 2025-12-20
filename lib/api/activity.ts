@@ -24,7 +24,7 @@ export async function getRecentActivity(limit: number = 5): Promise<Activity[]> 
   // Get completed tasks
   const { data: completedTasks, error: tasksError } = await supabase
     .from('gigs')
-    .select('id, title, updated_at')
+    .select('id, title, pay, updated_at')
     .eq('teen_id', user.id)
     .eq('status', 'completed')
     .order('updated_at', { ascending: false })
@@ -40,8 +40,8 @@ export async function getRecentActivity(limit: number = 5): Promise<Activity[]> 
       activities.push({
         id: `task-${task.id}`,
         type: 'task_completed',
-        title: 'Gig Completed',
-        description: task.title,
+        title: task.title,
+        description: `Completed for $${task.pay?.toFixed(2) || '0.00'}`,
         timestamp: task.updated_at,
         gig_id: task.id,
       });

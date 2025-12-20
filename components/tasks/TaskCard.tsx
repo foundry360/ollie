@@ -5,6 +5,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsGigSaved, useSaveGig, useUnsaveGig } from '@/hooks/useTasks';
+import { useGigApplications } from '@/hooks/useGigApplications';
 
 interface TaskCardProps {
   task: Task;
@@ -23,6 +24,10 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
   const { data: isSaved = false } = useIsGigSaved(isTeenlancer && isOpen ? task.id : null);
   const saveGigMutation = useSaveGig();
   const unsaveGigMutation = useUnsaveGig();
+
+  // Get application count for open gigs
+  const { data: applications = [] } = useGigApplications(isOpen ? task.id : null);
+  const applicationCount = isOpen ? (applications.filter(app => app.status === 'pending').length) : 0;
 
   const handlePress = () => {
     if (onPress) {
@@ -176,20 +181,32 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
             </Text>
           </View>
         </View>
-        {task.required_skills && task.required_skills.length > 0 && (
-          <View style={styles.skills}>
-            {task.required_skills.slice(0, 3).map((skill, index) => (
-              <View key={index} style={[styles.skillTag, isDark && styles.skillTagDark]}>
-                <Text style={[styles.skillText, isDark && styles.skillTextDark]}>{skill}</Text>
+        {(task.required_skills && task.required_skills.length > 0) || isOpen ? (
+          <View style={styles.skillsRow}>
+            {task.required_skills && task.required_skills.length > 0 && (
+              <View style={styles.skills}>
+                {task.required_skills.slice(0, 3).map((skill, index) => (
+                  <View key={index} style={[styles.skillTag, isDark && styles.skillTagDark]}>
+                    <Text style={[styles.skillText, isDark && styles.skillTextDark]}>{skill}</Text>
+                  </View>
+                ))}
+                {task.required_skills.length > 3 && (
+                  <Text style={[styles.moreSkills, metaStyle]}>
+                    +{task.required_skills.length - 3} more
+                  </Text>
+                )}
               </View>
-            ))}
-            {task.required_skills.length > 3 && (
-              <Text style={[styles.moreSkills, metaStyle]}>
-                +{task.required_skills.length - 3} more
-              </Text>
+            )}
+            {isOpen && (
+              <View style={styles.applicantRow}>
+                <Ionicons name="people" size={14} color="#73af17" />
+                <Text style={[styles.applicantText, metaStyle]}>
+                  Applicants ({applicationCount})
+                </Text>
+              </View>
             )}
           </View>
-        )}
+        ) : null}
       </View>
     </Pressable>
   );
@@ -332,11 +349,18 @@ const styles = StyleSheet.create({
   metaDark: {
     color: '#D1D5DB',
   },
+  skillsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
   skills: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     alignItems: 'center',
+    flex: 1,
   },
   skillTag: {
     backgroundColor: '#EFF6FF',
@@ -373,6 +397,16 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '600',
     textTransform: 'uppercase',
+  },
+  applicantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 'auto',
+  },
+  applicantText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 

@@ -372,6 +372,13 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                       </Text>
                     </View>
                   </View>
+                  {isOpen && (
+                    <View style={styles.applicantsRow}>
+                      <Text style={[styles.applicantsText, textStyle]}>
+                        Applicants ({pendingApplications.length})
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={[styles.section, sectionStyle]}>
@@ -783,7 +790,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 4,
     gap: 12,
   },
   payLeft: {
@@ -872,6 +879,16 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  applicantsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 0,
+  },
+  applicantsText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   label: {
     fontSize: 14,

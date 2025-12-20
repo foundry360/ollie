@@ -9,6 +9,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { format } from 'date-fns';
 import { AddReviewModal } from '@/components/reviews/AddReviewModal';
 import { useAuthStore } from '@/stores/authStore';
+import { formatAddress } from '@/lib/utils';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -105,6 +106,16 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
     const encodedAddress = encodeURIComponent(profile.address);
     const url = `https://maps.google.com/?q=${encodedAddress}`;
     Linking.openURL(url).catch(err => console.error('Failed to open maps:', err));
+  };
+
+  // Helper to convert 24-hour time to 12-hour format
+  const formatTime12Hour = (time24: string): string => {
+    if (!time24) return '';
+    const [hours, minutes] = time24.split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
   const containerStyle = isDark ? styles.containerDark : styles.containerLight;
@@ -216,6 +227,32 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                 </View>
               )}
 
+              {/* Available Hours */}
+              {profile.availability && (
+                <View style={[styles.section, cardStyle]}>
+                  <Text style={[styles.sectionTitle, titleStyle]}>Available Hours</Text>
+                  <View style={styles.availabilityContainer}>
+                    {Object.entries(profile.availability).map(([day, hours]) => {
+                      if (!hours || !hours.start || !hours.end) return null;
+                      const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                      return (
+                        <View key={day} style={styles.availabilityRow}>
+                          <Text style={[styles.availabilityDay, textStyle]}>{dayName}</Text>
+                          <Text style={[styles.availabilityTime, textStyle]}>
+                            {formatTime12Hour(hours.start)} - {formatTime12Hour(hours.end)}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                    {Object.values(profile.availability).every(h => !h || !h.start || !h.end) && (
+                      <Text style={[styles.noAvailabilityText, textStyle]}>
+                        No availability set
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+
               {/* Reviews from Neighbors */}
               <View style={[styles.section, cardStyle]}>
                 <Text style={[styles.sectionTitle, titleStyle]}>
@@ -287,8 +324,8 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                 )}
               </View>
 
-              {/* QR Code */}
-              {profileUrl && (
+              {/* QR Code - Only show to teenlancer themselves, not to neighbors */}
+              {profileUrl && !isNeighbor && (
                 <View style={[styles.section, cardStyle]}>
                   <Text style={[styles.sectionTitle, titleStyle]}>Scan to Hire</Text>
                   <View style={styles.qrContainer}>
@@ -318,7 +355,12 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                       color="#73af17" 
                       style={styles.locationIcon}
                     />
-                    <Text style={[styles.locationText, textStyle]}>{profile.address}</Text>
+                    <Text style={[styles.locationText, textStyle]}>
+                      {(() => {
+                        const { cityStateZip } = formatAddress(profile.address);
+                        return cityStateZip || profile.address;
+                      })()}
+                    </Text>
                     <Ionicons 
                       name="open-outline" 
                       size={16} 
@@ -689,5 +731,27 @@ const styles = StyleSheet.create({
   },
   containerLight: {
     backgroundColor: '#FFFFFF',
+  },
+  availabilityContainer: {
+    gap: 8,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  availabilityDay: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  availabilityTime: {
+    fontSize: 14,
+  },
+  noAvailabilityText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 8,
   },
 });

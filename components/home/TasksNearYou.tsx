@@ -4,10 +4,11 @@ import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
 import { formatTimeAgo } from '@/lib/utils';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as Location from 'expo-location';
 import { useTasksNearUser } from '@/hooks/useTasks';
 import { GigDetailModal } from '@/components/tasks/GigDetailModal';
+import { useGigApplicationCounts } from '@/hooks/useGigApplications';
 
 export function TasksNearYou() {
   const router = useRouter();
@@ -46,6 +47,13 @@ export function TasksNearYou() {
   }, []);
 
   const { data: tasks = [], isLoading, error: tasksError } = useTasksNearUser(userLocation, 10);
+
+  // Get application counts for open gigs
+  const openGigIds = useMemo(() => 
+    tasks.filter(t => t.status === 'open').map(t => t.id),
+    [tasks]
+  );
+  const { data: applicationCounts = new Map() } = useGigApplicationCounts(openGigIds);
 
   const handleSeeAll = () => {
     router.push('/(tabs)/'); // Navigate to marketplace
@@ -147,7 +155,7 @@ export function TasksNearYou() {
       <View style={styles.header}>
         <Text style={[styles.sectionTitle, titleStyle]}>Gigs Near You</Text>
         <Pressable onPress={handleSeeAll}>
-          <Text style={styles.seeAllText}>See All</Text>
+          <Text style={styles.seeAllText}>View All</Text>
         </Pressable>
       </View>
 
@@ -191,15 +199,27 @@ export function TasksNearYou() {
                   {formatTimeAgo(task.created_at)}
                 </Text>
               </View>
-              {task.required_skills && task.required_skills.length > 0 && (
-                <View style={styles.skillsContainer}>
-                  {task.required_skills.slice(0, 2).map((skill, idx) => (
-                    <View key={idx} style={[styles.skillTag, isDark && styles.skillTagDark]}>
-                      <Text style={[styles.skillText, isDark && styles.skillTextDark]}>
-                        {skill}
+              {((task.required_skills && task.required_skills.length > 0) || task.status === 'open') && (
+                <View style={styles.skillsRow}>
+                  {task.required_skills && task.required_skills.length > 0 && (
+                    <View style={styles.skillsContainer}>
+                      {task.required_skills.slice(0, 2).map((skill, idx) => (
+                        <View key={idx} style={[styles.skillTag, isDark && styles.skillTagDark]}>
+                          <Text style={[styles.skillText, isDark && styles.skillTextDark]}>
+                            {skill}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  {task.status === 'open' && (
+                    <View style={styles.applicantRow}>
+                      <Ionicons name="people" size={14} color="#73af17" />
+                      <Text style={[styles.applicantText, isDark && styles.applicantTextDark]}>
+                        Applicants ({applicationCounts.get(task.id) || 0})
                       </Text>
                     </View>
-                  ))}
+                  )}
                 </View>
               )}
             </View>
@@ -312,11 +332,18 @@ const styles = StyleSheet.create({
   textDark: {
     color: '#D1D5DB',
   },
+  skillsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
   skillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 8,
+    flex: 1,
   },
   skillTag: {
     backgroundColor: '#EFF6FF',
@@ -338,6 +365,20 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 10,
     color: '#6B7280',
+  },
+  applicantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 'auto',
+  },
+  applicantText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  applicantTextDark: {
+    color: '#D1D5DB',
   },
   emptyContainer: {
     alignItems: 'center',

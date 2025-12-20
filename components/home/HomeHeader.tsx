@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   greeting: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#000000',
   },

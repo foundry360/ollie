@@ -151,9 +151,9 @@ export function NeighborActiveGigs() {
                   </View>
                 </View>
                 <View style={styles.applicationsRow}>
-                  {item.status === 'open' && applicationCounts.has(item.id) && (
+                  {item.status === 'open' && (
                     <Text style={[styles.applicationsText, textStyle]}>
-                      Applications ({applicationCounts.get(item.id)})
+                      Applicants ({applicationCounts.get(item.id) || 0})
                     </Text>
                   )}
                   {item.teen_id && (
@@ -180,7 +180,7 @@ export function NeighborActiveGigs() {
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   containerLight: {
     backgroundColor: '#FFFFFF',
@@ -193,8 +193,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 8,
-    marginBottom: 12,
+    paddingTop: 4,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
@@ -230,18 +230,19 @@ const styles = StyleSheet.create({
     width: 100,
     flexDirection: 'column',
     backgroundColor: '#F0F9E8',
+    alignSelf: 'stretch',
   },
   leftSectionDark: {
     backgroundColor: '#111827',
   },
   image: {
     width: 100,
-    height: 100,
+    flex: 1,
     resizeMode: 'cover',
   },
   imagePlaceholder: {
     width: 100,
-    height: 100,
+    flex: 1,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -265,7 +266,7 @@ const styles = StyleSheet.create({
   gigTitle: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 4,
     color: '#000000',
   },
   headerRow: {
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   leftInfo: {
     flexDirection: 'row',
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 0,
   },
   applicationsText: {
     fontSize: 14,

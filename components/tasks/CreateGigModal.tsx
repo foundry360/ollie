@@ -12,9 +12,23 @@ import { normalizeAddress } from '@/lib/utils';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { TimeRangePicker } from '@/components/ui/TimeRangePicker';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
+
+const COMMON_SKILLS = [
+  'Yard Work',
+  'Pet Care',
+  'Babysitting',
+  'Tutoring',
+  'Cleaning',
+  'Moving',
+  'Tech Help',
+  'Cooking',
+  'Delivery',
+  'Other',
+];
 
 const createTaskSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -22,7 +36,7 @@ const createTaskSchema = z.object({
   pay: z.number().min(0.01, 'Pay must be greater than 0'),
   address: z.string().min(5, 'Please enter a valid address'),
   estimated_hours: z.number().min(0.5).optional(),
-  required_skills: z.array(z.string()).optional(),
+  required_skills: z.array(z.string()).min(1, 'At least one skill is required'),
   scheduled_date: z.date().optional(),
   scheduled_start_time: z.string().optional(),
   scheduled_end_time: z.string().optional(),
@@ -56,6 +70,7 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [scheduledStartTime, setScheduledStartTime] = useState<string>('');
   const [scheduledEndTime, setScheduledEndTime] = useState<string>('');
+  const [showSkillsModal, setShowSkillsModal] = useState(false);
 
   const { control, handleSubmit, formState: { errors }, setValue, reset, watch } = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
@@ -71,6 +86,8 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
       scheduled_end_time: undefined,
     },
   });
+
+  const selectedSkills = watch('required_skills') || [];
 
   // Reset or populate form when modal opens
   useEffect(() => {
@@ -380,6 +397,47 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
               )}
             />
 
+            {/* Required Skills */}
+            <View style={styles.skillsSection}>
+              <Text style={[styles.label, isDark && styles.labelDark]}>
+                Required Skills <Text style={styles.required}>*</Text>
+              </Text>
+              <Pressable
+                style={[styles.skillsButton, isDark && styles.skillsButtonDark]}
+                onPress={() => setShowSkillsModal(true)}
+              >
+                <Text style={[styles.skillsButtonText, isDark && styles.skillsButtonTextDark]}>
+                  {selectedSkills.length > 0 
+                    ? `${selectedSkills.length} skill${selectedSkills.length > 1 ? 's' : ''} selected`
+                    : 'Select skills'}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+              </Pressable>
+              {selectedSkills.length > 0 && (
+                <View style={styles.selectedSkillsContainer}>
+                  {selectedSkills.map((skill, index) => (
+                    <View key={index} style={[styles.skillChip, isDark && styles.skillChipDark]}>
+                      <Text style={[styles.skillChipText, isDark && styles.skillChipTextDark]}>
+                        {skill}
+                      </Text>
+                      <Pressable
+                        onPress={() => {
+                          const newSkills = selectedSkills.filter((_, i) => i !== index);
+                          setValue('required_skills', newSkills);
+                        }}
+                        style={styles.removeSkillButton}
+                      >
+                        <Ionicons name="close-circle" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {errors.required_skills && (
+                <Text style={styles.errorText}>{errors.required_skills.message}</Text>
+              )}
+            </View>
+
             <Controller
               control={control}
               name="pay"
@@ -644,12 +702,71 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
               title={isEditMode ? "Update Gig" : "Create Gig"}
               onPress={handleSubmit(onSubmit)}
               loading={isEditMode ? updateTaskMutation.isPending : createTaskMutation.isPending}
-              disabled={(isEditMode ? updateTaskMutation.isPending : createTaskMutation.isPending) || !location}
+              disabled={(isEditMode ? updateTaskMutation.isPending : createTaskMutation.isPending) || !location || selectedSkills.length === 0}
               fullWidth
             />
           </ScrollView>
         </View>
       </View>
+
+      {/* Skills Selection Bottom Modal */}
+      <BottomSheet
+        visible={showSkillsModal}
+        onClose={() => setShowSkillsModal(false)}
+        title="Select Required Skills"
+      >
+        <View style={styles.skillsModalContent}>
+          <Text style={[styles.skillsModalDescription, isDark && styles.skillsModalDescriptionDark]}>
+            Select at least one skill required for this gig
+          </Text>
+          <View style={styles.skillsGrid}>
+            {COMMON_SKILLS.map((skill) => {
+              const isSelected = selectedSkills.includes(skill);
+              return (
+                <Pressable
+                  key={skill}
+                  style={[
+                    styles.skillOptionChip,
+                    isSelected && styles.skillOptionChipSelected,
+                    isDark && styles.skillOptionChipDark,
+                    isSelected && isDark && styles.skillOptionChipSelectedDark,
+                  ]}
+                  onPress={() => {
+                    const newSkills = isSelected
+                      ? selectedSkills.filter(s => s !== skill)
+                      : [...selectedSkills, skill];
+                    setValue('required_skills', newSkills);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.skillOptionText,
+                      isSelected && styles.skillOptionTextSelected,
+                      isDark && !isSelected && styles.skillOptionTextDark,
+                    ]}
+                  >
+                    {skill}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={20} color="#73af17" />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+          <Button
+            title="Done"
+            onPress={() => {
+              if (selectedSkills.length === 0) {
+                Alert.alert('Skills Required', 'Please select at least one skill');
+                return;
+              }
+              setShowSkillsModal(false);
+            }}
+            fullWidth
+          />
+        </View>
+      </BottomSheet>
     </Modal>
   );
 }
@@ -909,6 +1026,113 @@ const styles = StyleSheet.create({
   },
   containerLight: {
     backgroundColor: '#FFFFFF',
+  },
+  skillsSection: {
+    marginBottom: 16,
+  },
+  skillsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+  },
+  skillsButtonDark: {
+    borderColor: '#4B5563',
+    backgroundColor: '#1F2937',
+  },
+  skillsButtonText: {
+    fontSize: 16,
+    color: '#111827',
+  },
+  skillsButtonTextDark: {
+    color: '#FFFFFF',
+  },
+  selectedSkillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  skillChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  skillChipDark: {
+    backgroundColor: '#1E3A8A',
+  },
+  skillChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#73af17',
+  },
+  skillChipTextDark: {
+    color: '#93C5FD',
+  },
+  removeSkillButton: {
+    marginLeft: 2,
+  },
+  skillsModalContent: {
+    gap: 16,
+  },
+  skillsModalDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  skillsModalDescriptionDark: {
+    color: '#9CA3AF',
+  },
+  skillsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  skillOptionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    minWidth: '45%',
+  },
+  skillOptionChipSelected: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#73af17',
+    borderWidth: 2,
+  },
+  skillOptionChipDark: {
+    backgroundColor: '#1F2937',
+    borderColor: '#4B5563',
+  },
+  skillOptionChipSelectedDark: {
+    backgroundColor: '#1F2937',
+    borderColor: '#73af17',
+  },
+  skillOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    flex: 1,
+  },
+  skillOptionTextSelected: {
+    color: '#73af17',
+  },
+  skillOptionTextDark: {
+    color: '#D1D5DB',
   },
 });
 

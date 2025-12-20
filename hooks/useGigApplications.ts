@@ -6,6 +6,7 @@ import {
   hasAppliedForGig,
   approveGigApplication,
   rejectGigApplication,
+  getGigApplicationCounts,
   type GigApplication,
 } from '@/lib/api/gigApplications';
 
@@ -84,5 +85,15 @@ export function useRejectGigApplication() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['gigs'] });
     },
+  });
+}
+
+// Get application counts for multiple gigs
+export function useGigApplicationCounts(gigIds: string[]) {
+  return useQuery<Map<string, number>>({
+    queryKey: [...gigApplicationKeys.all, 'counts', gigIds.sort().join(',')],
+    queryFn: () => getGigApplicationCounts(gigIds),
+    enabled: gigIds.length > 0,
+    staleTime: 30000, // 30 seconds
   });
 }

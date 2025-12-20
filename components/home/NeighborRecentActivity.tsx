@@ -104,7 +104,11 @@ export function NeighborRecentActivity() {
           {displayedGigs.map((gig) => (
             <Pressable
               key={gig.id}
-              style={[styles.activityItem, cardStyle]}
+              style={[
+                styles.activityItem, 
+                cardStyle,
+                activeTab === 'completed' && styles.activityItemNoBorder
+              ]}
               onPress={() => handleGigPress(gig.id)}
               android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
             >
@@ -223,6 +227,9 @@ const styles = StyleSheet.create({
   cardDark: {
     backgroundColor: '#1F2937',
     borderColor: '#374151',
+  },
+  activityItemNoBorder: {
+    borderWidth: 0,
   },
   timelineLeft: {
     alignItems: 'center',

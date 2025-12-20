@@ -166,6 +166,32 @@ export async function getTeenApplications(): Promise<GigApplication[]> {
   }));
 }
 
+// Get application counts for multiple gigs (for displaying on cards)
+export async function getGigApplicationCounts(gigIds: string[]): Promise<Map<string, number>> {
+  if (gigIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from('gig_applications')
+    .select('gig_id, status')
+    .in('gig_id', gigIds)
+    .eq('status', 'pending');
+
+  if (error) {
+    console.error('Error fetching application counts:', error);
+    return new Map();
+  }
+
+  const counts = new Map<string, number>();
+  gigIds.forEach(id => counts.set(id, 0));
+
+  (data || []).forEach((app: any) => {
+    const current = counts.get(app.gig_id) || 0;
+    counts.set(app.gig_id, current + 1);
+  });
+
+  return counts;
+}
+
 // Check if teen has already applied for a gig
 export async function hasAppliedForGig(gigId: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();

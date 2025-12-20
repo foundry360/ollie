@@ -129,7 +129,7 @@ export function NeighborUpcomingScheduledGigs() {
             />
             <Text style={[styles.emptyText, titleStyle]}>No upcoming gigs scheduled</Text>
             <Text style={[styles.emptySubtext, textStyle]}>
-              Gigs will appear here once they're assigned and scheduled
+              Gigs appear when assigned and scheduled
             </Text>
           </View>
         ) : (
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 4,
   },
   timeText: {
     fontSize: 14,
@@ -327,8 +327,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 16,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 0,
   },
   detailRow: {
     flexDirection: 'row',

@@ -6,6 +6,7 @@ import { formatTimeAgo } from '@/lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 import { Activity, ActivityType } from '@/lib/api/activity';
 import { useState } from 'react';
+import { GigDetailModal } from '@/components/tasks/GigDetailModal';
 
 export function RecentActivity() {
   const router = useRouter();
@@ -13,10 +14,24 @@ export function RecentActivity() {
   const isDark = colorScheme === 'dark';
   const { data: activities = [], isLoading } = useRecentActivity(10);
   const [activeTab, setActiveTab] = useState<'completed' | 'payments'>('payments');
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const handleViewAll = () => {
     // Navigate to activity history screen (to be created)
     router.push('/activity');
+  };
+
+  const handleGigPress = (gigId: string | undefined) => {
+    if (gigId) {
+      setSelectedTaskId(gigId);
+      setShowDetailModal(true);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowDetailModal(false);
+    setSelectedTaskId(null);
   };
 
   const getActivityIcon = (type: ActivityType): keyof typeof Ionicons.glyphMap => {
@@ -44,6 +59,7 @@ export function RecentActivity() {
   const containerStyle = isDark ? styles.containerDark : styles.containerLight;
   const titleStyle = isDark ? styles.titleDark : styles.titleLight;
   const textStyle = isDark ? styles.textDark : styles.textLight;
+  const cardStyle = isDark ? styles.cardDark : styles.cardLight;
 
   // Filter activities by type - only show completed gigs and payments
   const completedGigs = activities.filter(a => a.type === 'task_completed').slice(0, 5);
@@ -99,11 +115,43 @@ export function RecentActivity() {
           </Text>
         </View>
       ) : (
-        <View style={styles.timeline}>
+        <View style={activeTab === 'completed' ? styles.activitiesList : styles.timeline}>
           {displayedActivities.map((activity, index) => {
             const color = getActivityColor(activity.type);
             const isLast = index === displayedActivities.length - 1;
+            const cardStyle = isDark ? styles.cardDark : styles.cardLight;
 
+            // For completed gigs, use card layout like neighbor
+            if (activeTab === 'completed' && activity.type === 'task_completed') {
+              return (
+                <Pressable
+                  key={activity.id}
+                  style={[styles.activityItem, cardStyle, styles.activityItemNoBorder]}
+                  onPress={() => handleGigPress(activity.gig_id)}
+                  android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
+                >
+                  <View style={styles.timelineLeft}>
+                    <Ionicons name="checkmark-circle" size={24} color={color} />
+                    {activity !== displayedActivities[displayedActivities.length - 1] && (
+                      <View style={[styles.timelineLine, isDark && styles.timelineLineDark]} />
+                    )}
+                  </View>
+                  <View style={styles.activityContent}>
+                    <Text style={[styles.activityTitle, titleStyle]} numberOfLines={1}>
+                      {activity.title}
+                    </Text>
+                    <Text style={[styles.activityDescription, textStyle]}>
+                      {activity.description}
+                    </Text>
+                    <Text style={[styles.activityTime, textStyle]}>
+                      {formatTimeAgo(activity.timestamp)}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            }
+
+            // For payments, keep timeline layout
             return (
               <View key={activity.id} style={styles.timelineItem}>
                 <View style={styles.timelineLeft}>
@@ -133,6 +181,11 @@ export function RecentActivity() {
           })}
         </View>
       )}
+      <GigDetailModal
+        visible={showDetailModal}
+        taskId={selectedTaskId}
+        onClose={handleCloseModal}
+      />
     </View>
   );
 }
@@ -208,8 +261,8 @@ const styles = StyleSheet.create({
   },
   timelineLeft: {
     alignItems: 'center',
-    marginRight: 8,
-    width: 16,
+    marginRight: 12,
+    width: 24,
   },
   timelineDot: {
     width: 8,
@@ -264,6 +317,43 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     paddingVertical: 8,
+  },
+  activitiesList: {
+    paddingHorizontal: 0,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  activityItemNoBorder: {
+    borderWidth: 0,
+  },
+  cardLight: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  cardDark: {
+    backgroundColor: '#1F2937',
+    borderColor: '#374151',
+  },
+  timelineLine: {
+    position: 'absolute',
+    top: 32,
+    width: 2,
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+  },
+  timelineLineDark: {
+    backgroundColor: '#374151',
+  },
+  activityContent: {
+    flex: 1,
   },
 });
 
