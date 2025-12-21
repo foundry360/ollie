@@ -97,3 +97,4 @@ export function useGigApplicationCounts(gigIds: string[]) {
     staleTime: 30000, // 30 seconds
   });
 }
+

@@ -136,12 +136,17 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
       <View style={styles.modalOverlay}>
         <Pressable style={styles.overlayPressable} onPress={onClose} />
         <View style={[styles.modalContent, modalStyle]}>
-          <View style={[styles.modalHeader, headerStyle]}>
-            <View style={styles.handle} />
+          {isNeighbor && (
+            <View style={styles.greenHeaderBackground} />
+          )}
+          <View style={[styles.modalHeader, headerStyle, isNeighbor && styles.modalHeaderWithGreen]}>
+            <View style={[styles.handle, isNeighbor && styles.handleOnGreen]} />
             <View style={styles.headerRow}>
-              <Text style={[styles.modalTitle, titleStyle]}>Teenlancer Profile</Text>
+              <Text style={[styles.modalTitle, titleStyle, isNeighbor && styles.modalTitleOnGreen]}>
+                Teenlancer Profile
+              </Text>
               <Pressable onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#111827'} />
+                <Ionicons name="close" size={24} color={isNeighbor ? '#FFFFFF' : (isDark ? '#FFFFFF' : '#111827')} />
               </Pressable>
             </View>
           </View>
@@ -171,10 +176,14 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                 {profile.profile_photo_url ? (
                   <Image 
                     source={{ uri: profile.profile_photo_url }} 
-                    style={styles.avatar}
+                    style={[styles.avatar, isNeighbor && styles.avatarWhiteBorder]}
                   />
                 ) : (
-                  <View style={[styles.avatarPlaceholder, isDark && styles.avatarPlaceholderDark]}>
+                  <View style={[
+                    styles.avatarPlaceholder, 
+                    isDark && styles.avatarPlaceholderDark,
+                    isNeighbor && styles.avatarPlaceholderWhiteBorder
+                  ]}>
                     <Ionicons name="person" size={60} color={isDark ? '#9CA3AF' : '#6B7280'} />
                   </View>
                 )}
@@ -419,11 +428,27 @@ const styles = StyleSheet.create({
   modalDark: {
     backgroundColor: '#000000',
   },
+  greenHeaderBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: '#73af17',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    zIndex: 0,
+  },
   modalHeader: {
     paddingTop: 12,
     paddingHorizontal: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
+    position: 'relative',
+    zIndex: 1,
+  },
+  modalHeaderWithGreen: {
+    borderBottomWidth: 0,
   },
   modalHeaderLight: {
     borderBottomColor: '#E5E7EB',
@@ -439,6 +464,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 16,
   },
+  handleOnGreen: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -447,6 +475,9 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  modalTitleOnGreen: {
+    color: '#FFFFFF',
   },
   titleLight: {
     color: '#000000',
@@ -503,6 +534,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#73af17',
   },
+  avatarWhiteBorder: {
+    borderColor: '#FFFFFF',
+    borderWidth: 6,
+  },
   avatarPlaceholder: {
     width: 100,
     height: 100,
@@ -512,6 +547,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#73af17',
+  },
+  avatarPlaceholderWhiteBorder: {
+    borderColor: '#FFFFFF',
+    borderWidth: 6,
   },
   avatarPlaceholderDark: {
     backgroundColor: '#374151',
@@ -737,13 +776,18 @@ const styles = StyleSheet.create({
   },
   availabilityRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 4,
   },
   availabilityDay: {
     fontSize: 14,
     fontWeight: '500',
+    width: 100,
+    flexShrink: 0,
+  },
+  availabilityTime: {
+    fontSize: 14,
+    marginLeft: 16,
   },
   availabilityTime: {
     fontSize: 14,

@@ -214,7 +214,11 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={true}
         >
         <Text style={[styles.screenTitle, titleStyle]}>Profile</Text>
-        <View style={[styles.profileHeader, cardStyle]}>
+        <View style={[
+          styles.profileHeader, 
+          cardStyle,
+          (user?.role === 'teen' || user?.role === 'poster') && (isDark ? styles.profileHeaderLightGreenDark : styles.profileHeaderLightGreen)
+        ]}>
           <Pressable 
             style={styles.photoContainer} 
             onPress={() => {
@@ -281,15 +285,15 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, styles.infoLabelBold, labelStyle]}>Full Name</Text>
+            <Ionicons name="person" size={20} color="#73af17" />
             <Text style={[styles.infoValue, textStyle]}>{user?.full_name || 'Not set'}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, styles.infoLabelBold, labelStyle]}>Email</Text>
+            <Ionicons name="mail" size={20} color="#73af17" />
             <Text style={[styles.infoValue, textStyle]}>{user?.email || 'Not set'}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, styles.infoLabelBold, labelStyle]}>Phone</Text>
+            <Ionicons name="call" size={20} color="#73af17" />
             <Text style={[styles.infoValue, textStyle]}>{user?.phone ? formatPhoneNumber(user.phone) : 'Not set'}</Text>
           </View>
         </View>
@@ -309,7 +313,7 @@ export default function ProfileScreen() {
 
           {locationData.address && (
             <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, styles.infoLabelBold, labelStyle]}>Address</Text>
+              <Ionicons name="location" size={20} color="#73af17" />
               <Text style={[styles.infoValue, textStyle]}>{locationData.address}</Text>
             </View>
           )}
@@ -327,7 +331,7 @@ export default function ProfileScreen() {
           )}
           {!locationData.address && !locationData.city && !locationData.state && !locationData.zipCode && (
             <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, styles.infoLabelBold, labelStyle]}>Address</Text>
+              <Ionicons name="location" size={20} color="#73af17" />
               <Text style={[styles.infoValue, textStyle]}>Not set</Text>
             </View>
           )}
@@ -351,110 +355,115 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={[styles.section, cardStyle]}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <Text style={[styles.sectionTitle, titleStyle]}>Gigs</Text>
+        {user?.role === 'teen' && (
+          <View style={[styles.section, cardStyle]}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <Text style={[styles.sectionTitle, titleStyle]}>Gigs</Text>
+              </View>
+              <Pressable onPress={() => {
+                setEditingSection('tasks');
+                setTasksData({
+                  skills: user?.skills || [],
+                  availability: tasksData.availability,
+                });
+              }}>
+                <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              </Pressable>
             </View>
-            <Pressable onPress={() => {
-              setEditingSection('tasks');
-              setTasksData({
-                skills: user?.skills || [],
-                availability: tasksData.availability,
-              });
-            }}>
-              <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-            </Pressable>
+
+            <Text style={[styles.subsectionTitle, titleStyle]}>Skills</Text>
+            {tasksData.skills && tasksData.skills.length > 0 ? (
+              <View style={styles.skillsContainer}>
+                {tasksData.skills.map((skill) => (
+                  <View
+                    key={skill}
+                    style={[styles.skillBubble, styles.skillBubbleDisplay]}
+                  >
+                    <Text style={styles.skillTextSelected}>
+                      {skill}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.infoValue, textStyle]}>No skills selected</Text>
+            )}
           </View>
+        )}
 
-          <Text style={[styles.subsectionTitle, titleStyle]}>Skills</Text>
-          {tasksData.skills && tasksData.skills.length > 0 ? (
-            <View style={styles.skillsContainer}>
-              {tasksData.skills.map((skill) => (
-                <View
-                  key={skill}
-                  style={[styles.skillBubble, styles.skillBubbleDisplay]}
-                >
-                  <Text style={styles.skillTextSelected}>
-                    {skill}
-                  </Text>
-                </View>
-              ))}
+        {user?.role === 'teen' && (
+          <View style={[styles.section, cardStyle]}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <Text style={[styles.sectionTitle, titleStyle]}>Availability</Text>
+              </View>
+              <Pressable onPress={() => {
+                setEditingSection('availability');
+                const availability = (user?.availability as typeof defaultAvailability) || defaultAvailability;
+                setTasksData({
+                  ...tasksData,
+                  availability,
+                });
+                // Check if all days have the same hours to set toggle state
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                const firstDay = availability.monday;
+                const allSame = days.every(day => {
+                  const dayData = availability[day as keyof typeof availability];
+                  return dayData.start === firstDay.start && dayData.end === firstDay.end;
+                });
+                setUseSameHours(allSame);
+                if (allSame) {
+                  setSameHoursRange({
+                    start: firstDay.start,
+                    end: firstDay.end,
+                  });
+                }
+              }}>
+                <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              </Pressable>
             </View>
-          ) : (
-            <Text style={[styles.infoValue, textStyle]}>No skills selected</Text>
-          )}
-        </View>
 
-        <View style={[styles.section, cardStyle]}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <Text style={[styles.sectionTitle, titleStyle]}>Availability</Text>
-            </View>
-            <Pressable onPress={() => {
-              setEditingSection('availability');
-              const availability = (user?.availability as typeof defaultAvailability) || defaultAvailability;
-              setTasksData({
-                ...tasksData,
-                availability,
-              });
-              // Check if all days have the same hours to set toggle state
+            {(() => {
+              // Check if all days have the same hours
               const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-              const firstDay = availability.monday;
+              const firstDay = tasksData.availability.monday;
               const allSame = days.every(day => {
-                const dayData = availability[day as keyof typeof availability];
+                const dayData = tasksData.availability[day as keyof typeof tasksData.availability];
                 return dayData.start === firstDay.start && dayData.end === firstDay.end;
               });
-              setUseSameHours(allSame);
+
               if (allSame) {
-                setSameHoursRange({
-                  start: firstDay.start,
-                  end: firstDay.end,
-                });
-              }
-            }}>
-              <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
-            </Pressable>
-          </View>
-
-          {(() => {
-            // Check if all days have the same hours
-            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-            const firstDay = tasksData.availability.monday;
-            const allSame = days.every(day => {
-              const dayData = tasksData.availability[day as keyof typeof tasksData.availability];
-              return dayData.start === firstDay.start && dayData.end === firstDay.end;
-            });
-
-            if (allSame) {
-              // Show single "Hours" row when all days are the same
-              return (
-                <View style={styles.availabilityRow}>
-                  <Text style={[styles.dayLabel, textStyle]}>Hours</Text>
-                  <Text style={[styles.infoValue, textStyle]}>
-                    {convertTo12Hour(firstDay.start)} - {convertTo12Hour(firstDay.end)}
-                  </Text>
-                </View>
-              );
-            } else {
-              // Show individual days
-              return days.map((day) => {
-                const dayData = tasksData.availability[day as keyof typeof tasksData.availability];
-                const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                // Show single "Hours" row when all days are the same
                 return (
-                  <View key={day} style={styles.availabilityRow}>
-                    <Text style={[styles.dayLabel, textStyle]}>
-                      {dayName}
-                    </Text>
+                  <View style={styles.availabilityRow}>
+                    <Ionicons name="time" size={20} color="#73af17" />
                     <Text style={[styles.infoValue, textStyle]}>
-                      {convertTo12Hour(dayData.start)} - {convertTo12Hour(dayData.end)}
+                      {convertTo12Hour(firstDay.start)} - {convertTo12Hour(firstDay.end)}
                     </Text>
                   </View>
                 );
-              });
-            }
-          })()}
-        </View>
+              } else {
+                // Show individual days
+                return days.map((day) => {
+                  const dayData = tasksData.availability[day as keyof typeof tasksData.availability];
+                  const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                  return (
+                    <View key={day} style={styles.availabilityRow}>
+                      <Ionicons name="time" size={20} color="#73af17" />
+                      <Text style={[styles.dayLabel, textStyle, styles.availabilityDayFixed]}>
+                        {dayName}
+                      </Text>
+                      <Text style={[styles.infoValue, textStyle]}>
+                        {convertTo12Hour(dayData.start)} - {convertTo12Hour(dayData.end)}
+                      </Text>
+                    </View>
+                  );
+                });
+              }
+            })()}
+          </View>
+        )}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -960,11 +969,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#FFFFFF',
   },
+  profileHeaderLightGreen: {
+    backgroundColor: '#F0F9E8',
+  },
   cardLight: {
     backgroundColor: '#FFFFFF',
   },
   cardDark: {
     backgroundColor: '#111111',
+  },
+  profileHeaderLightGreenDark: {
+    backgroundColor: '#1F3A1F',
   },
   photoContainer: {
     position: 'relative',
@@ -1102,11 +1117,15 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 16,
   },
   infoRowNoMargin: {
     marginBottom: 0,
     marginTop: -16,
+    paddingLeft: 32,
   },
   infoLabel: {
     fontSize: 16,
@@ -1247,13 +1266,17 @@ const styles = StyleSheet.create({
   },
   availabilityRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
     marginBottom: 12,
   },
   dayLabel: {
     fontSize: 16,
     minWidth: 100,
+  },
+  availabilityDayFixed: {
+    width: 105,
+    flexShrink: 0,
   },
   timeInputs: {
     flexDirection: 'row',

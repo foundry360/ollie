@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEarningsSummary, useEarningsHistory } from '@/hooks/useEarnings';
+import { 
+  useEarningsSummary, 
+  useEarningsHistory,
+  useNeighborSpendingSummary,
+  useNeighborSpendingHistory 
+} from '@/hooks/useEarnings';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -93,17 +98,28 @@ export default function EarningsScreen() {
     }
   };
 
+  const isNeighbor = user?.role === 'poster';
   const dateRange = getDateRange(dateFilter);
-  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useEarningsSummary(dateRange);
+  
+  // Use different hooks based on user role
+  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = isNeighbor
+    ? useNeighborSpendingSummary(dateRange)
+    : useEarningsSummary(dateRange);
+  
   const {
     data: history = [],
     isLoading: historyLoading,
     isRefetching,
     refetch: refetchHistory,
-  } = useEarningsHistory({
-    ...(statusFilter === 'all' ? {} : { status: statusFilter }),
-    ...dateRange,
-  });
+  } = isNeighbor
+    ? useNeighborSpendingHistory({
+        ...(statusFilter === 'all' ? {} : { status: statusFilter }),
+        ...dateRange,
+      })
+    : useEarningsHistory({
+        ...(statusFilter === 'all' ? {} : { status: statusFilter }),
+        ...dateRange,
+      });
 
   const handleRefresh = () => {
     refetchSummary();
@@ -118,19 +134,7 @@ export default function EarningsScreen() {
   const textStyle = isDark ? styles.textDark : styles.textLight;
   const labelStyle = isDark ? styles.labelDark : styles.labelLight;
 
-  if (user?.role !== 'teen') {
-    return (
-      <SafeAreaView style={[styles.container, containerStyle]} edges={['bottom', 'left', 'right']}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="lock-closed" size={64} color={isDark ? '#6B7280' : '#9CA3AF'} />
-          <Text style={[styles.errorText, titleStyle]}>Wallet</Text>
-          <Text style={[styles.errorSubtext, textStyle]}>
-            Wallet is only available for teens
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Wallet is available for both teens and neighbors
 
   const handleEarningPress = (gigId: string | null | undefined) => {
     if (!gigId) {
@@ -165,6 +169,11 @@ export default function EarningsScreen() {
             <Text style={[styles.earningDate, labelStyle]}>
               {format(new Date(item.created_at), 'MMM d, yyyy')}
             </Text>
+            {isNeighbor && item.teen_name && (
+              <Text style={[styles.teenName, labelStyle]}>
+                Paid to: {item.teen_name}
+              </Text>
+            )}
           </View>
           <View style={styles.earningAmount}>
             <Text style={[styles.amountText, titleStyle]}>${item.amount.toFixed(2)}</Text>
@@ -183,7 +192,7 @@ export default function EarningsScreen() {
         </View>
         {item.paid_at && (
           <Text style={[styles.paidDate, labelStyle]}>
-            Paid on {format(new Date(item.paid_at), 'MMM d, yyyy')}
+            {isNeighbor ? 'Payment sent on' : 'Paid on'} {format(new Date(item.paid_at), 'MMM d, yyyy')}
           </Text>
         )}
       </View>
@@ -211,29 +220,54 @@ export default function EarningsScreen() {
             <Text style={[styles.screenTitle, titleStyle]}>Wallet</Text>
             <View style={styles.summarySection}>
               <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, titleStyle]}>Earnings Summary</Text>
+                <Text style={[styles.sectionTitle, titleStyle]}>
+                  {isNeighbor ? 'Spending Summary' : 'Earnings Summary'}
+                </Text>
                 <DateFilter value={dateFilter} onChange={setDateFilter} />
               </View>
               <View style={styles.summaryGrid}>
                 <View style={[styles.summaryCard, cardStyle]}>
                   <Ionicons name="cash" size={32} color="#73af17" />
-                  <Text style={[styles.summaryLabel, labelStyle]}>Total Earnings</Text>
-                  <Text style={[styles.summaryValue, titleStyle]}>
-                    ${summary?.total_earnings.toFixed(2) || '0.00'}
+                  <Text style={[styles.summaryLabel, labelStyle]}>
+                    {isNeighbor ? 'Total Spent' : 'Total Earnings'}
+                  </Text>
+                  <Text 
+                    style={[styles.summaryValue, titleStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    ${isNeighbor 
+                      ? (summary as any)?.total_spent?.toFixed(2) || '0.00'
+                      : (summary as any)?.total_earnings?.toFixed(2) || '0.00'}
                   </Text>
                 </View>
                 <View style={[styles.summaryCard, cardStyle]}>
                   <Ionicons name="time" size={32} color={isDark ? '#F59E0B' : '#F59E0B'} />
                   <Text style={[styles.summaryLabel, labelStyle]}>Pending</Text>
-                  <Text style={[styles.summaryValue, titleStyle]}>
-                    ${summary?.pending_earnings.toFixed(2) || '0.00'}
+                  <Text 
+                    style={[styles.summaryValue, titleStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    ${isNeighbor
+                      ? (summary as any)?.pending_spent?.toFixed(2) || '0.00'
+                      : (summary as any)?.pending_earnings?.toFixed(2) || '0.00'}
                   </Text>
                 </View>
                 <View style={[styles.summaryCard, cardStyle]}>
                   <Ionicons name="checkmark-circle" size={32} color="#73af17" />
                   <Text style={[styles.summaryLabel, labelStyle]}>Paid</Text>
-                  <Text style={[styles.summaryValue, titleStyle]}>
-                    ${summary?.paid_earnings.toFixed(2) || '0.00'}
+                  <Text 
+                    style={[styles.summaryValue, titleStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    ${isNeighbor
+                      ? (summary as any)?.paid_spent?.toFixed(2) || '0.00'
+                      : (summary as any)?.paid_earnings?.toFixed(2) || '0.00'}
                   </Text>
                 </View>
               </View>
@@ -312,9 +346,13 @@ export default function EarningsScreen() {
                     size={64}
                     color={isDark ? '#6B7280' : '#9CA3AF'}
                   />
-                  <Text style={[styles.emptyText, titleStyle]}>No payments received</Text>
+                  <Text style={[styles.emptyText, titleStyle]}>
+                    {isNeighbor ? 'No payments made' : 'No payments received'}
+                  </Text>
                   <Text style={[styles.emptySubtext, textStyle]}>
-                    Complete gigs to start earning!
+                    {isNeighbor 
+                      ? 'Your payment history will appear here once gigs are completed'
+                      : 'Complete gigs to start earning!'}
                   </Text>
                 </View>
               ) : (
@@ -387,6 +425,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'space-between',
   },
   summaryCard: {
     flex: 1,
@@ -408,7 +447,7 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   summaryValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     marginTop: 4,
     color: '#000000',
@@ -507,6 +546,11 @@ const styles = StyleSheet.create({
   paidDate: {
     fontSize: 12,
     marginTop: 8,
+    color: '#6B7280',
+  },
+  teenName: {
+    fontSize: 12,
+    marginTop: 4,
     color: '#6B7280',
   },
   emptyContainer: {

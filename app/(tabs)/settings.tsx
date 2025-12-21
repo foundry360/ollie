@@ -84,7 +84,7 @@ export default function SettingsScreen() {
             onPress={() => handleMenuItemPress('Privacy & Security')}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="shield-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              <Ionicons name="shield" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Privacy & Security</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
@@ -95,7 +95,7 @@ export default function SettingsScreen() {
             onPress={() => handleMenuItemPress('Billing & Payments')}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="card-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              <Ionicons name="card" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Billing & Payments</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
@@ -106,7 +106,7 @@ export default function SettingsScreen() {
             onPress={() => setShowChangePassword(true)}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="lock-closed-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              <Ionicons name="lock-closed" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Change Password</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
@@ -118,7 +118,7 @@ export default function SettingsScreen() {
           
           <View style={styles.menuItem}>
             <View style={styles.menuItemLeft}>
-              <Ionicons name="moon-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              <Ionicons name="moon" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Dark Mode</Text>
             </View>
             <ThemeToggle />
@@ -133,7 +133,7 @@ export default function SettingsScreen() {
             onPress={() => handleMenuItemPress('Activity Notifications')}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="notifications-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              <Ionicons name="notifications" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Notifications</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
@@ -148,7 +148,7 @@ export default function SettingsScreen() {
             onPress={() => handleMenuItemPress('Help Center')}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="help-circle-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              <Ionicons name="help-circle" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Help Center</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
@@ -159,7 +159,7 @@ export default function SettingsScreen() {
             onPress={() => handleMenuItemPress('Terms of Use')}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="document-text-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              <Ionicons name="document-text" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Terms of Use</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
@@ -170,7 +170,7 @@ export default function SettingsScreen() {
             onPress={() => handleMenuItemPress('Privacy Policy')}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
+              <Ionicons name="shield-checkmark" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Privacy Policy</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />

@@ -1,4 +1,4 @@
-import { Modal, View, Text, StyleSheet, Pressable, Animated, Dimensions } from 'react-native';
+import { Modal, View, Text, StyleSheet, Pressable, Animated, Dimensions, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,18 +52,31 @@ export function BottomSheet({ visible, onClose, title, children }: BottomSheetPr
               },
             ]}
           >
-            <View style={[styles.header, isDark && styles.headerDark]}>
-              <View style={styles.handle} />
+            <View style={styles.greenHeaderBackground} />
+            <View style={[styles.header, isDark && styles.headerDark, styles.headerWithGreen]}>
+              <View style={[styles.handle, styles.handleOnGreen]} />
               <View style={styles.headerContent}>
-                <Text style={[styles.title, isDark && styles.titleDark]}>{title}</Text>
+                <Text style={[styles.title, isDark && styles.titleDark, styles.titleOnGreen]}>{title}</Text>
                 <Pressable onPress={onClose} style={styles.closeButton}>
-                  <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+                  <Ionicons name="close" size={24} color="#FFFFFF" />
                 </Pressable>
               </View>
             </View>
-            <View style={styles.content}>
-              {children}
-            </View>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={styles.keyboardAvoidingView}
+              keyboardVerticalOffset={0}
+            >
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.content}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
+              >
+                {children}
+              </ScrollView>
+            </KeyboardAvoidingView>
           </Animated.View>
         </Pressable>
       </Pressable>
@@ -83,23 +96,44 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: SCREEN_HEIGHT * 0.9,
     paddingBottom: 34,
+    flexDirection: 'column',
+    height: SCREEN_HEIGHT * 0.9,
   },
   containerDark: {
     backgroundColor: '#111111',
   },
+  greenHeaderBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: '#73af17',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    zIndex: 0,
+  },
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: '#73af17',
+    backgroundColor: '#D1D5DB',
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 12,
     marginBottom: 16,
   },
+  handleOnGreen: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
   header: {
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
     paddingBottom: 16,
+    position: 'relative',
+    zIndex: 1,
+  },
+  headerWithGreen: {
+    borderBottomWidth: 0,
   },
   headerDark: {
     borderBottomColor: '#1F1F1F',
@@ -118,8 +152,18 @@ const styles = StyleSheet.create({
   titleDark: {
     color: '#FFFFFF',
   },
+  titleOnGreen: {
+    color: '#FFFFFF',
+  },
   closeButton: {
     padding: 4,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    minHeight: 0,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 20,

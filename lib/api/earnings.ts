@@ -196,3 +196,146 @@ export async function getWeeklyEarnings(): Promise<WeeklyEarningsData> {
   };
 }
 
+// Neighbor Spending Interfaces
+export interface NeighborSpendingSummary {
+  total_spent: number;
+  pending_spent: number;
+  paid_spent: number;
+  completed_gigs: number;
+}
+
+export interface NeighborSpendingRecord {
+  id: string;
+  gig_id: string;
+  task_title: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'cancelled';
+  created_at: string;
+  paid_at: string | null;
+  teen_name?: string;
+}
+
+// Get spending summary for a neighbor
+export async function getNeighborSpendingSummary(filters?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<NeighborSpendingSummary> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  let query = supabase
+    .from('earnings')
+    .select(`
+      amount,
+      status,
+      created_at,
+      gigs!earnings_gig_id_fkey(poster_id)
+    `);
+
+  // Filter by poster_id through the join
+  // We need to filter client-side since Supabase doesn't support filtering on joined tables easily
+  const { data, error } = await query;
+
+  if (error) throw error;
+
+  // Filter by poster_id and date range client-side
+  const filteredData = (data || []).filter((earning: any) => {
+    if (earning.gigs?.poster_id !== user.id) return false;
+    
+    if (filters?.startDate) {
+      const earningDate = new Date(earning.created_at);
+      if (earningDate < new Date(filters.startDate)) return false;
+    }
+    
+    if (filters?.endDate) {
+      const earningDate = new Date(earning.created_at);
+      if (earningDate > new Date(filters.endDate)) return false;
+    }
+    
+    return true;
+  });
+
+  const summary: NeighborSpendingSummary = {
+    total_spent: 0,
+    pending_spent: 0,
+    paid_spent: 0,
+    completed_gigs: filteredData.length,
+  };
+
+  filteredData.forEach((earning: any) => {
+    summary.total_spent += parseFloat(earning.amount.toString());
+    if (earning.status === 'pending') {
+      summary.pending_spent += parseFloat(earning.amount.toString());
+    } else if (earning.status === 'paid') {
+      summary.paid_spent += parseFloat(earning.amount.toString());
+    }
+  });
+
+  return summary;
+}
+
+// Get spending history for a neighbor
+export async function getNeighborSpendingHistory(filters?: {
+  status?: 'pending' | 'paid' | 'cancelled';
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<NeighborSpendingRecord[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  let query = supabase
+    .from('earnings')
+    .select(`
+      id,
+      gig_id,
+      amount,
+      status,
+      created_at,
+      paid_at,
+      gigs!earnings_gig_id_fkey(id, title, poster_id),
+      teen:users!earnings_teen_id_fkey(full_name)
+    `);
+
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+
+  if (filters?.startDate) {
+    query = query.gte('created_at', filters.startDate);
+  }
+
+  if (filters?.endDate) {
+    query = query.lte('created_at', filters.endDate);
+  }
+
+  query = query.order('created_at', { ascending: false });
+
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
+  }
+  if (filters?.offset) {
+    query = query.range(filters.offset, filters.offset + (filters.limit || 20) - 1);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  // Filter by poster_id client-side and apply remaining filters
+  const filteredData = (data || [])
+    .filter((item: any) => item.gigs?.poster_id === user.id)
+    .map((item: any) => ({
+      id: item.id,
+      gig_id: item.gig_id,
+      task_title: item.gigs?.title || 'Unknown Gig',
+      amount: parseFloat(item.amount.toString()),
+      status: item.status,
+      created_at: item.created_at,
+      paid_at: item.paid_at,
+      teen_name: item.teen?.full_name,
+    }));
+
+  return filteredData;
+}
+

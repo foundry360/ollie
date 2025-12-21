@@ -302,12 +302,13 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
       <View style={styles.modalOverlay}>
         <Pressable style={styles.overlayPressable} onPress={onClose} />
         <View style={[styles.modalContent, modalStyle]}>
-          <View style={[styles.modalHeader, headerStyle]}>
-            <View style={styles.handle} />
+          <View style={styles.greenHeaderBackground} />
+          <View style={[styles.modalHeader, headerStyle, styles.modalHeaderWithGreen]}>
+            <View style={[styles.handle, styles.handleOnGreen]} />
             <View style={styles.headerRow}>
-              <Text style={[styles.modalTitle, titleStyle]}>Gig Details</Text>
+              <Text style={[styles.modalTitle, titleStyle, styles.modalTitleOnGreen]}>Gig Details</Text>
               <Pressable onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#111827'} />
+                <Ionicons name="close" size={24} color="#FFFFFF" />
               </Pressable>
             </View>
           </View>
@@ -689,11 +690,27 @@ const styles = StyleSheet.create({
   modalDark: {
     backgroundColor: '#000000',
   },
+  greenHeaderBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: '#73af17',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    zIndex: 0,
+  },
   modalHeader: {
     paddingTop: 12,
     paddingHorizontal: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
+    position: 'relative',
+    zIndex: 1,
+  },
+  modalHeaderWithGreen: {
+    borderBottomWidth: 0,
   },
   modalHeaderLight: {
     borderBottomColor: '#E5E7EB',
@@ -709,6 +726,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 16,
   },
+  handleOnGreen: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -717,6 +737,9 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  modalTitleOnGreen: {
+    color: '#FFFFFF',
   },
   titleLight: {
     color: '#000000',

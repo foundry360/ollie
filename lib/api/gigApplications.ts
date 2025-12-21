@@ -285,3 +285,4 @@ export async function rejectGigApplication(applicationId: string, reason?: strin
 
   throw new Error('Failed to reject application. Invalid response from database function.');
 }
+
