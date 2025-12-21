@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getAverageRating } from './reviews';
 
 export interface GigApplication {
   id: string;
@@ -12,6 +13,7 @@ export interface GigApplication {
   teen_name?: string;
   teen_photo?: string;
   teen_age?: number;
+  teen_rating?: number;
   gig_title?: string;
   gig_pay?: number;
   gig_description?: string;
@@ -48,22 +50,41 @@ export async function getGigApplications(gigId: string): Promise<GigApplication[
 
   if (error) throw error;
 
-  return (data || []).map((app: any) => ({
-    id: app.id,
-    gig_id: app.gig_id,
-    teen_id: app.teen_id,
-    status: app.status,
-    rejection_reason: app.rejection_reason,
-    created_at: app.created_at,
-    updated_at: app.updated_at,
-    teen_name: app.teen?.full_name,
-    teen_photo: app.teen?.profile_photo_url,
-    teen_age: app.teen?.date_of_birth 
-      ? new Date().getFullYear() - new Date(app.teen.date_of_birth).getFullYear()
-      : undefined,
-    gig_title: app.gig?.title,
-    gig_pay: app.gig?.pay,
-  }));
+  // Fetch ratings for all teens in parallel
+  const applicationsWithRatings = await Promise.all(
+    (data || []).map(async (app: any) => {
+      let rating = 0;
+      if (app.teen_id) {
+        try {
+          const ratingData = await getAverageRating(app.teen_id);
+          rating = ratingData.averageRating;
+        } catch (error) {
+          // If rating fetch fails, default to 0
+          console.log('Could not fetch rating for teen:', app.teen_id, error);
+        }
+      }
+
+      return {
+        id: app.id,
+        gig_id: app.gig_id,
+        teen_id: app.teen_id,
+        status: app.status,
+        rejection_reason: app.rejection_reason,
+        created_at: app.created_at,
+        updated_at: app.updated_at,
+        teen_name: app.teen?.full_name,
+        teen_photo: app.teen?.profile_photo_url,
+        teen_age: app.teen?.date_of_birth 
+          ? new Date().getFullYear() - new Date(app.teen.date_of_birth).getFullYear()
+          : undefined,
+        teen_rating: rating,
+        gig_title: app.gig?.title,
+        gig_pay: app.gig?.pay,
+      };
+    })
+  );
+
+  return applicationsWithRatings;
 }
 
 // Get pending applications for a neighbor's gigs
@@ -285,4 +306,5 @@ export async function rejectGigApplication(applicationId: string, reason?: strin
 
   throw new Error('Failed to reject application. Invalid response from database function.');
 }
+
 

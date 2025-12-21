@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Linking, Modal, Dimensions, Pressable, Platform } from 'react-native';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { AddReviewModal } from '@/components/reviews/AddReviewModal';
 import { useAuthStore } from '@/stores/authStore';
 import { formatAddress } from '@/lib/utils';
+import { useRouter } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -20,6 +22,7 @@ interface ProfileModalProps {
 export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
   const { colorScheme } = useThemeStore();
   const { user: currentUser } = useAuthStore();
+  const router = useRouter();
   const isDark = colorScheme === 'dark';
   
   const [profile, setProfile] = useState<User | null>(null);
@@ -28,13 +31,33 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
   const [rating, setRating] = useState<number>(0);
   const [reviewCount, setReviewCount] = useState<number>(0);
   const [reviews, setReviews] = useState<Array<Review & { reviewer_name?: string; reviewer_photo?: string }>>([]);
+  const [ratingDistribution, setRatingDistribution] = useState<{ [key: number]: number }>({ 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 });
   const [showAddReviewModal, setShowAddReviewModal] = useState(false);
+  const [existingGigId, setExistingGigId] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   
   const isNeighbor = currentUser?.role === 'poster';
+  const isTeenlancerProfile = profile?.role === 'teen';
+
+  // Format name to show first name and last initial
+  const formatReviewerName = (fullName: string | undefined | null): string => {
+    if (!fullName) return 'Anonymous';
+    const parts = fullName.trim().split(' ');
+    if (parts.length === 1) return parts[0];
+    const firstName = parts[0];
+    const lastInitial = parts[parts.length - 1][0].toUpperCase();
+    return `${firstName} ${lastInitial}.`;
+  };
 
   useEffect(() => {
     if (visible && userId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:40',message:'Modal opened - initial state',data:{visible,userId,isNeighbor,isDark,headerZIndex:10,scrollWrapperMarginTop:80},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       loadProfile();
+      if (isNeighbor && userId) {
+        findExistingGig();
+      }
     } else {
       // Reset state when modal closes
       setProfile(null);
@@ -44,8 +67,110 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
       setReviewCount(0);
       setReviews([]);
       setShowAddReviewModal(false);
+      setExistingGigId(null);
     }
-  }, [visible, userId]);
+  }, [visible, userId, isNeighbor]);
+
+  const findExistingGig = async () => {
+    if (!currentUser?.id || !userId) return;
+    
+    try {
+      // Find gigs with existing messages between the neighbor and teenlancer
+      // Prioritize gigs where they've already been communicating (not completed or cancelled)
+      const { data: messages, error: messagesError } = await supabase
+        .from('messages')
+        .select(`
+          gig_id,
+          created_at,
+          gigs!inner(id, poster_id, teen_id, status)
+        `)
+        .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
+        .order('created_at', { ascending: false });
+
+      if (!messagesError && messages && messages.length > 0) {
+        // Find the most recent message where:
+        // 1. The gig belongs to the current user (poster)
+        // 2. The gig is not completed or cancelled
+        // 3. The message involves the teenlancer
+        for (const msg of messages) {
+          const gig = (msg as any).gigs;
+          if (!gig || gig.poster_id !== currentUser.id) continue;
+          if (gig.status === 'completed' || gig.status === 'cancelled') continue;
+          
+          // Check if this message involves the teenlancer
+          const { data: messageWithTeen } = await supabase
+            .from('messages')
+            .select('id')
+            .eq('gig_id', gig.id)
+            .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+            .limit(1)
+            .single();
+
+          if (messageWithTeen) {
+            setExistingGigId(gig.id);
+            return;
+          }
+        }
+      }
+
+      // If no messages, find gigs where the teenlancer is assigned (not completed or cancelled)
+      const { data: assignedGigs, error: assignedError } = await supabase
+        .from('gigs')
+        .select('id')
+        .eq('poster_id', currentUser.id)
+        .eq('teen_id', userId)
+        .neq('status', 'completed')
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (assignedError) throw assignedError;
+      if (assignedGigs && assignedGigs.length > 0) {
+        setExistingGigId(assignedGigs[0].id);
+        return;
+      }
+
+      // If no assigned gig, find the most recent gig where the teenlancer has applied
+      const { data: myGigs, error: myGigsError } = await supabase
+        .from('gigs')
+        .select('id')
+        .eq('poster_id', currentUser.id)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false });
+
+      if (myGigsError) throw myGigsError;
+      if (myGigs && myGigs.length > 0) {
+        const gigIds = myGigs.map(g => g.id);
+        const { data: applications, error: appError } = await supabase
+          .from('gig_applications')
+          .select('gig_id')
+          .eq('teen_id', userId)
+          .eq('status', 'pending')
+          .in('gig_id', gigIds)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (appError) throw appError;
+        if (applications && applications.length > 0) {
+          setExistingGigId(applications[0].gig_id);
+        }
+      }
+    } catch (error) {
+      console.error('Error finding existing gig:', error);
+    }
+  };
+
+  const handleMessagePress = () => {
+    if (existingGigId) {
+      // Navigate directly to the specific gig's chat, just like teenlancers do
+      router.push(`/chat/${existingGigId}`);
+      onClose();
+    } else {
+      // Fallback to messages screen if no gig found
+      router.push('/(tabs)/messages');
+      onClose();
+    }
+  };
 
   const loadProfile = async () => {
     if (!userId) {
@@ -83,9 +208,20 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
       try {
         const userReviews = await getReviewsForUser(userId);
         setReviews(userReviews);
+        
+        // Calculate rating distribution
+        const distribution: { [key: number]: number } = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        userReviews.forEach((review) => {
+          const ratingValue = review.rating;
+          if (ratingValue >= 1 && ratingValue <= 5) {
+            distribution[ratingValue] = (distribution[ratingValue] || 0) + 1;
+          }
+        });
+        setRatingDistribution(distribution);
       } catch (reviewsError) {
         console.log('Could not fetch reviews:', reviewsError);
         setReviews([]);
+        setRatingDistribution({ 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 });
       }
     } catch (err: any) {
       console.error('Error loading profile:', err);
@@ -118,7 +254,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
     return `${hour12}:${minutes} ${ampm}`;
   };
 
-  const containerStyle = isDark ? styles.containerDark : styles.containerLight;
+  // Removed containerStyle - not used
   const cardStyle = isDark ? styles.cardDark : styles.cardLight;
   const titleStyle = isDark ? styles.titleDark : styles.titleLight;
   const textStyle = isDark ? styles.textDark : styles.textLight;
@@ -136,10 +272,23 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
       <View style={styles.modalOverlay}>
         <Pressable style={styles.overlayPressable} onPress={onClose} />
         <View style={[styles.modalContent, modalStyle]}>
+          {/* #region agent log */}
+          {(() => {
+            fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:270',message:'ModalContent render',data:{hasOverflow:false,flexDirection:'column'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            return null;
+          })()}
+          {/* #endregion */}
           {isNeighbor && (
             <View style={styles.greenHeaderBackground} />
           )}
           <View style={[styles.modalHeader, headerStyle, isNeighbor && styles.modalHeaderWithGreen]}>
+            {/* #region agent log */}
+            {(() => {
+              const headerBg = isNeighbor ? 'transparent' : (isDark ? '#000000' : '#FFFFFF');
+              fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:284',message:'Header render - BEFORE ScrollView (original solution)',data:{isNeighbor,isDark,headerBg,zIndex:100,position:'absolute',renderedBeforeScrollView:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+              return null;
+            })()}
+            {/* #endregion */}
             <View style={[styles.handle, isNeighbor && styles.handleOnGreen]} />
             <View style={styles.headerRow}>
               <Text style={[styles.modalTitle, titleStyle, isNeighbor && styles.modalTitleOnGreen]}>
@@ -151,6 +300,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
             </View>
           </View>
 
+          <View style={styles.scrollWrapper}>
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#73af17" />
@@ -166,29 +316,21 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
             </View>
           ) : (
             <ScrollView 
+              ref={scrollViewRef}
               style={styles.scrollView} 
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={true}
               nestedScrollEnabled={true}
+              bounces={false}
+              contentInsetAdjustmentBehavior="never"
+              onScroll={(e) => {
+                // #region agent log
+                const scrollY = e.nativeEvent.contentOffset.y;
+                fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:300',message:'Scroll event - checking if content goes over header',data:{scrollY,contentHeight:e.nativeEvent.contentSize.height,layoutHeight:e.nativeEvent.layoutMeasurement.height,scrollWrapperPaddingTop:75,avatarMarginTop:-25},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'E'})}).catch(()=>{});
+                // #endregion
+              }}
+              scrollEventThrottle={16}
             >
-              {/* Avatar */}
-              <View style={styles.avatarContainer}>
-                {profile.profile_photo_url ? (
-                  <Image 
-                    source={{ uri: profile.profile_photo_url }} 
-                    style={[styles.avatar, isNeighbor && styles.avatarWhiteBorder]}
-                  />
-                ) : (
-                  <View style={[
-                    styles.avatarPlaceholder, 
-                    isDark && styles.avatarPlaceholderDark,
-                    isNeighbor && styles.avatarPlaceholderWhiteBorder
-                  ]}>
-                    <Ionicons name="person" size={60} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                  </View>
-                )}
-              </View>
-
               {/* Name */}
               <Text style={[styles.name, titleStyle]}>{profile.full_name}</Text>
 
@@ -236,38 +378,70 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                 </View>
               )}
 
-              {/* Available Hours */}
-              {profile.availability && (
-                <View style={[styles.section, cardStyle]}>
-                  <Text style={[styles.sectionTitle, titleStyle]}>Available Hours</Text>
-                  <View style={styles.availabilityContainer}>
-                    {Object.entries(profile.availability).map(([day, hours]) => {
-                      if (!hours || !hours.start || !hours.end) return null;
-                      const dayName = day.charAt(0).toUpperCase() + day.slice(1);
-                      return (
-                        <View key={day} style={styles.availabilityRow}>
-                          <Text style={[styles.availabilityDay, textStyle]}>{dayName}</Text>
-                          <Text style={[styles.availabilityTime, textStyle]}>
-                            {formatTime12Hour(hours.start)} - {formatTime12Hour(hours.end)}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                    {Object.values(profile.availability).every(h => !h || !h.start || !h.end) && (
-                      <Text style={[styles.noAvailabilityText, textStyle]}>
-                        No availability set
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              )}
-
               {/* Reviews from Neighbors */}
               <View style={[styles.section, cardStyle]}>
                 <Text style={[styles.sectionTitle, titleStyle]}>
                   Reviews from Neighbors ({reviewCount})
                 </Text>
                 {reviews.length > 0 ? (
+                  <>
+                    {/* Rating Breakdown Bar Chart */}
+                    <View style={[styles.ratingBreakdownContainer, isDark && styles.ratingBreakdownContainerDark]}>
+                      <View style={styles.overallRatingContainer}>
+                        <Text style={[styles.overallRatingText, textStyle]}>
+                          Overall Rating
+                        </Text>
+                        <View style={styles.overallRatingValue}>
+                          <Text style={[styles.overallRatingNumber, textStyle]}>
+                            {rating > 0 ? rating.toFixed(1) : '0.0'}
+                          </Text>
+                          <Text style={[styles.overallRatingCount, isDark ? styles.overallRatingCountDark : styles.overallRatingCountLight]}>
+                            ({reviewCount})
+                          </Text>
+                          <View style={styles.overallRatingStars}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Ionicons
+                                key={star}
+                                name={star <= Math.round(rating) ? 'star' : 'star-outline'}
+                                size={16}
+                                color="#F59E0B"
+                              />
+                            ))}
+                          </View>
+                        </View>
+                      </View>
+                      {[5, 4, 3, 2, 1].map((starRating) => {
+                        const count = ratingDistribution[starRating] || 0;
+                        const percentage = reviewCount > 0 ? (count / reviewCount) * 100 : 0;
+                        return (
+                          <View key={starRating} style={styles.ratingBarRow}>
+                            <View style={styles.ratingBarLabel}>
+                              <Text style={[styles.ratingBarStarText, textStyle]}>
+                                {starRating}
+                              </Text>
+                              <Ionicons name="star" size={12} color="#F59E0B" />
+                            </View>
+                            <View style={styles.ratingBarContainer}>
+                              <View 
+                                style={[
+                                  styles.ratingBar,
+                                  { width: `${percentage}%` },
+                                  isDark && styles.ratingBarDark
+                                ]}
+                              />
+                            </View>
+                            <View style={styles.ratingBarStats}>
+                              <Text style={[styles.ratingBarCount, textStyle]}>
+                                {count}
+                              </Text>
+                              <Text style={[styles.ratingBarPercentage, isDark ? styles.ratingBarPercentageDark : styles.ratingBarPercentageLight]}>
+                                {percentage > 0 ? percentage.toFixed(0) : '0'}%
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
                   <View style={styles.reviewsList}>
                     {reviews.map((review) => (
                       <View key={review.id} style={[styles.reviewItem, isDark && styles.reviewItemDark]}>
@@ -284,7 +458,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                               </View>
                             )}
                             <Text style={[styles.reviewerName, textStyle]}>
-                              {review.reviewer_name || 'Anonymous'}
+                              {formatReviewerName(review.reviewer_name)}
                             </Text>
                           </View>
                           <Text style={[styles.reviewDate, isDark ? styles.reviewDateDark : styles.reviewDateLight]}>
@@ -307,6 +481,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                       </View>
                     ))}
                   </View>
+                  </>
                 ) : (
                   <View style={styles.emptyReviewsContainer}>
                     <Ionicons 
@@ -332,6 +507,32 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                   </View>
                 )}
               </View>
+
+              {/* Available Hours */}
+              {profile.availability && (
+                <View style={[styles.section, cardStyle]}>
+                  <Text style={[styles.sectionTitle, titleStyle]}>Available Hours</Text>
+                  <View style={styles.availabilityContainer}>
+                    {Object.entries(profile.availability).map(([day, hours]) => {
+                      if (!hours || !hours.start || !hours.end) return null;
+                      const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                      return (
+                        <View key={day} style={styles.availabilityRow}>
+                          <Text style={[styles.availabilityDay, textStyle]}>{dayName}</Text>
+                          <Text style={[styles.availabilityTime, textStyle]}>
+                            {formatTime12Hour(hours.start)} - {formatTime12Hour(hours.end)}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                    {Object.values(profile.availability).every(h => !h || !h.start || !h.end) && (
+                      <Text style={[styles.noAvailabilityText, textStyle]}>
+                        No availability set
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
 
               {/* QR Code - Only show to teenlancer themselves, not to neighbors */}
               {profileUrl && !isNeighbor && (
@@ -381,11 +582,56 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
 
             </ScrollView>
           )}
+          </View>
+
+          {/* Avatar - rendered outside ScrollView to appear above header */}
+          {profile && (
+            <View style={styles.avatarContainer}>
+              {profile.profile_photo_url ? (
+                <Image 
+                  source={{ uri: profile.profile_photo_url }} 
+                  style={[styles.avatar, isNeighbor && styles.avatarWhiteBorder]}
+                />
+              ) : (
+                <View style={[
+                  styles.avatarPlaceholder, 
+                  isDark && styles.avatarPlaceholderDark,
+                  isNeighbor && styles.avatarPlaceholderWhiteBorder
+                ]}>
+                  <Ionicons name="person" size={60} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Floating Message Pill for Neighbors viewing Teenlancer profiles */}
+          {isNeighbor && isTeenlancerProfile && profile && (
+            <Pressable 
+              style={styles.floatingMessageBubble}
+              onPress={handleMessagePress}
+            >
+              <View style={styles.floatingMessageContent}>
+                {profile.profile_photo_url ? (
+                  <Image
+                    source={{ uri: profile.profile_photo_url }}
+                    style={styles.floatingAvatar}
+                  />
+                ) : (
+                  <View style={styles.floatingAvatarPlaceholder}>
+                    <Ionicons name="person" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                  </View>
+                )}
+                <View style={styles.floatingMessageIcon}>
+                  <Ionicons name="chatbubble" size={16} color="#FFFFFF" />
+                </View>
+              </View>
+            </Pressable>
+          )}
         </View>
       </View>
       <AddReviewModal
         visible={showAddReviewModal}
-        teenlancerId={userId || ''}
+        teenlancerId={userId || undefined}
         onClose={() => setShowAddReviewModal(false)}
         onReviewAdded={async () => {
           // Reload reviews and rating
@@ -424,6 +670,10 @@ const styles = StyleSheet.create({
     height: Dimensions.get('window').height * 0.9,
     paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  modalLight: {
+    backgroundColor: '#FFFFFF',
   },
   modalDark: {
     backgroundColor: '#000000',
@@ -444,17 +694,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    position: 'relative',
-    zIndex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    elevation: 10,
+    backgroundColor: '#FFFFFF',
   },
   modalHeaderWithGreen: {
     borderBottomWidth: 0,
+    backgroundColor: 'transparent',
   },
   modalHeaderLight: {
     borderBottomColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
   modalHeaderDark: {
     borderBottomColor: '#374151',
+    backgroundColor: '#000000',
   },
   handle: {
     width: 40,
@@ -488,13 +746,18 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
+  scrollWrapper: {
+    flex: 1,
+    paddingTop: 190,
+    zIndex: 50,
+  },
   scrollView: {
     flex: 1,
-    flexGrow: 1,
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 24,
+    paddingTop: 0,
     alignItems: 'center',
   },
   loadingContainer: {
@@ -525,7 +788,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   avatarContainer: {
-    marginBottom: 16,
+    position: 'absolute',
+    top: 90,
+    alignSelf: 'center',
+    zIndex: 200,
+    elevation: 20,
   },
   avatar: {
     width: 100,
@@ -650,6 +917,103 @@ const styles = StyleSheet.create({
   reviewsList: {
     gap: 12,
   },
+  ratingBreakdownContainer: {
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  ratingBreakdownContainerDark: {
+    borderBottomColor: '#374151',
+  },
+  overallRatingContainer: {
+    marginBottom: 16,
+  },
+  overallRatingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  overallRatingValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  overallRatingNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  overallRatingCount: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  overallRatingCountLight: {
+    color: '#6B7280',
+  },
+  overallRatingCountDark: {
+    color: '#9CA3AF',
+  },
+  overallRatingStars: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  ratingBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  ratingBarLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    width: 40,
+  },
+  ratingBarStarText: {
+    fontSize: 12,
+    fontWeight: '500',
+    width: 12,
+  },
+  ratingBarContainer: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  ratingBar: {
+    height: '100%',
+    backgroundColor: '#73af17',
+    borderRadius: 4,
+  },
+  ratingBarDark: {
+    backgroundColor: '#73af17',
+  },
+  ratingBarStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 75,
+    justifyContent: 'flex-end',
+  },
+  ratingBarCount: {
+    fontSize: 12,
+    fontWeight: '500',
+    minWidth: 20,
+    textAlign: 'right',
+  },
+  ratingBarPercentage: {
+    fontSize: 12,
+    fontWeight: '500',
+    width: 40,
+    textAlign: 'right',
+  },
+  ratingBarPercentageLight: {
+    color: '#6B7280',
+  },
+  ratingBarPercentageDark: {
+    color: '#9CA3AF',
+  },
   emptyReviewsContainer: {
     alignItems: 'center',
     paddingVertical: 32,
@@ -765,11 +1129,52 @@ const styles = StyleSheet.create({
   labelDark: {
     color: '#9CA3AF',
   },
-  containerDark: {
-    backgroundColor: '#000000',
+  floatingMessageBubble: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 50 : 30,
+    right: 20,
+    zIndex: 100,
   },
-  containerLight: {
+  floatingMessageContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 32,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#73af17',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  floatingAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#73af17',
+  },
+  floatingAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#73af17',
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingMessageIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#73af17',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   availabilityContainer: {
     gap: 8,
@@ -788,9 +1193,6 @@ const styles = StyleSheet.create({
   availabilityTime: {
     fontSize: 14,
     marginLeft: 16,
-  },
-  availabilityTime: {
-    fontSize: 14,
   },
   noAvailabilityText: {
     fontSize: 14,

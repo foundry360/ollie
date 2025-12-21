@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 120,
+    minHeight: 48,
   },
   alignLeft: {
     alignItems: 'flex-start',

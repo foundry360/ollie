@@ -221,6 +221,17 @@ export default function TabLayout() {
         }} 
       />
       <Tabs.Screen 
+        name="select-teenlancer" 
+        options={{ 
+          title: 'Teenlancers',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people-outline" size={size} color={color} />
+          ),
+          tabBarLabelStyle,
+          href: isNeighbor ? undefined : null, // Only show for neighbors
+        }} 
+      />
+      <Tabs.Screen 
         name="earnings" 
         options={{ 
           title: 'Wallet',

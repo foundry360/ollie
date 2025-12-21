@@ -10,12 +10,13 @@ import { Task } from '@/types';
 
 interface AddReviewModalProps {
   visible: boolean;
-  teenlancerId: string;
+  teenlancerId?: string; // For neighbors reviewing teenlancers
+  neighborId?: string; // For teenlancers reviewing neighbors
   onClose: () => void;
   onReviewAdded: () => void;
 }
 
-export function AddReviewModal({ visible, teenlancerId, onClose, onReviewAdded }: AddReviewModalProps) {
+export function AddReviewModal({ visible, teenlancerId, neighborId, onClose, onReviewAdded }: AddReviewModalProps) {
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
   
@@ -27,7 +28,7 @@ export function AddReviewModal({ visible, teenlancerId, onClose, onReviewAdded }
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (visible && teenlancerId) {
+    if (visible && (teenlancerId || neighborId)) {
       loadAvailableGigs();
     } else {
       // Reset form when modal closes
@@ -36,7 +37,7 @@ export function AddReviewModal({ visible, teenlancerId, onClose, onReviewAdded }
       setSelectedGigId(null);
       setAvailableGigs([]);
     }
-  }, [visible, teenlancerId]);
+  }, [visible, teenlancerId, neighborId]);
 
   const loadAvailableGigs = async () => {
     try {
@@ -47,14 +48,34 @@ export function AddReviewModal({ visible, teenlancerId, onClose, onReviewAdded }
         return;
       }
 
-      // Get completed gigs where the current user is the poster and the teenlancer is assigned
-      const { data: gigs, error } = await supabase
-        .from('gigs')
-        .select('*')
-        .eq('poster_id', user.id)
-        .eq('teen_id', teenlancerId)
-        .eq('status', 'completed')
-        .order('created_at', { ascending: false });
+      let gigs;
+      let error;
+
+      if (teenlancerId) {
+        // Neighbor reviewing teenlancer: get completed gigs where current user is poster and teenlancer is assigned
+        const result = await supabase
+          .from('gigs')
+          .select('*')
+          .eq('poster_id', user.id)
+          .eq('teen_id', teenlancerId)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false });
+        gigs = result.data;
+        error = result.error;
+      } else if (neighborId) {
+        // Teenlancer reviewing neighbor: get completed gigs where current user is teen and neighbor is poster
+        const result = await supabase
+          .from('gigs')
+          .select('*')
+          .eq('teen_id', user.id)
+          .eq('poster_id', neighborId)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false });
+        gigs = result.data;
+        error = result.error;
+      } else {
+        throw new Error('Either teenlancerId or neighborId must be provided');
+      }
 
       if (error) throw error;
 
@@ -94,9 +115,15 @@ export function AddReviewModal({ visible, teenlancerId, onClose, onReviewAdded }
 
     try {
       setSubmitting(true);
+      const revieweeId = teenlancerId || neighborId;
+      if (!revieweeId) {
+        Alert.alert('Error', 'Invalid review target');
+        return;
+      }
+      
       await createReview({
         gig_id: selectedGigId,
-        reviewee_id: teenlancerId,
+        reviewee_id: revieweeId,
         rating,
         comment: comment.trim() || undefined,
       });
@@ -201,7 +228,7 @@ export function AddReviewModal({ visible, teenlancerId, onClose, onReviewAdded }
                 style={[styles.textArea, inputStyle, inputTextStyle]}
                 value={comment}
                 onChangeText={setComment}
-                placeholder="Share your experience working with this teenlancer..."
+                placeholder={neighborId ? "Share your experience working with this neighbor..." : "Share your experience working with this teenlancer..."}
                 placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
                 multiline
                 numberOfLines={6}

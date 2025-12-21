@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { User } from '@/types';
-import { getWeekRange } from '@/lib/utils';
+import { getWeekRange, calculateDistance } from '@/lib/utils';
 import { getAverageRating } from './reviews';
 
 export interface UpdateProfileData {
@@ -46,6 +46,26 @@ export async function getPublicUserProfile(userId: string): Promise<User | null>
     .eq('id', userId)
     .eq('role', 'teen') // Only allow viewing teen profiles publicly
     .maybeSingle(); // Use maybeSingle() to handle 0 rows gracefully
+
+  if (error) {
+    // Handle specific error codes
+    if (error.code === 'PGRST116') {
+      // No rows returned - profile not found or not accessible
+      return null;
+    }
+    throw error;
+  }
+  
+  return data;
+}
+
+// Get any user profile by ID (for messaging/chat - allows both teen and poster roles)
+export async function getUserProfileForChat(userId: string): Promise<User | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, full_name, profile_photo_url, role')
+    .eq('id', userId)
+    .maybeSingle();
 
   if (error) {
     // Handle specific error codes
@@ -275,5 +295,138 @@ export async function uploadProfilePhoto(uri: string): Promise<string> {
     console.error('Error uploading profile photo:', error);
     throw new Error(error.message || 'Failed to upload profile photo');
   }
+}
+
+// Get teenlancers for neighbor selection
+export interface TeenlancerProfile {
+  id: string;
+  full_name: string;
+  profile_photo_url?: string;
+  bio?: string;
+  skills?: string[];
+  rating: number;
+  reviewCount: number;
+  distance?: number; // in miles
+  address?: string;
+}
+
+export interface TeenlancerFilters {
+  minRating?: number;
+  skills?: string[];
+  radius?: number;
+  searchTerm?: string;
+}
+
+export async function getTeenlancers(
+  filters?: TeenlancerFilters,
+  userLocation?: { latitude: number; longitude: number },
+  sortBy?: 'rating' | 'distance'
+): Promise<TeenlancerProfile[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Get current user's location if not provided
+  let neighborLocation = userLocation;
+  if (!neighborLocation) {
+    const currentUser = await supabase
+      .from('users')
+      .select('address')
+      .eq('id', user.id)
+      .single();
+    
+    // If user has address, we'd need to geocode it, but for now we'll require location
+    // For simplicity, we'll fetch all teenlancers and calculate distance if location is provided
+  }
+
+  // Fetch all teenlancers (role = 'teen')
+  let query = supabase
+    .from('users')
+    .select('id, full_name, profile_photo_url, bio, skills, address')
+    .eq('role', 'teen');
+    // Note: Removed verified filter to show all teenlancers by default
+
+  // Apply skill filter if provided
+  if (filters?.skills && filters.skills.length > 0) {
+    query = query.contains('skills', filters.skills);
+  }
+
+  const { data: teenlancers, error } = await query;
+  if (error) throw error;
+
+  if (!teenlancers) return [];
+
+  // Get ratings for each teenlancer and calculate distance
+  const profilesWithNulls: (TeenlancerProfile | null)[] = await Promise.all(
+    teenlancers.map(async (teen) => {
+      try {
+        // Get rating
+        const ratingData = await getAverageRating(teen.id);
+        const rating = ratingData.averageRating;
+        const reviewCount = ratingData.reviewCount;
+
+        // Calculate distance if location is provided
+        let distance: number | undefined;
+        if (neighborLocation && teen.address) {
+          // For now, we'll skip distance calculation if address isn't geocoded
+          // In a real implementation, you'd geocode the address to get lat/lng
+          // For this implementation, we'll return undefined for distance
+          distance = undefined;
+        }
+
+        // Apply rating filter
+        if (filters?.minRating && rating < filters.minRating) {
+          return null;
+        }
+
+        return {
+          id: teen.id,
+          full_name: teen.full_name,
+          profile_photo_url: teen.profile_photo_url,
+          bio: teen.bio,
+          skills: teen.skills || [],
+          rating,
+          reviewCount,
+          distance,
+          address: teen.address,
+        };
+      } catch (error) {
+        console.error(`Error processing teenlancer ${teen.id}:`, error);
+        return null;
+      }
+    })
+  );
+
+  // Filter out nulls and apply search term filter
+  let filtered: TeenlancerProfile[] = profilesWithNulls.filter((p) => p !== null) as TeenlancerProfile[];
+
+  if (filters?.searchTerm) {
+    const searchLower = filters.searchTerm.toLowerCase();
+    filtered = filtered.filter(
+      (p) =>
+        p.full_name.toLowerCase().includes(searchLower) ||
+        p.bio?.toLowerCase().includes(searchLower) ||
+        p.skills?.some((s) => s.toLowerCase().includes(searchLower))
+    );
+  }
+
+  // Sort based on sortBy parameter
+  const sortMethod = sortBy || 'rating';
+  filtered.sort((a, b) => {
+    if (sortMethod === 'distance') {
+      if (a.distance !== undefined && b.distance !== undefined) {
+        return a.distance - b.distance;
+      }
+      // If one has distance and other doesn't, prioritize the one with distance
+      if (a.distance !== undefined) return -1;
+      if (b.distance !== undefined) return 1;
+      // Fallback to rating if no distances
+      return b.rating - a.rating;
+    } else {
+      // Default: sort by rating (descending)
+      return b.rating - a.rating;
+    }
+  });
+
+  return filtered;
 }
 

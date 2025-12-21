@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native';
 import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig } from '@/hooks/useTasks';
 import { applyForGig } from '@/lib/api/tasks';
@@ -14,8 +14,10 @@ import { formatAddress } from '@/lib/utils';
 import { format } from 'date-fns';
 import { CreateGigModal } from '@/components/tasks/CreateGigModal';
 import { ProfileModal } from '@/components/profile/ProfileModal';
-import { getPublicUserProfile } from '@/lib/api/users';
+import { getPublicUserProfile, getUserProfileForChat } from '@/lib/api/users';
 import { useGigApplications, useHasAppliedForGig, useApproveGigApplication, useRejectGigApplication } from '@/hooks/useGigApplications';
+import { AddReviewModal } from '@/components/reviews/AddReviewModal';
+import { canReviewGig } from '@/lib/api/reviews';
 
 interface GigDetailModalProps {
   visible: boolean;
@@ -36,6 +38,8 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedTeenId, setSelectedTeenId] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [canReview, setCanReview] = useState<{ canReview: boolean; reason?: string }>({ canReview: false });
   
   // Check if gig is saved (only for teenlancers)
   const { data: isSaved = false } = useIsGigSaved(taskId);
@@ -45,8 +49,18 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   // Check if teen has already applied
   const { data: hasApplied = false } = useHasAppliedForGig(taskId);
   
-  // Get applications for this gig (for neighbors)
-  const { data: applications = [] } = useGigApplications(isNeighbor ? taskId : null);
+  // Determine user roles and relationships
+  const isPoster = task ? user?.id === task.poster_id : false;
+  const isTeen = task ? (task.teen_id ? user?.id === task.teen_id : false) : false;
+  const isTeenlancer = user?.role === 'teen';
+  const isNeighbor = user?.role === 'poster';
+  const isOpen = task?.status === 'open';
+  
+  // Get applications for this gig (for neighbors and teenlancers viewing open gigs)
+  // Neighbors need full details, teenlancers just need the count
+  const shouldFetchApplications = isNeighbor || (isOpen && isTeenlancer && !isPoster && !isTeen);
+  const { data: applications = [] } = useGigApplications(shouldFetchApplications ? taskId : null);
+  
   const approveMutation = useApproveGigApplication();
   const rejectMutation = useRejectGigApplication();
 
@@ -57,18 +71,43 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
     enabled: !!task?.teen_id,
     staleTime: 300000, // 5 minutes
   });
-
-  const isPoster = task ? user?.id === task.poster_id : false;
-  const isTeen = task ? (task.teen_id ? user?.id === task.teen_id : false) : false;
-  const isTeenlancer = user?.role === 'teen';
-  const isNeighbor = user?.role === 'poster';
-  const isOpen = task?.status === 'open';
+  
+  // Fetch neighbor/poster profile for teenlancers viewing open gigs
+  const { data: neighborProfile } = useQuery({
+    queryKey: ['neighborProfile', task?.poster_id],
+    queryFn: () => getUserProfileForChat(task!.poster_id!),
+    enabled: !!task?.poster_id && isOpen && isTeenlancer && !isPoster && !isTeen,
+    staleTime: 300000, // 5 minutes
+  });
   const canApply = task && isOpen && !isPoster && !isTeen && isTeenlancer && !hasApplied;
   const canStart = task && isTeen && task.status === 'accepted';
   const canComplete = task && isTeen && task.status === 'in_progress';
   const canEdit = task && isPoster && isNeighbor && ['open', 'cancelled'].includes(task.status);
   const canSave = task && isOpen && isTeenlancer && !isPoster && !isTeen;
   const pendingApplications = applications.filter(app => app.status === 'pending');
+  
+  // Get applicant count from pending applications
+  const applicantCount = pendingApplications.length;
+  
+  // Check if teenlancer can review neighbor for completed gigs
+  const isCompleted = task?.status === 'completed';
+  const canReviewNeighbor = task && isCompleted && isTeen && task.poster_id;
+  
+  // Check review eligibility when task changes
+  useEffect(() => {
+    if (canReviewNeighbor && task?.id) {
+      canReviewGig(task.id)
+        .then((data) => {
+          setCanReview(data);
+        })
+        .catch((error) => {
+          console.error('Error checking review eligibility:', error);
+          setCanReview({ canReview: false });
+        });
+    } else {
+      setCanReview({ canReview: false });
+    }
+  }, [canReviewNeighbor, task?.id]);
 
   const handleApply = async () => {
     if (!task) return;
@@ -132,7 +171,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
         {
           text: 'Reject',
           style: 'destructive',
-          onPress: async (reason) => {
+          onPress: async (reason: string | undefined) => {
             try {
               await rejectMutation.mutateAsync({ applicationId, reason });
               queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -329,6 +368,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={true}
               nestedScrollEnabled={true}
+              contentInsetAdjustmentBehavior="never"
             >
               {task.photos && task.photos.length > 0 && (
                 <View style={styles.imageContainer}>
@@ -376,19 +416,19 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                   {isOpen && (
                     <View style={styles.applicantsRow}>
                       <Text style={[styles.applicantsText, textStyle]}>
-                        Applicants ({pendingApplications.length})
+                        Applicants ({applicantCount})
                       </Text>
                     </View>
                   )}
                 </View>
 
                 <View style={[styles.section, sectionStyle]}>
-                  <Text style={[styles.sectionTitle, titleStyle]}>Description</Text>
+                  <Text style={[titleStyle, styles.sectionTitle]}>Description</Text>
                   <Text style={[styles.description, textStyle]}>{task.description}</Text>
                 </View>
 
                 <View style={[styles.section, sectionStyle]}>
-                  <Text style={[styles.sectionTitle, titleStyle]}>Details</Text>
+                  <Text style={[titleStyle, styles.sectionTitle]}>Details</Text>
                   {task.estimated_hours && (
                     <View style={styles.detailRow}>
                       <Ionicons name="time" size={20} color="#73af17" />
@@ -471,7 +511,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                 </View>
 
                 <View style={[styles.section, sectionStyle]}>
-                  <Text style={[styles.sectionTitle, titleStyle]}>Location</Text>
+                  <Text style={[titleStyle, styles.sectionTitle]}>Location</Text>
                   <View style={[styles.locationContainer, isDark && styles.locationContainerDark]}>
                     <View style={styles.locationInfo}>
                       <Ionicons name="location" size={24} color="#73af17" />
@@ -479,15 +519,15 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                         {(() => {
                           const { street, cityStateZip } = formatAddress(task.address);
                           return (
-                            <View>
-                              <Text style={[styles.locationAddress, textStyle]}>{street || task.address}</Text>
+                            <View style={styles.locationAddressContainer}>
+                              <Text style={[textStyle, styles.locationAddress]}>{street || task.address}</Text>
                               {cityStateZip ? (
-                                <Text style={[styles.locationAddress, textStyle]}>{cityStateZip}</Text>
+                                <Text style={[textStyle, styles.locationAddress, styles.locationAddressSecondLine]}>{cityStateZip}</Text>
                               ) : null}
                             </View>
                           );
                         })()}
-                        <Text style={[styles.locationCoords, labelStyle]}>
+                        <Text style={[labelStyle, styles.locationCoords]}>
                           {task.location.latitude.toFixed(6)}, {task.location.longitude.toFixed(6)}
                         </Text>
                       </View>
@@ -501,73 +541,75 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                   </Pressable>
                 </View>
 
-                {isNeighbor && isOpen && pendingApplications.length > 0 && (
+                {isNeighbor && isOpen && (
                   <View style={[styles.section, sectionStyle]}>
-                    <Text style={[styles.sectionTitle, titleStyle]}>Applications ({pendingApplications.length})</Text>
-                    {pendingApplications.map((application) => (
-                      <View key={application.id} style={[styles.applicationCard, isDark && styles.applicationCardDark]}>
-                        <Pressable
-                          style={styles.applicationHeader}
-                          onPress={() => {
-                            setSelectedTeenId(application.teen_id);
-                            setShowProfileModal(true);
-                          }}
-                        >
-                          <View style={styles.applicationTeenInfo}>
-                            {application.teen_photo ? (
-                              <Image
-                                source={{ uri: application.teen_photo }}
-                                style={styles.applicationAvatar}
-                              />
-                            ) : (
-                              <View style={[styles.applicationAvatarPlaceholder, isDark && styles.applicationAvatarPlaceholderDark]}>
-                                <Ionicons name="person" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                              </View>
-                            )}
-                            <View style={styles.applicationTeenDetails}>
-                              <Text style={[styles.applicationTeenName, textStyle]}>
-                                {application.teen_name || 'Unknown'}
-                              </Text>
-                              {application.teen_age && (
-                                <Text style={[styles.applicationTeenAge, labelStyle]}>
-                                  Age {application.teen_age}
-                                </Text>
+                    <Text style={[titleStyle, styles.sectionTitle]}>Applicants ({applicantCount})</Text>
+                    {pendingApplications.length > 0 ? (
+                      pendingApplications.map((application) => (
+                        <View key={application.id} style={[styles.applicationCard, isDark && styles.applicationCardDark]}>
+                          <Pressable
+                            style={styles.applicationHeader}
+                            onPress={() => {
+                              setSelectedTeenId(application.teen_id);
+                              setShowProfileModal(true);
+                            }}
+                          >
+                            <View style={styles.applicationTeenInfo}>
+                              {application.teen_photo ? (
+                                <Image
+                                  source={{ uri: application.teen_photo }}
+                                  style={styles.applicationAvatar}
+                                />
+                              ) : (
+                                <View style={[styles.applicationAvatarPlaceholder, isDark && styles.applicationAvatarPlaceholderDark]}>
+                                  <Ionicons name="person" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                                </View>
                               )}
+                              <View style={styles.applicationTeenDetails}>
+                                <Text style={[styles.applicationTeenName, textStyle]}>
+                                  {application.teen_name || 'Unknown'}
+                                </Text>
+                                <View style={styles.applicationTeenMeta}>
+                                  {application.teen_age && (
+                                    <Text style={[styles.applicationTeenAge, labelStyle]}>
+                                      Age {application.teen_age}
+                                    </Text>
+                                  )}
+                                  {application.teen_rating !== undefined && application.teen_rating > 0 && (
+                                    <View style={styles.ratingContainer}>
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <Ionicons
+                                          key={star}
+                                          name={star <= Math.round(application.teen_rating) ? 'star' : 'star-outline'}
+                                          size={14}
+                                          color="#F59E0B"
+                                          style={styles.starIcon}
+                                        />
+                                      ))}
+                                      <Text style={[styles.applicationTeenRating, labelStyle]}>
+                                        {application.teen_rating.toFixed(1)}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              </View>
                             </View>
-                          </View>
-                          <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                        </Pressable>
-                        <View style={styles.applicationActions}>
-                          <Pressable
-                            style={[styles.approveButton, isDark && styles.approveButtonDark]}
-                            onPress={() => handleApproveApplication(application.id)}
-                            disabled={approveMutation.isPending}
-                          >
-                            {approveMutation.isPending ? (
-                              <ActivityIndicator size="small" color="#73af17" />
-                            ) : (
-                              <Text style={styles.approveButtonText}>Approve</Text>
-                            )}
-                          </Pressable>
-                          <Pressable
-                            style={[styles.rejectButton, isDark && styles.rejectButtonDark]}
-                            onPress={() => handleRejectApplication(application.id)}
-                            disabled={rejectMutation.isPending}
-                          >
-                            {rejectMutation.isPending ? (
-                              <ActivityIndicator size="small" color="#EF4444" />
-                            ) : (
-                              <Text style={[styles.rejectButtonText, isDark && styles.rejectButtonTextDark]}>Reject</Text>
-                            )}
+                            <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
                           </Pressable>
                         </View>
+                      ))
+                    ) : (
+                      <View style={styles.emptyApplicationsContainer}>
+                        <Text style={[styles.emptyApplicationsText, textStyle]}>
+                          No applicants yet. Teenlancers will appear here when they apply.
+                        </Text>
                       </View>
-                    ))}
+                    )}
                   </View>
                 )}
 
                 <View style={styles.actions}>
-                  {(canSave || canApply || hasApplied) && (
+                  {(canSave || canApply || hasApplied || (isOpen && isTeenlancer && !isPoster && !isTeen)) && (
                     <View style={styles.actionRow}>
                       {canApply && (
                         <View style={styles.acceptButtonContainer}>
@@ -635,7 +677,8 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                       fullWidth
                     />
                   )}
-                  {(isPoster || isTeen) && task.status !== 'completed' && task.status !== 'cancelled' && (
+                  {/* Chat button for assigned gigs */}
+                  {(isPoster || isTeen) && task.teen_id && task.status !== 'completed' && task.status !== 'cancelled' && (
                     <Button
                       title="Chat"
                       onPress={handleChat}
@@ -643,9 +686,66 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                       fullWidth
                     />
                   )}
+                  {/* Leave Review button for teenlancers on completed gigs */}
+                  {canReviewNeighbor && canReview.canReview && (
+                    <Button
+                      title="Leave Review"
+                      onPress={() => setShowReviewModal(true)}
+                      variant="secondary"
+                      fullWidth
+                    />
+                  )}
                 </View>
               </View>
             </ScrollView>
+          )}
+          
+          {/* Floating message bubble for teenlancers viewing open gigs */}
+          {isOpen && isTeenlancer && !isPoster && !isTeen && (
+            <Pressable 
+              style={styles.floatingMessageBubble}
+              onPress={handleChat}
+            >
+              <View style={[styles.floatingMessageContent, isDark && styles.floatingMessageContentDark]}>
+                {neighborProfile?.profile_photo_url ? (
+                  <Image
+                    source={{ uri: neighborProfile.profile_photo_url }}
+                    style={styles.floatingAvatar}
+                  />
+                ) : (
+                  <View style={[styles.floatingAvatarPlaceholder, isDark && styles.floatingAvatarPlaceholderDark]}>
+                    <Ionicons name="person" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                  </View>
+                )}
+                <View style={styles.floatingMessageIcon}>
+                  <Ionicons name="chatbubble" size={16} color="#FFFFFF" />
+                </View>
+              </View>
+            </Pressable>
+          )}
+          
+          {/* Floating message bubble for neighbors viewing assigned gigs (not completed or cancelled) */}
+          {isNeighbor && task?.teen_id && task.status !== 'completed' && task.status !== 'cancelled' && (
+            <Pressable 
+              style={styles.floatingMessageBubble}
+              onPress={handleChat}
+            >
+              <View style={[styles.floatingMessageContent, isDark && styles.floatingMessageContentDark]}>
+                {teenProfile?.profile_photo_url ? (
+                  <Image
+                    source={{ uri: teenProfile.profile_photo_url }}
+                    style={styles.floatingAvatar}
+                  />
+                ) : (
+                  <View style={[styles.floatingAvatarPlaceholder, isDark && styles.floatingAvatarPlaceholderDark]}>
+                    <Ionicons name="person" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                  </View>
+                )}
+                <View style={styles.floatingMessageIcon}>
+                  <Ionicons name="chatbubble" size={16} color="#FFFFFF" />
+                </View>
+              </View>
+            </Pressable>
           )}
         </View>
       </View>
@@ -663,6 +763,18 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
         onClose={() => {
           setShowProfileModal(false);
           setSelectedTeenId(null);
+        }}
+      />
+      <AddReviewModal
+        visible={showReviewModal}
+        neighborId={task?.poster_id}
+        onClose={() => {
+          setShowReviewModal(false);
+          queryClient.invalidateQueries({ queryKey: ['canReviewGig'] });
+        }}
+        onReviewAdded={() => {
+          queryClient.invalidateQueries({ queryKey: ['reviews'] });
+          queryClient.invalidateQueries({ queryKey: ['canReviewGig'] });
         }}
       />
     </Modal>
@@ -699,7 +811,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#73af17',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    zIndex: 0,
+    zIndex: 5,
   },
   modalHeader: {
     paddingTop: 12,
@@ -707,7 +819,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     position: 'relative',
-    zIndex: 1,
+    zIndex: 10,
   },
   modalHeaderWithGreen: {
     borderBottomWidth: 0,
@@ -735,7 +847,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   modalTitleOnGreen: {
@@ -753,8 +865,10 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     flexGrow: 1,
+    zIndex: 1,
   },
   scrollContent: {
+    paddingTop: 24,
     paddingBottom: 24,
   },
   loadingContainer: {
@@ -780,6 +894,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     height: 200,
+    marginTop: 0,
   },
   image: {
     width: '100%',
@@ -855,13 +970,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     flex: 1,
     marginRight: 12,
   },
   payAmount: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   section: {
@@ -874,7 +989,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1F2937',
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 12,
   },
@@ -965,15 +1080,22 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'column',
   },
+  locationAddressContainer: {
+    marginBottom: 4,
+  },
   locationAddress: {
     fontSize: 14,
     fontWeight: '500',
-    marginBottom: 2,
-    color: '#000000',
+    marginBottom: 0,
+    lineHeight: 16,
+  },
+  locationAddressSecondLine: {
+    marginTop: 2,
   },
   locationCoords: {
     fontSize: 12,
     color: '#6B7280',
+    marginTop: 4,
   },
   mapButton: {
     flexDirection: 'row',
@@ -1014,6 +1136,8 @@ const styles = StyleSheet.create({
     borderColor: '#73af17',
     padding: 2, // Inner padding to account for border
     backgroundColor: '#73af17', // Fill the border area
+    justifyContent: 'center',
+    height: 52, // Fixed height: 48 (button minHeight) + 4 (2px padding top + 2px padding bottom)
   },
   saveButtonContainer: {
     flex: 1,
@@ -1024,13 +1148,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: '#73af17',
     backgroundColor: 'transparent',
-    minHeight: 48, // Match Button component default height
+    height: 52, // Fixed height to match Apply/Applied buttons (wrapper is 52px: 48px button + 4px padding)
   },
   saveButtonSaved: {
     borderColor: '#73af17',
@@ -1146,30 +1270,60 @@ const styles = StyleSheet.create({
   applicationTeenAge: {
     fontSize: 14,
     color: '#6B7280',
+    lineHeight: 14,
+  },
+  applicationTeenMeta: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  applicationTeenMetaSeparator: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginHorizontal: 4,
+    lineHeight: 20,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    flexShrink: 0,
+    marginLeft: 8,
+  },
+  starIcon: {
+    marginRight: 2,
+  },
+  applicationTeenRating: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    lineHeight: 14,
+    includeFontPadding: false,
   },
   applicationActions: {
     flexDirection: 'row',
     gap: 12,
   },
-  approveButton: {
+  thumbsUpButton: {
     flex: 1,
-    backgroundColor: '#73af17',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#73af17',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     minHeight: 48,
   },
-  approveButtonDark: {
-    backgroundColor: '#73af17',
+  thumbsUpButtonDark: {
+    backgroundColor: 'transparent',
+    borderColor: '#73af17',
   },
-  approveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  rejectButton: {
+  thumbsDownButton: {
     flex: 1,
     backgroundColor: 'transparent',
     borderWidth: 2,
@@ -1179,19 +1333,82 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     minHeight: 48,
   },
-  rejectButtonDark: {
+  thumbsDownButtonDark: {
     backgroundColor: 'transparent',
     borderColor: '#EF4444',
   },
-  rejectButtonText: {
-    color: '#EF4444',
+  thumbsButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },
-  rejectButtonTextDark: {
-    color: '#EF4444',
+  emptyApplicationsContainer: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyApplicationsText: {
+    fontSize: 14,
+    textAlign: 'center',
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  floatingMessageBubble: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 50 : 30,
+    right: 20,
+    zIndex: 100,
+  },
+  floatingMessageContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#73af17',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  floatingMessageContentDark: {
+    backgroundColor: '#1F2937',
+    borderColor: '#73af17',
+  },
+  floatingAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#73af17',
+  },
+  floatingAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#73af17',
+  },
+  floatingAvatarPlaceholderDark: {
+    backgroundColor: '#374151',
+  },
+  floatingMessageIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#73af17',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

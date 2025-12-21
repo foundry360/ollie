@@ -13,14 +13,14 @@ const TIPS: Tip[] = [
   {
     id: '1',
     icon: 'person',
-    title: 'Complete Your Profile',
-    description: 'Add your skills and availability to get more task matches',
+    title: 'Update Your Profile',
+    description: 'Add your skills to get more gig matches',
   },
   {
     id: '2',
     icon: 'time',
     title: 'Set Your Availability',
-    description: 'Let neighbors know when you\'re available to work',
+    description: 'Let neighbors know when you\'re available',
   },
   {
     id: '3',
@@ -31,7 +31,7 @@ const TIPS: Tip[] = [
   {
     id: '4',
     icon: 'chatbubbles',
-    title: 'Communicate Clearly',
+    title: 'Good Communication',
     description: 'Respond to messages quickly to build trust',
   },
 ];
@@ -50,9 +50,18 @@ export function TipsCarousel() {
       >
         {TIPS.map((tip) => (
           <View key={tip.id} style={[styles.tipCard, isDark && styles.tipCardDark]}>
-            <View style={styles.tipContent}>
-              <Ionicons name={tip.icon} size={32} color={isDark ? '#A8D574' : '#73af17'} />
-              <Text style={[styles.tipTitle, isDark && styles.tipTitleDark]}>{tip.title}</Text>
+            <View style={[styles.tipTopHalf, isDark && styles.tipTopHalfDark]}>
+              <View style={[styles.iconContainer, isDark && styles.iconContainerDark]}>
+                <Ionicons name={tip.icon} size={28} color={isDark ? '#A8D574' : '#73af17'} />
+              </View>
+            </View>
+            <View style={styles.tipBottomHalf}>
+              <Text 
+                style={[styles.tipTitle, isDark && styles.tipTitleDark]}
+                numberOfLines={2}
+              >
+                {tip.title}
+              </Text>
               <Text style={[styles.tipDescription, isDark && styles.tipDescriptionDark]}>{tip.description}</Text>
             </View>
           </View>
@@ -68,7 +77,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -85,42 +94,78 @@ const styles = StyleSheet.create({
   tipCard: {
     width: 200,
     height: 200,
-    borderRadius: 16,
-    backgroundColor: '#E8F5D9',
-    borderWidth: 1,
-    borderColor: '#C8E5A3',
+    borderRadius: 20,
+    backgroundColor: '#F0F9E8',
+    borderWidth: 1.5,
+    borderColor: '#D4E8B8',
+    shadowColor: '#73af17',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
   },
   tipCardDark: {
-    backgroundColor: '#2D4A1A',
-    borderColor: '#3D5F2A',
+    backgroundColor: '#1F3A0F',
+    borderColor: '#2D5A1A',
+    shadowColor: '#A8D574',
+    shadowOpacity: 0.2,
   },
-  tipContent: {
+  tipTopHalf: {
+    height: '50%',
+    backgroundColor: '#73af17',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  tipTopHalfDark: {
+    backgroundColor: '#73af17',
+  },
+  tipBottomHalf: {
+    height: '50%',
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    height: '100%',
+  },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E8F5D9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconContainerDark: {
+    backgroundColor: '#2D4A1A',
   },
   tipTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#73af17',
-    marginTop: 12,
-    marginBottom: 8,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#5a8a12',
+    marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: 0.1,
+    width: '100%',
   },
   tipTitleDark: {
     color: '#A8D574',
   },
   tipDescription: {
-    fontSize: 13,
-    color: '#5a8a12',
+    fontSize: 11,
+    color: '#6B8A3A',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 16,
+    fontWeight: '400',
   },
   tipDescriptionDark: {
     color: '#B8E584',
   },
 });
+
 
 
 

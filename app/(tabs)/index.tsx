@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Pressable, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -24,7 +24,9 @@ export default function MarketplaceScreen() {
     maxPay?: number;
     skills?: string[];
     radius?: number;
+    searchTerm?: string;
   }>({});
+  const [searchInput, setSearchInput] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -61,15 +63,31 @@ export default function MarketplaceScreen() {
   }, [isNeighbor]);
 
   const {
-    data: gigs = [],
+    data: allGigs = [],
     isLoading,
     isRefetching,
     refetch,
   } = useOpenTasks({
-    ...filters,
+    minPay: filters.minPay,
+    maxPay: filters.maxPay,
+    skills: filters.skills,
+    radius: filters.radius,
     userLocation: filters.radius ? userLocation || undefined : undefined,
     limit: 50,
   });
+
+  // Filter gigs by search term client-side
+  const gigs = filters.searchTerm
+    ? allGigs.filter(gig => {
+        const searchLower = filters.searchTerm!.toLowerCase();
+        return (
+          gig.title.toLowerCase().includes(searchLower) ||
+          gig.description.toLowerCase().includes(searchLower) ||
+          gig.address.toLowerCase().includes(searchLower) ||
+          gig.required_skills?.some(skill => skill.toLowerCase().includes(searchLower))
+        );
+      })
+    : allGigs;
 
   const {
     data: savedGigs = [],
@@ -150,6 +168,40 @@ export default function MarketplaceScreen() {
           <View style={styles.headerActions}>
             <TaskFilters filters={filters} onFiltersChange={setFilters} />
           </View>
+        </View>
+      </View>
+
+      {/* Search Field */}
+      <View style={[styles.searchFieldWrapper, isDark && styles.searchFieldWrapperDark]}>
+        <View style={[styles.searchFieldContainer, isDark && styles.searchFieldContainerDark]}>
+          <Ionicons 
+            name="search" 
+            size={18} 
+            color={isDark ? '#9CA3AF' : '#6B7280'} 
+            style={styles.searchFieldIcon}
+          />
+            <TextInput
+              style={[styles.searchFieldInput, isDark && styles.searchFieldInputDark]}
+              placeholder="Try yard work, babysitting, pet care..."
+              placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+              value={searchInput}
+              onChangeText={(text) => {
+                setSearchInput(text);
+                setFilters({ ...filters, searchTerm: text.trim() || undefined });
+              }}
+              returnKeyType="search"
+            />
+          {searchInput.length > 0 && (
+            <Pressable
+              onPress={() => {
+                setSearchInput('');
+                setFilters({ ...filters, searchTerm: undefined });
+              }}
+              style={styles.searchFieldClear}
+            >
+              <Ionicons name="close-circle" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -378,5 +430,46 @@ const styles = StyleSheet.create({
   },
   tabTextDark: {
     color: '#9CA3AF',
+  },
+  searchFieldWrapper: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  searchFieldWrapperDark: {
+    backgroundColor: '#000000',
+    borderBottomColor: '#374151',
+  },
+  searchFieldContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
+  },
+  searchFieldContainerDark: {
+    borderColor: '#4B5563',
+    backgroundColor: '#374151',
+  },
+  searchFieldIcon: {
+    marginRight: 12,
+  },
+  searchFieldInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#111827',
+    padding: 0,
+  },
+  searchFieldInputDark: {
+    color: '#FFFFFF',
+  },
+  searchFieldClear: {
+    marginLeft: 8,
+    padding: 4,
   },
 });

@@ -25,8 +25,12 @@ export default function ChatScreen() {
   const markAsReadMutation = useMarkMessagesAsRead();
 
   // Get the other user's ID
+  // For assigned gigs: poster messages teen, teen messages poster
+  // For open gigs: teenlancer can message poster (teen_id is null)
   const otherUserId = task
-    ? (task.poster_id === user?.id ? task.teen_id : task.poster_id)
+    ? (task.poster_id === user?.id 
+        ? task.teen_id  // Poster messaging teen (only works if gig is assigned)
+        : task.poster_id) // Teenlancer messaging poster (works for both assigned and open gigs)
     : null;
 
   // Mark messages as read when viewing
