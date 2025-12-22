@@ -143,8 +143,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#374151',
+    backgroundColor: 'transparent',
+    borderColor: '#1F2937',
   },
   taskHeader: {
     flexDirection: 'row',
@@ -223,6 +223,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 });
+
+
 
 
 

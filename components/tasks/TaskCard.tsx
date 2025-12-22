@@ -101,14 +101,20 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
     >
       {/* Left side: Image with info below */}
       <View style={[styles.leftSection, isDark && styles.leftSectionDark]}>
-        {task.photos && task.photos.length > 0 ? (
+        {task.photos && task.photos.length > 0 && task.photos[0] ? (
           <Image 
             source={{ uri: task.photos[0] }} 
             style={styles.image}
             resizeMode="cover"
+            onError={(e) => {
+              console.log('Image load error for task:', task.id, 'Photo URL:', task.photos?.[0], 'Error:', e.nativeEvent.error);
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully for task:', task.id, 'Photo URL:', task.photos?.[0]);
+            }}
           />
         ) : (
-          <View style={styles.imagePlaceholder}>
+          <View style={[styles.imagePlaceholder, isDark && styles.imagePlaceholderDark]}>
             <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
           </View>
         )}
@@ -226,8 +232,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#374151',
+    backgroundColor: 'transparent',
+    borderColor: '#1F2937',
   },
   leftSection: {
     width: 100,
@@ -248,6 +254,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  imagePlaceholderDark: {
+    backgroundColor: '#1F2937',
   },
   infoRow: {
     flexDirection: 'column',
@@ -361,15 +370,18 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
     flex: 1,
+    paddingLeft: 0,
+    marginLeft: 0,
   },
   skillTag: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
+    backgroundColor: 'transparent',
+    paddingLeft: 0,
+    paddingRight: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
   skillTagDark: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: 'transparent',
   },
   skillText: {
     fontSize: 12,

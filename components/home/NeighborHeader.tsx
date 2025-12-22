@@ -119,7 +119,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#1F2937',
   },
   statValue: {
     fontSize: 16,
@@ -139,6 +141,8 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 });
+
+
 
 
 

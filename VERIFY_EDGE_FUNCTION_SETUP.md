@@ -56,3 +56,5 @@ The Edge Function code checks for `RESEND_API_KEY` at runtime. If it's not set, 
 
 
 
+
+

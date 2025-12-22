@@ -116,7 +116,7 @@ export function TeenlancerFilters({ filters, onFiltersChange }: TeenlancerFilter
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, modalStyle]}>
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, isDark && styles.modalHeaderDark]}>
               <Text style={[styles.modalTitle, titleStyle]}>Filter Teenlancers</Text>
               <Pressable onPress={() => setShowModal(false)}>
                 <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#111827'} />
@@ -231,12 +231,12 @@ export function TeenlancerFilters({ filters, onFiltersChange }: TeenlancerFilter
               </View>
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            <View style={[styles.modalFooter, isDark && styles.modalFooterDark]}>
               <Pressable
-                style={[styles.footerButton, styles.clearButton]}
+                style={[styles.footerButton, styles.clearButton, isDark && styles.clearButtonDark]}
                 onPress={clearFilters}
               >
-                <Text style={styles.clearButtonText}>Clear</Text>
+                <Text style={[styles.clearButtonText, isDark && styles.clearButtonTextDark]}>Clear</Text>
               </Pressable>
               <Pressable
                 style={[styles.footerButton, styles.applyButton]}
@@ -296,7 +296,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   modalDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: '#1F2937',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -305,6 +307,9 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+  },
+  modalHeaderDark: {
+    borderBottomColor: '#1F2937',
   },
   modalTitle: {
     fontSize: 20,
@@ -345,8 +350,8 @@ const styles = StyleSheet.create({
     borderColor: '#73af17',
   },
   ratingChipDark: {
-    backgroundColor: '#374151',
-    borderColor: '#4B5563',
+    backgroundColor: '#111827',
+    borderColor: '#1F2937',
   },
   ratingChipSelectedDark: {
     backgroundColor: '#73af17',
@@ -390,8 +395,8 @@ const styles = StyleSheet.create({
     borderColor: '#73af17',
   },
   radiusChipDark: {
-    backgroundColor: '#374151',
-    borderColor: '#4B5563',
+    backgroundColor: '#111827',
+    borderColor: '#1F2937',
   },
   radiusChipSelectedDark: {
     backgroundColor: '#73af17',
@@ -426,8 +431,8 @@ const styles = StyleSheet.create({
     borderColor: '#73af17',
   },
   skillChipDark: {
-    backgroundColor: '#374151',
-    borderColor: '#4B5563',
+    backgroundColor: '#111827',
+    borderColor: '#1F2937',
   },
   skillChipSelectedDark: {
     backgroundColor: '#73af17',
@@ -451,6 +456,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
+  modalFooterDark: {
+    borderTopColor: '#1F2937',
+  },
   footerButton: {
     flex: 1,
     paddingVertical: 12,
@@ -458,12 +466,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clearButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  clearButtonDark: {
+    borderColor: '#1F2937',
   },
   clearButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
+  },
+  clearButtonTextDark: {
+    color: '#D1D5DB',
   },
   applyButton: {
     backgroundColor: '#73af17',
@@ -480,4 +496,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 });
+
+
 

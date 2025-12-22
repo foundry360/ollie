@@ -118,7 +118,7 @@ export function NeighborActiveGigs() {
                     resizeMode="cover"
                   />
                 ) : (
-                  <View style={styles.imagePlaceholder}>
+                  <View style={[styles.imagePlaceholder, isDark && styles.imagePlaceholderDark]}>
                     <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
                   </View>
                 )}
@@ -127,6 +127,9 @@ export function NeighborActiveGigs() {
 
               {/* Right side: Title, status, and details */}
               <View style={styles.content}>
+                <Text style={styles.postedText} allowFontScaling={false}>
+                  Posted {formatTimeAgo(new Date(item.created_at))}
+                </Text>
                 <Text style={[styles.gigTitle, titleStyle]} numberOfLines={2}>
                   {item.title}
                 </Text>
@@ -223,8 +226,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#374151',
+    backgroundColor: 'transparent',
+    borderColor: '#1F2937',
   },
   leftSection: {
     width: 100,
@@ -246,6 +249,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  imagePlaceholderDark: {
+    backgroundColor: '#1F2937',
   },
   metaItem: {
     flexDirection: 'row',
@@ -296,6 +302,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 0,
   },
+  postedText: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
   applicationsText: {
     fontSize: 14,
     color: '#73af17',
@@ -343,6 +354,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 });
+
+
 
 
 

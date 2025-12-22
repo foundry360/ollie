@@ -225,7 +225,7 @@ export default function TabLayout() {
         options={{ 
           title: 'Teenlancers',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
+            <Ionicons name="search-outline" size={size} color={color} />
           ),
           tabBarLabelStyle,
           href: isNeighbor ? undefined : null, // Only show for neighbors

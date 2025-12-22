@@ -127,7 +127,7 @@ export default function SelectTeenlancerScreen() {
     <SafeAreaView style={[styles.container, containerStyle]} edges={['bottom', 'left', 'right']}>
       <View style={[styles.header, headerStyle]}>
         <View style={styles.headerRow}>
-          <Text style={[styles.heading, titleStyle]}>Select a Teenlancer</Text>
+          <Text style={[styles.heading, titleStyle]}>Find a Teenlancer</Text>
           <View style={styles.headerActions}>
             <TeenlancerFilters filters={filters} onFiltersChange={setFilters} />
           </View>
@@ -341,4 +341,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+
 

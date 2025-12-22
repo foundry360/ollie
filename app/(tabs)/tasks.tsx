@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     borderColor: '#73af17',
   },
   filterButtonDark: {
-    backgroundColor: '#374151',
+    backgroundColor: '#111827',
     borderColor: '#4B5563',
   },
   filterButtonActiveDark: {

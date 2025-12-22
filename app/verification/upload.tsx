@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   cardDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#73af1720',
   },
   sectionTitle: {
     fontSize: 18,

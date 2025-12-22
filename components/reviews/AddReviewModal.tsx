@@ -4,9 +4,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
-import { createReview, canReviewGig } from '@/lib/api/reviews';
-import { supabase } from '@/lib/supabase';
-import { Task } from '@/types';
+import { createReview } from '@/lib/api/reviews';
 
 interface AddReviewModalProps {
   visible: boolean;
@@ -22,92 +20,17 @@ export function AddReviewModal({ visible, teenlancerId, neighborId, onClose, onR
   
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState<string>('');
-  const [selectedGigId, setSelectedGigId] = useState<string | null>(null);
-  const [availableGigs, setAvailableGigs] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (visible && (teenlancerId || neighborId)) {
-      loadAvailableGigs();
-    } else {
-      // Reset form when modal closes
+    if (visible) {
+      // Reset form when modal opens
       setRating(0);
       setComment('');
-      setSelectedGigId(null);
-      setAvailableGigs([]);
     }
-  }, [visible, teenlancerId, neighborId]);
-
-  const loadAvailableGigs = async () => {
-    try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        Alert.alert('Error', 'You must be logged in to leave a review');
-        return;
-      }
-
-      let gigs;
-      let error;
-
-      if (teenlancerId) {
-        // Neighbor reviewing teenlancer: get completed gigs where current user is poster and teenlancer is assigned
-        const result = await supabase
-          .from('gigs')
-          .select('*')
-          .eq('poster_id', user.id)
-          .eq('teen_id', teenlancerId)
-          .eq('status', 'completed')
-          .order('created_at', { ascending: false });
-        gigs = result.data;
-        error = result.error;
-      } else if (neighborId) {
-        // Teenlancer reviewing neighbor: get completed gigs where current user is teen and neighbor is poster
-        const result = await supabase
-          .from('gigs')
-          .select('*')
-          .eq('teen_id', user.id)
-          .eq('poster_id', neighborId)
-          .eq('status', 'completed')
-          .order('created_at', { ascending: false });
-        gigs = result.data;
-        error = result.error;
-      } else {
-        throw new Error('Either teenlancerId or neighborId must be provided');
-      }
-
-      if (error) throw error;
-
-      // Filter gigs that can be reviewed (not already reviewed)
-      const reviewableGigs: Task[] = [];
-      for (const gig of gigs || []) {
-        const canReview = await canReviewGig(gig.id);
-        if (canReview.canReview) {
-          reviewableGigs.push(gig as Task);
-        }
-      }
-
-      setAvailableGigs(reviewableGigs);
-      
-      // Auto-select the first gig if only one available
-      if (reviewableGigs.length === 1) {
-        setSelectedGigId(reviewableGigs[0].id);
-      }
-    } catch (error: any) {
-      console.error('Error loading available gigs:', error);
-      Alert.alert('Error', error.message || 'Failed to load available gigs');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [visible]);
 
   const handleSubmit = async () => {
-    if (!selectedGigId) {
-      Alert.alert('Error', 'Please select a gig to review');
-      return;
-    }
-
     if (rating === 0) {
       Alert.alert('Error', 'Please select a rating');
       return;
@@ -120,21 +43,35 @@ export function AddReviewModal({ visible, teenlancerId, neighborId, onClose, onR
         Alert.alert('Error', 'Invalid review target');
         return;
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/reviews/AddReviewModal.tsx:127',message:'AddReviewModal BEFORE createReview',data:{revieweeId,teenlancerId,neighborId,rating,hasComment:!!comment.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      console.log('AddReviewModal - Creating review:', { revieweeId, rating });
       
-      await createReview({
-        gig_id: selectedGigId,
+      const review = await createReview({
+        gig_id: null, // Reviews are independent of gigs - neighbors can review at any time
         reviewee_id: revieweeId,
         rating,
         comment: comment.trim() || undefined,
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/reviews/AddReviewModal.tsx:140',message:'AddReviewModal AFTER createReview',data:{reviewId:review.id,revieweeId:review.reviewee_id,reviewerId:review.reviewer_id,rating:review.rating},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      console.log('AddReviewModal - Review created:', review);
+      console.log('AddReviewModal - Review reviewee_id:', review.reviewee_id, 'Review reviewer_id:', review.reviewer_id);
 
+      // Call onReviewAdded BEFORE closing to ensure query invalidation happens
+      onReviewAdded();
+      
       Alert.alert('Success', 'Review submitted successfully!', [
         { text: 'OK', onPress: () => {
-          onReviewAdded();
           onClose();
         }}
       ]);
     } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/reviews/AddReviewModal.tsx:150',message:'AddReviewModal ERROR creating review',data:{errorMessage:error?.message,errorCode:error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.error('Error creating review:', error);
       Alert.alert('Error', error.message || 'Failed to submit review');
     } finally {
@@ -147,61 +84,11 @@ export function AddReviewModal({ visible, teenlancerId, neighborId, onClose, onR
   const titleStyle = isDark ? styles.titleDark : styles.titleLight;
   const inputStyle = isDark ? styles.inputDark : styles.inputLight;
   const inputTextStyle = isDark ? styles.inputTextDark : styles.inputTextLight;
-  const gigCardStyle = isDark ? styles.gigCardDark : styles.gigCardLight;
-  const selectedGigCardStyle = isDark ? styles.selectedGigCardDark : styles.selectedGigCardLight;
 
   return (
     <BottomSheet visible={visible} onClose={onClose} title="Add Review">
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#73af17" />
-            <Text style={[styles.loadingText, textStyle]}>Loading available gigs...</Text>
-          </View>
-        ) : availableGigs.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="checkmark-circle-outline" size={64} color={isDark ? '#6B7280' : '#9CA3AF'} />
-            <Text style={[styles.emptyText, titleStyle]}>No gigs available for review</Text>
-            <Text style={[styles.emptySubtext, textStyle]}>
-              You can only review completed gigs that you haven't reviewed yet.
-            </Text>
-          </View>
-        ) : (
-          <>
-            {/* Gig Selection */}
-            {availableGigs.length > 1 && (
-              <View style={styles.section}>
-                <Text style={[styles.label, titleStyle]}>Select Gig</Text>
-                <View style={styles.gigsList}>
-                  {availableGigs.map((gig) => (
-                    <Pressable
-                      key={gig.id}
-                      style={[
-                        styles.gigCard,
-                        gigCardStyle,
-                        selectedGigId === gig.id && styles.selectedGigCard,
-                        selectedGigId === gig.id && selectedGigCardStyle,
-                      ]}
-                      onPress={() => setSelectedGigId(gig.id)}
-                    >
-                      <View style={styles.gigCardContent}>
-                        <Text style={[styles.gigTitle, titleStyle]} numberOfLines={2}>
-                          {gig.title}
-                        </Text>
-                        <Text style={[styles.gigDate, textStyle]}>
-                          {new Date(gig.created_at).toLocaleDateString()}
-                        </Text>
-                      </View>
-                      {selectedGigId === gig.id && (
-                        <Ionicons name="checkmark-circle" size={24} color="#73af17" />
-                      )}
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Rating Selection */}
+        {/* Rating Selection */}
             <View style={styles.section}>
               <Text style={[styles.label, titleStyle]}>Rating *</Text>
               <View style={styles.ratingContainer}>
@@ -236,16 +123,14 @@ export function AddReviewModal({ visible, teenlancerId, neighborId, onClose, onR
               />
             </View>
 
-            {/* Submit Button */}
-            <Button
-              title="Submit Review"
-              onPress={handleSubmit}
-              loading={submitting}
-              disabled={!selectedGigId || rating === 0 || submitting}
-              fullWidth
-            />
-          </>
-        )}
+        {/* Submit Button */}
+        <Button
+          title="Submit Review"
+          onPress={handleSubmit}
+          loading={submitting}
+          disabled={rating === 0 || submitting}
+          fullWidth
+        />
       </ScrollView>
     </BottomSheet>
   );
@@ -255,29 +140,6 @@ const styles = StyleSheet.create({
   scrollView: {
     maxHeight: 600,
   },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
   section: {
     marginBottom: 24,
   },
@@ -285,45 +147,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
-  },
-  gigsList: {
-    gap: 12,
-  },
-  gigCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  gigCardLight: {
-    backgroundColor: '#F9FAFB',
-  },
-  gigCardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#374151',
-  },
-  selectedGigCard: {
-    borderColor: '#73af17',
-  },
-  selectedGigCardLight: {
-    backgroundColor: '#F0FDF4',
-  },
-  selectedGigCardDark: {
-    backgroundColor: '#1F2937',
-  },
-  gigCardContent: {
-    flex: 1,
-  },
-  gigTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  gigDate: {
-    fontSize: 12,
   },
   ratingContainer: {
     flexDirection: 'row',

@@ -41,6 +41,12 @@ export default function HomeScreen() {
 
   // Fetch data for teen home screen
   const { data: teenStats, isLoading: teenStatsLoading, refetch: refetchTeenStats } = useTeenStats();
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/home.tsx:43',message:'home.tsx teenStats data',data:{isLoading:teenStatsLoading,hasStats:!!teenStats,statsObject:teenStats ? JSON.stringify(teenStats) : 'null',rating:teenStats?.rating,reviewCount:teenStats?.reviewCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    console.log('home.tsx - teenStats:', teenStats, 'isLoading:', teenStatsLoading, 'rating:', teenStats?.rating, 'reviewCount:', teenStats?.reviewCount);
+  }, [teenStats, teenStatsLoading]);
+  // #endregion
   const { data: weeklyEarnings, isLoading: earningsLoading, refetch: refetchEarnings } = useWeeklyEarnings();
   const { data: activities, isLoading: activitiesLoading, refetch: refetchActivities } = useRecentActivity(5);
   const { data: activeTask, isLoading: activeTaskLoading, refetch: refetchActiveTask } = useActiveTask();
@@ -183,6 +189,8 @@ const styles = StyleSheet.create({
     color: '#D1D5DB',
   },
 });
+
+
 
 
 

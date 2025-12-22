@@ -93,8 +93,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#1F2937',
-    borderBottomColor: '#374151',
+    backgroundColor: '#73af1720',
+    borderBottomColor: '#1F2937',
   },
   avatar: {
     width: 48,

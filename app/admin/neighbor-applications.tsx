@@ -319,8 +319,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#4B5563',
+    backgroundColor: '#73af1720',
+    borderColor: '#1F2937',
   },
   cardLight: {
     backgroundColor: '#FFFFFF',

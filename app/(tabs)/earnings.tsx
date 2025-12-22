@@ -228,7 +228,12 @@ export default function EarningsScreen() {
               <View style={styles.summaryGrid}>
                 <View style={[styles.summaryCard, cardStyle]}>
                   <Ionicons name="cash" size={32} color="#73af17" />
-                  <Text style={[styles.summaryLabel, labelStyle]}>
+                  <Text 
+                    style={[styles.summaryLabel, labelStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                  >
                     {isNeighbor ? 'Total Spent' : 'Total Earnings'}
                   </Text>
                   <Text 
@@ -436,12 +441,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   cardDark: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#1F2937',
   },
   summaryLabel: {
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 8,
     color: '#6B7280',
+    textAlign: 'center',
   },
   labelDark: {
     color: '#9CA3AF',
@@ -472,7 +480,7 @@ const styles = StyleSheet.create({
     borderColor: '#73af17',
   },
   filterButtonDark: {
-    backgroundColor: '#374151',
+    backgroundColor: '#111827',
     borderColor: '#4B5563',
   },
   filterButtonText: {

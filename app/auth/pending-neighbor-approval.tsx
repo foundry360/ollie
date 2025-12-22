@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#73af1720',
   },
   icon: {
     marginBottom: 16,

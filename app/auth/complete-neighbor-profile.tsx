@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    borderColor: '#4B5563',
+    borderColor: '#1F2937',
   },
   profilePhoto: {
     width: '100%',

@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   },
   searchFieldContainerDark: {
     borderColor: '#4B5563',
-    backgroundColor: '#374151',
+    backgroundColor: 'transparent',
   },
   searchFieldIcon: {
     marginRight: 12,

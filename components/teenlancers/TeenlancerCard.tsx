@@ -154,8 +154,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#374151',
+    backgroundColor: 'transparent',
+    borderColor: '#1F2937',
   },
   content: {
     padding: 16,
@@ -235,7 +235,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8F5D9',
   },
   skillTagDark: {
-    backgroundColor: '#2D4A1A',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#1F2937',
   },
   skillText: {
     fontSize: 12,
@@ -243,7 +245,7 @@ const styles = StyleSheet.create({
     color: '#5a8a12',
   },
   skillTextDark: {
-    color: '#A8D574',
+    color: '#FFFFFF',
   },
   moreSkills: {
     fontSize: 12,
@@ -294,4 +296,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
+
+
 

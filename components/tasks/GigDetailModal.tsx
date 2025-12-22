@@ -17,7 +17,8 @@ import { ProfileModal } from '@/components/profile/ProfileModal';
 import { getPublicUserProfile, getUserProfileForChat } from '@/lib/api/users';
 import { useGigApplications, useHasAppliedForGig, useApproveGigApplication, useRejectGigApplication } from '@/hooks/useGigApplications';
 import { AddReviewModal } from '@/components/reviews/AddReviewModal';
-import { canReviewGig } from '@/lib/api/reviews';
+import { canReviewGig, getAverageRating } from '@/lib/api/reviews';
+import { teenStatsKeys } from '@/hooks/useTeenStats';
 
 interface GigDetailModalProps {
   visible: boolean;
@@ -40,6 +41,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const [isApplying, setIsApplying] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [canReview, setCanReview] = useState<{ canReview: boolean; reason?: string }>({ canReview: false });
+  const [selectedTeenForReview, setSelectedTeenForReview] = useState<string | null>(null);
   
   // Check if gig is saved (only for teenlancers)
   const { data: isSaved = false } = useIsGigSaved(taskId);
@@ -72,13 +74,59 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
     staleTime: 300000, // 5 minutes
   });
   
-  // Fetch neighbor/poster profile for teenlancers viewing open gigs
-  const { data: neighborProfile } = useQuery({
-    queryKey: ['neighborProfile', task?.poster_id],
-    queryFn: () => getUserProfileForChat(task!.poster_id!),
-    enabled: !!task?.poster_id && isOpen && isTeenlancer && !isPoster && !isTeen,
+  // Fetch teenlancer rating
+  const { data: teenRatingData } = useQuery({
+    queryKey: ['teenRating', task?.teen_id],
+    queryFn: () => getAverageRating(task!.teen_id!),
+    enabled: !!task?.teen_id,
     staleTime: 300000, // 5 minutes
   });
+  
+  const teenRating = teenRatingData?.averageRating || 0;
+  const teenReviewCount = teenRatingData?.reviewCount || 0;
+  
+  // Fetch neighbor/poster profile for teenlancers viewing open gigs
+  const shouldFetchNeighborProfile = !!task?.poster_id && isOpen && isTeenlancer && !isPoster && !isTeen;
+  const { data: neighborProfile, isLoading: isLoadingNeighborProfile, error: neighborProfileError, status: queryStatus, fetchStatus } = useQuery({
+    queryKey: ['neighborProfile', task?.poster_id],
+    queryFn: async () => {
+      try {
+        const profile = await getUserProfileForChat(task!.poster_id!);
+        console.log('getUserProfileForChat result:', {
+          posterId: task!.poster_id,
+          profile,
+          hasPhoto: !!profile?.profile_photo_url,
+          photoUrl: profile?.profile_photo_url,
+        });
+        return profile;
+      } catch (error) {
+        console.error('Error fetching neighbor profile:', error);
+        throw error;
+      }
+    },
+    enabled: shouldFetchNeighborProfile,
+    staleTime: 300000, // 5 minutes
+    retry: 1,
+  });
+  
+  // Debug logging
+  useEffect(() => {
+    if (shouldFetchNeighborProfile) {
+      console.log('Floating message bubble - Neighbor profile query state:', {
+        posterId: task?.poster_id,
+        shouldFetch: shouldFetchNeighborProfile,
+        neighborProfile,
+        isLoadingNeighborProfile,
+        error: neighborProfileError,
+        hasPhoto: !!neighborProfile?.profile_photo_url,
+        photoUrl: neighborProfile?.profile_photo_url,
+        isOpen,
+        isTeenlancer,
+        isPoster,
+        isTeen,
+      });
+    }
+  }, [neighborProfile, isLoadingNeighborProfile, neighborProfileError, shouldFetchNeighborProfile, task?.poster_id, isOpen, isTeenlancer, isPoster, isTeen]);
   const canApply = task && isOpen && !isPoster && !isTeen && isTeenlancer && !hasApplied;
   const canStart = task && isTeen && task.status === 'accepted';
   const canComplete = task && isTeen && task.status === 'in_progress';
@@ -370,15 +418,42 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
               nestedScrollEnabled={true}
               contentInsetAdjustmentBehavior="never"
             >
-              {task.photos && task.photos.length > 0 && (
-                <View style={styles.imageContainer}>
-                  <Image 
-                    source={{ uri: task.photos[0] }} 
-                    style={styles.image}
-                    resizeMode="cover"
-                  />
-                </View>
-              )}
+              <View style={styles.imageContainer}>
+                {task.photos && task.photos.length > 0 ? (
+                  (() => {
+                    const imageUrl = task.photos[0];
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:438',message:'Rendering gig image',data:{hasPhotos:!!task.photos,photoCount:task.photos?.length,imageUrl,isValidUrl:imageUrl?.startsWith('http')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                    // #endregion
+                    return (
+                      <Image 
+                        source={{ uri: imageUrl }} 
+                        style={styles.image}
+                        resizeMode="cover"
+                        onError={(e) => {
+                          // #region agent log
+                          fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:446',message:'Gig image onError',data:{imageUrl,error:e.nativeEvent?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                          // #endregion
+                          console.log('Gig image load error:', e.nativeEvent.error, 'URL:', imageUrl);
+                        }}
+                        onLoad={() => {
+                          // #region agent log
+                          fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:451',message:'Gig image onLoad',data:{imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                          // #endregion
+                          console.log('Gig image loaded successfully:', imageUrl);
+                        }}
+                      />
+                    );
+                  })()
+                ) : (
+                  <View style={[styles.imagePlaceholder, isDark && styles.imagePlaceholderDark]}>
+                    <Ionicons name="aperture-outline" size={48} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                    <Text style={[styles.imagePlaceholderText, isDark ? styles.imagePlaceholderTextDark : styles.imagePlaceholderTextLight]}>
+                      No image available
+                    </Text>
+                  </View>
+                )}
+              </View>
 
               <View style={styles.content}>
                 <View style={styles.header}>
@@ -490,10 +565,37 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                           <Text style={[styles.teenName, textStyle]}>
                             {teenProfile?.full_name || 'Loading...'}
                           </Text>
+                          <View style={styles.teenRatingRow}>
+                            <View style={styles.teenRatingStars}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Ionicons
+                                  key={star}
+                                  name={star <= Math.round(teenRating) ? 'star' : 'star-outline'}
+                                  size={14}
+                                  color="#FBBF24"
+                                />
+                              ))}
+                            </View>
+                            <Text style={[styles.teenRatingText, labelStyle]}>
+                              {teenRating > 0 ? teenRating.toFixed(1) : '0.0'} ({teenReviewCount} {teenReviewCount === 1 ? 'review' : 'reviews'})
+                            </Text>
+                          </View>
                           <Text style={[styles.teenLabel, labelStyle]}>Assigned Teenlancer</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
                       </Pressable>
+                      {isNeighbor && (
+                        <Pressable
+                          style={[styles.addReviewButton, isDark && styles.addReviewButtonDark]}
+                          onPress={() => {
+                            setSelectedTeenForReview(task?.teen_id || null);
+                            setShowReviewModal(true);
+                          }}
+                        >
+                          <Ionicons name="star-outline" size={16} color="#73af17" />
+                          <Text style={styles.addReviewButtonText}>Review</Text>
+                        </Pressable>
+                      )}
                     </View>
                   )}
                   {task.required_skills && task.required_skills.length > 0 && (
@@ -575,22 +677,20 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                                       Age {application.teen_age}
                                     </Text>
                                   )}
-                                  {application.teen_rating !== undefined && application.teen_rating > 0 && (
-                                    <View style={styles.ratingContainer}>
-                                      {[1, 2, 3, 4, 5].map((star) => (
-                                        <Ionicons
-                                          key={star}
-                                          name={star <= Math.round(application.teen_rating) ? 'star' : 'star-outline'}
-                                          size={14}
-                                          color="#F59E0B"
-                                          style={styles.starIcon}
-                                        />
-                                      ))}
-                                      <Text style={[styles.applicationTeenRating, labelStyle]}>
-                                        {application.teen_rating.toFixed(1)}
-                                      </Text>
-                                    </View>
-                                  )}
+                                  <View style={styles.ratingContainer}>
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <Ionicons
+                                        key={star}
+                                        name={star <= Math.round(application.teen_rating || 0) ? 'star' : 'star-outline'}
+                                        size={14}
+                                        color="#F59E0B"
+                                        style={styles.starIcon}
+                                      />
+                                    ))}
+                                    <Text style={[styles.applicationTeenRating, labelStyle]}>
+                                      {(application.teen_rating || 0).toFixed(1)} ({application.teen_review_count || 0} {application.teen_review_count === 1 ? 'review' : 'reviews'})
+                                    </Text>
+                                  </View>
                                 </View>
                               </View>
                             </View>
@@ -707,16 +807,34 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
               onPress={handleChat}
             >
               <View style={[styles.floatingMessageContent, isDark && styles.floatingMessageContentDark]}>
-                {neighborProfile?.profile_photo_url ? (
-                  <Image
-                    source={{ uri: neighborProfile.profile_photo_url }}
-                    style={styles.floatingAvatar}
-                  />
-                ) : (
-                  <View style={[styles.floatingAvatarPlaceholder, isDark && styles.floatingAvatarPlaceholderDark]}>
-                    <Ionicons name="person" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                  </View>
-                )}
+                {(() => {
+                  if (isLoadingNeighborProfile) {
+                    return (
+                      <View style={[styles.floatingAvatarPlaceholder, isDark && styles.floatingAvatarPlaceholderDark]}>
+                        <Ionicons name="person" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                      </View>
+                    );
+                  }
+                  if (neighborProfile?.profile_photo_url) {
+                    return (
+                      <Image
+                        source={{ uri: neighborProfile.profile_photo_url }}
+                        style={styles.floatingAvatar}
+                        onError={(e) => {
+                          console.log('Floating avatar load error:', e.nativeEvent.error, 'URL:', neighborProfile.profile_photo_url);
+                        }}
+                        onLoad={() => {
+                          console.log('Floating avatar loaded successfully:', neighborProfile.profile_photo_url);
+                        }}
+                      />
+                    );
+                  }
+                  return (
+                    <View style={[styles.floatingAvatarPlaceholder, isDark && styles.floatingAvatarPlaceholderDark]}>
+                      <Ionicons name="person" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                    </View>
+                  );
+                })()}
                 <View style={styles.floatingMessageIcon}>
                   <Ionicons name="chatbubble" size={16} color="#FFFFFF" />
                 </View>
@@ -767,14 +885,17 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
       />
       <AddReviewModal
         visible={showReviewModal}
-        neighborId={task?.poster_id}
+        teenlancerId={selectedTeenForReview || (canReviewNeighbor ? undefined : (task?.teen_id || undefined))}
+        neighborId={canReviewNeighbor ? task?.poster_id : undefined}
         onClose={() => {
           setShowReviewModal(false);
+          setSelectedTeenForReview(null);
           queryClient.invalidateQueries({ queryKey: ['canReviewGig'] });
         }}
         onReviewAdded={() => {
           queryClient.invalidateQueries({ queryKey: ['reviews'] });
           queryClient.invalidateQueries({ queryKey: ['canReviewGig'] });
+          queryClient.invalidateQueries({ queryKey: teenStatsKeys.all });
         }}
       />
     </Modal>
@@ -901,6 +1022,26 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#F3F4F6',
   },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderDark: {
+    backgroundColor: '#1F2937',
+  },
+  imagePlaceholderText: {
+    marginTop: 8,
+    fontSize: 14,
+  },
+  imagePlaceholderTextLight: {
+    color: '#6B7280',
+  },
+  imagePlaceholderTextDark: {
+    color: '#9CA3AF',
+  },
   content: {
     padding: 16,
   },
@@ -986,7 +1127,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   sectionDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#1F2937',
   },
   sectionTitle: {
     fontSize: 14,
@@ -1052,7 +1195,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   skillTagDark: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#374151',
   },
   skillText: {
     fontSize: 12,
@@ -1060,16 +1205,16 @@ const styles = StyleSheet.create({
     color: '#73af17',
   },
   skillTextDark: {
-    color: '#93C5FD',
+    color: '#FFFFFF',
   },
   locationContainer: {
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
     marginBottom: 12,
   },
   locationContainerDark: {
-    backgroundColor: '#374151',
+    backgroundColor: 'transparent',
   },
   locationInfo: {
     flexDirection: 'row',
@@ -1103,7 +1248,7 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
   },
   mapButtonText: {
     fontSize: 14,
@@ -1207,8 +1352,22 @@ const styles = StyleSheet.create({
   teenName: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 4,
     color: '#374151',
+  },
+  teenRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  teenRatingStars: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  teenRatingText: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   teenLabel: {
     fontSize: 12,
@@ -1223,8 +1382,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   applicationCardDark: {
-    backgroundColor: '#111827',
-    borderColor: '#374151',
+    backgroundColor: 'transparent',
+    borderColor: '#1F2937',
   },
   applicationHeader: {
     flexDirection: 'row',
@@ -1289,13 +1448,15 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: 4,
     flexShrink: 0,
-    marginLeft: 8,
+    marginLeft: 0,
+    marginTop: 4,
+    width: '100%',
   },
   starIcon: {
     marginRight: 2,
   },
   applicationTeenRating: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6B7280',
     fontWeight: '500',
     lineHeight: 14,
@@ -1349,6 +1510,28 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  addReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#73af17',
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  addReviewButtonDark: {
+    backgroundColor: '#1F2937',
+    borderColor: '#73af17',
+  },
+  addReviewButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#73af17',
   },
   emptyApplicationsText: {
     fontSize: 14,

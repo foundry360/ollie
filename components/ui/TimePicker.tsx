@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   },
   timeButtonDark: {
     borderColor: '#4B5563',
-    backgroundColor: '#1F2937',
+    backgroundColor: '#111827',
   },
   timeText: {
     fontSize: 16,

@@ -10,10 +10,15 @@ export function useTeenStats() {
   return useQuery<TeenStats>({
     queryKey: teenStatsKeys.stats(),
     queryFn: getTeenStats,
-    staleTime: 30000, // 30 seconds - shorter to ensure updates show quickly
-    refetchOnMount: true,
+    staleTime: 0, // Always consider data stale to ensure fresh data
+    gcTime: 0, // Don't cache - always fetch fresh
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 }
+
+
 
 
 

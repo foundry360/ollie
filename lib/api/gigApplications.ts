@@ -14,6 +14,7 @@ export interface GigApplication {
   teen_photo?: string;
   teen_age?: number;
   teen_rating?: number;
+  teen_review_count?: number;
   gig_title?: string;
   gig_pay?: number;
   gig_description?: string;
@@ -54,10 +55,12 @@ export async function getGigApplications(gigId: string): Promise<GigApplication[
   const applicationsWithRatings = await Promise.all(
     (data || []).map(async (app: any) => {
       let rating = 0;
+      let reviewCount = 0;
       if (app.teen_id) {
         try {
           const ratingData = await getAverageRating(app.teen_id);
           rating = ratingData.averageRating;
+          reviewCount = ratingData.reviewCount;
         } catch (error) {
           // If rating fetch fails, default to 0
           console.log('Could not fetch rating for teen:', app.teen_id, error);
@@ -78,6 +81,7 @@ export async function getGigApplications(gigId: string): Promise<GigApplication[
           ? new Date().getFullYear() - new Date(app.teen.date_of_birth).getFullYear()
           : undefined,
         teen_rating: rating,
+        teen_review_count: reviewCount,
         gig_title: app.gig?.title,
         gig_pay: app.gig?.pay,
       };
@@ -306,5 +310,7 @@ export async function rejectGigApplication(applicationId: string, reason?: strin
 
   throw new Error('Failed to reject application. Invalid response from database function.');
 }
+
+
 
 

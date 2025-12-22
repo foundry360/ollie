@@ -912,7 +912,7 @@ const styles = StyleSheet.create({
   },
   dateButtonDark: {
     borderColor: '#4B5563',
-    backgroundColor: '#1F2937',
+    backgroundColor: '#111827',
   },
   dateButtonText: {
     fontSize: 16,
@@ -1043,7 +1043,7 @@ const styles = StyleSheet.create({
   },
   skillsButtonDark: {
     borderColor: '#4B5563',
-    backgroundColor: '#1F2937',
+    backgroundColor: '#111827',
   },
   skillsButtonText: {
     fontSize: 16,

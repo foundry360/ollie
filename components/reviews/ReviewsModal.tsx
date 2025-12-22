@@ -180,8 +180,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#374151',
+    backgroundColor: '#73af1720',
+    borderColor: '#1F2937',
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -252,5 +252,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+
 
 

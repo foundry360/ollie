@@ -74,6 +74,9 @@ export default function QRCodeScreen() {
                   backgroundColor={isDark ? '#111111' : '#FFFFFF'}
                 />
               </View>
+              <Text style={[styles.urlText, textStyle]} selectable>
+                {profileUrl}
+              </Text>
             </View>
           ) : (
             <View style={styles.errorContainer}>
@@ -120,7 +123,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   cardDark: {
-    backgroundColor: '#111111',
+    backgroundColor: '#73af1720',
   },
   title: {
     fontSize: 20,
@@ -153,6 +156,13 @@ const styles = StyleSheet.create({
   },
   qrWrapperDark: {
     backgroundColor: '#111111',
+  },
+  urlText: {
+    fontSize: 12,
+    marginTop: 16,
+    textAlign: 'center',
+    color: '#6B7280',
+    paddingHorizontal: 16,
   },
   shareButton: {
     flexDirection: 'row',

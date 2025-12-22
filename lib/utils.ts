@@ -237,14 +237,16 @@ export function formatTimeAgo(timestamp: string): string {
 // Get array of dates for current week (Monday to Sunday)
 export function getWeekDates(): Date[] {
   const dates: Date[] = [];
-  const today = new Date();
-  const day = today.getDay();
-  const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
-  const monday = new Date(today.setDate(diff));
+  const { start } = getWeekRange(); // Use UTC-based week range
+  const monday = new Date(start);
   
   for (let i = 0; i < 7; i++) {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
+    const date = new Date(Date.UTC(
+      monday.getUTCFullYear(),
+      monday.getUTCMonth(),
+      monday.getUTCDate() + i,
+      0, 0, 0, 0
+    ));
     dates.push(date);
   }
   
@@ -270,17 +272,34 @@ export function getDayAbbreviation(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short' });
 }
 
-// Get start and end of current week (Monday to Sunday)
+// Get start and end of current week (Monday to Sunday) in UTC
 export function getWeekRange(): { start: Date; end: Date } {
-  const today = new Date();
-  const day = today.getDay();
-  const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(today.setDate(diff));
-  monday.setHours(0, 0, 0, 0);
+  const now = new Date();
+  // Get current date in UTC
+  const utcNow = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    now.getUTCHours(),
+    now.getUTCMinutes(),
+    now.getUTCSeconds()
+  ));
   
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
+  const day = utcNow.getUTCDay();
+  const diff = utcNow.getUTCDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(Date.UTC(
+    utcNow.getUTCFullYear(),
+    utcNow.getUTCMonth(),
+    diff,
+    0, 0, 0, 0
+  ));
+  
+  const sunday = new Date(Date.UTC(
+    monday.getUTCFullYear(),
+    monday.getUTCMonth(),
+    monday.getUTCDate() + 6,
+    23, 59, 59, 999
+  ));
   
   return { start: monday, end: sunday };
 }

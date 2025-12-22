@@ -2,6 +2,22 @@ import { supabase, getUserProfile } from '@/lib/supabase';
 import { Task, TaskStatus } from '@/types';
 import { calculateDistance } from '@/lib/utils';
 
+// Helper function to normalize photos field (handles JSON strings, arrays, or null)
+function normalizePhotos(photos: any): string[] {
+  if (!photos) return [];
+  if (Array.isArray(photos)) return photos.filter(p => p && typeof p === 'string');
+  if (typeof photos === 'string') {
+    try {
+      const parsed = JSON.parse(photos);
+      return Array.isArray(parsed) ? parsed.filter((p: any) => p && typeof p === 'string') : [parsed].filter((p: any) => p && typeof p === 'string');
+    } catch (e) {
+      // If it's not JSON, treat it as a single URL string
+      return [photos];
+    }
+  }
+  return [];
+}
+
 // Upload gig photo to Supabase Storage (returns public URL)
 export async function uploadGigPhoto(uri: string, gigId?: string): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -185,7 +201,18 @@ export async function getOpenTasks(filters?: {
   const { data, error } = await query;
   if (error) throw error;
   
-  let tasks = data || [];
+  let tasks = (data || []).map(task => {
+    const photos = normalizePhotos(task.photos);
+    
+    // Log photos data for debugging
+    if (photos && photos.length > 0) {
+      console.log('Task', task.id, 'has photos:', photos, 'First photo URL:', photos[0], 'Is Supabase URL:', photos[0]?.includes('supabase.co'));
+    } else {
+      console.log('Task', task.id, 'has NO photos');
+    }
+    
+    return { ...task, photos };
+  });
   
   // Filter by radius if provided
   if (filters?.radius && filters?.userLocation) {
@@ -333,7 +360,17 @@ export async function getTaskById(taskId: string): Promise<Task> {
     .single();
 
   if (error) throw error;
-  return data;
+  
+  const photos = normalizePhotos(data.photos);
+  
+  // Log photos data for debugging
+  if (photos && photos.length > 0) {
+    console.log('getTaskById - Task', taskId, 'has photos:', photos, 'First photo URL:', photos[0], 'Is Supabase URL:', photos[0]?.includes('supabase.co'));
+  } else {
+    console.log('getTaskById - Task', taskId, 'has NO photos');
+  }
+  
+  return { ...data, photos };
 }
 
 // Get completed tasks for a teen (for calculating ratings/reviews on public profile)
@@ -690,6 +727,8 @@ export async function getTasksNearUser(
   // Calculate distance for each task and filter/sort
   const tasksWithDistance: TaskWithDistance[] = (tasks || [])
     .map(task => {
+      const photos = normalizePhotos(task.photos);
+      task = { ...task, photos };
       try {
         const taskLocation = task.location as { latitude: number; longitude: number };
         

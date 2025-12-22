@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, Linking, Modal, Dimensions, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Linking, Modal, Dimensions, Pressable, Platform } from 'react-native';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { getPublicUserProfile } from '@/lib/api/users';
@@ -12,6 +12,9 @@ import { useAuthStore } from '@/stores/authStore';
 import { formatAddress } from '@/lib/utils';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { Loading } from '@/components/ui/Loading';
+import { useQueryClient } from '@tanstack/react-query';
+import { teenStatsKeys } from '@/hooks/useTeenStats';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -23,6 +26,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
   const { colorScheme } = useThemeStore();
   const { user: currentUser } = useAuthStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isDark = colorScheme === 'dark';
   
   const [profile, setProfile] = useState<User | null>(null);
@@ -302,10 +306,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
 
           <View style={styles.scrollWrapper}>
           {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#73af17" />
-              <Text style={[styles.loadingText, textStyle]}>Loading profile...</Text>
-            </View>
+            <Loading />
           ) : error || !profile ? (
             <View style={styles.errorContainer}>
               <Ionicons name="alert-circle-outline" size={64} color={isDark ? '#6B7280' : '#9CA3AF'} />
@@ -379,7 +380,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
               )}
 
               {/* Reviews from Neighbors */}
-              <View style={[styles.section, cardStyle]}>
+              <View style={[styles.section, styles.reviewsSection, cardStyle]}>
                 <Text style={[styles.sectionTitle, titleStyle]}>
                   Reviews from Neighbors ({reviewCount})
                 </Text>
@@ -495,15 +496,16 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
                     <Text style={[styles.emptyReviewsSubtext, isDark ? styles.emptyReviewsSubtextDark : styles.emptyReviewsSubtextLight]}>
                       Share your experience working with this teenlancer
                     </Text>
-                    {isNeighbor && (
-                      <Pressable 
-                        style={[styles.addReviewButton, isDark && styles.addReviewButtonDark]}
-                        onPress={() => setShowAddReviewModal(true)}
-                      >
-                        <Ionicons name="add-circle-outline" size={20} color="#73af17" />
-                        <Text style={styles.addReviewButtonText}>Add Review</Text>
-                      </Pressable>
-                    )}
+                  </View>
+                )}
+                {isNeighbor && isTeenlancerProfile && (
+                  <View style={styles.addReviewButtonContainer}>
+                    <Pressable
+                      style={[styles.addReviewButton, isDark && styles.addReviewButtonDark]}
+                      onPress={() => setShowAddReviewModal(true)}
+                    >
+                      <Text style={styles.addReviewButtonText}>Add Review</Text>
+                    </Pressable>
                   </View>
                 )}
               </View>
@@ -643,6 +645,9 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
               
               const userReviews = await getReviewsForUser(userId);
               setReviews(userReviews);
+              
+              // Invalidate teen stats query so the home screen stat card updates
+              queryClient.invalidateQueries({ queryKey: teenStatsKeys.all });
             } catch (error) {
               console.error('Error reloading reviews:', error);
             }
@@ -847,11 +852,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#F9FAFB',
   },
+  reviewsSection: {
+    marginBottom: 24,
+  },
   cardLight: {
     backgroundColor: '#F9FAFB',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#1F2937',
   },
   sectionTitle: {
     fontSize: 16,
@@ -870,7 +880,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   skillBubbleDark: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: '#73af17',
   },
   skillText: {
     fontSize: 12,
@@ -878,7 +888,7 @@ const styles = StyleSheet.create({
     color: '#73af17',
   },
   skillTextDark: {
-    color: '#93C5FD',
+    color: '#FFFFFF',
   },
   bioText: {
     fontSize: 14,
@@ -1028,7 +1038,7 @@ const styles = StyleSheet.create({
   emptyReviewsSubtext: {
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 0,
   },
   emptyReviewsSubtextLight: {
     color: '#6B7280',
@@ -1036,23 +1046,27 @@ const styles = StyleSheet.create({
   emptyReviewsSubtextDark: {
     color: '#9CA3AF',
   },
+  addReviewButtonContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
   addReviewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#F0FDF4',
     borderWidth: 1,
     borderColor: '#73af17',
   },
   addReviewButtonDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: 'transparent',
     borderColor: '#73af17',
   },
   addReviewButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#73af17',
   },
@@ -1064,7 +1078,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   reviewItemDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: 'transparent',
     borderColor: '#374151',
   },
   reviewHeader: {

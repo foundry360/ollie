@@ -174,7 +174,7 @@ export function TasksNearYou() {
                 resizeMode="cover"
               />
             ) : (
-              <View style={styles.taskImagePlaceholder}>
+              <View style={[styles.taskImagePlaceholder, isDark && styles.taskImagePlaceholderDark]}>
                 <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
               </View>
             )}
@@ -283,8 +283,8 @@ const styles = StyleSheet.create({
     minHeight: 120,
   },
   cardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#374151',
+    backgroundColor: 'transparent',
+    borderColor: '#1F2937',
   },
   taskImage: {
     width: 120,
@@ -297,6 +297,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  taskImagePlaceholderDark: {
+    backgroundColor: '#1F2937',
   },
   taskContent: {
     flex: 1,
@@ -344,15 +347,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     flex: 1,
+    paddingLeft: 0,
+    marginLeft: 0,
   },
   skillTag: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 6,
+    backgroundColor: 'transparent',
+    paddingLeft: 0,
+    paddingRight: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
   skillTagDark: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: 'transparent',
   },
   skillText: {
     fontSize: 10,
@@ -360,7 +366,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   skillTextDark: {
-    color: '#93C5FD',
+    color: '#73af17',
   },
   timeText: {
     fontSize: 10,
@@ -402,6 +408,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 });
+
+
 
 
 

@@ -976,7 +976,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   cardDark: {
-    backgroundColor: '#111111',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#1F2937',
   },
   profileHeaderLightGreenDark: {
     backgroundColor: '#1F3A1F',

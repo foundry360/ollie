@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connect to Expo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+        }
+        .container {
+            text-align: center;
+            max-width: 400px;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        .url {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            word-break: break-all;
+            font-family: monospace;
+        }
+        .button {
+            display: inline-block;
+            background: #73af17;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .button:hover {
+            background: #5a8a12;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Connect to Expo</h1>
+        <p>Tap the button below to open in Expo Go:</p>
+        <div class="url" id="url">exp://192.168.1.241:8081</div>
+        <a href="exp://192.168.1.241:8081" class="button">Open in Expo Go</a>
+        <p style="margin-top: 30px; font-size: 14px; color: #999;">
+            Make sure your iPad is on the same Wi-Fi network as your computer.
+        </p>
+    </div>
+    <script>
+        // Update URL if needed
+        const urlParams = new URLSearchParams(window.location.search);
+        const expoUrl = urlParams.get('url') || 'exp://192.168.1.241:8081';
+        document.getElementById('url').textContent = expoUrl;
+        document.querySelector('.button').href = expoUrl;
+    </script>
+</body>
+</html>
+

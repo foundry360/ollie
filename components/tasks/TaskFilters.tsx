@@ -289,7 +289,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   modalDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: '#374151',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -345,7 +347,7 @@ const styles = StyleSheet.create({
     borderColor: '#73af17',
   },
   skillChipDark: {
-    backgroundColor: '#374151',
+    backgroundColor: '#111827',
     borderColor: '#4B5563',
   },
   skillChipSelectedDark: {
@@ -381,7 +383,7 @@ const styles = StyleSheet.create({
     borderColor: '#73af17',
   },
   radiusChipDark: {
-    backgroundColor: '#374151',
+    backgroundColor: '#111827',
     borderColor: '#4B5563',
   },
   radiusChipSelectedDark: {

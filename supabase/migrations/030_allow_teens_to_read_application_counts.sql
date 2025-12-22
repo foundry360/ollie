@@ -38,3 +38,5 @@ CREATE POLICY "Posters can read applications for their gigs" ON public.gig_appli
 CREATE POLICY "Teens can read own applications" ON public.gig_applications
   FOR SELECT USING (teen_id = auth.uid());
 
+
+

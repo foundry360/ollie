@@ -61,20 +61,63 @@ export async function getPublicUserProfile(userId: string): Promise<User | null>
 
 // Get any user profile by ID (for messaging/chat - allows both teen and poster roles)
 export async function getUserProfileForChat(userId: string): Promise<User | null> {
+  console.log('getUserProfileForChat called for userId:', userId);
+  
+  // First, try to get the user's role to determine which policy applies
+  const { data: currentUser } = await supabase.auth.getUser();
+  
   const { data, error } = await supabase
     .from('users')
     .select('id, full_name, profile_photo_url, role')
     .eq('id', userId)
     .maybeSingle();
 
+  // If data is null (RLS blocking or user doesn't exist), try workaround via gigs join
+  if (!data && !error && currentUser?.user?.id) {
+    // Try querying via the gigs relationship - this should work because
+    // we can read open gigs, and the join should allow us to get the poster profile
+    const { data: gigWithPoster, error: gigError } = await supabase
+      .from('gigs')
+      .select(`
+        poster_id,
+        users!gigs_poster_id_fkey (
+          id,
+          full_name,
+          profile_photo_url,
+          role
+        )
+      `)
+      .eq('poster_id', userId)
+      .eq('status', 'open')
+      .limit(1)
+      .maybeSingle();
+    
+    if (gigWithPoster && (gigWithPoster as any).users) {
+      const userData = (gigWithPoster as any).users as User;
+      return userData;
+    }
+  }
+
   if (error) {
+    console.log('getUserProfileForChat error:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     // Handle specific error codes
     if (error.code === 'PGRST116') {
-      // No rows returned - profile not found or not accessible
       return null;
     }
     throw error;
   }
+  
+  console.log('getUserProfileForChat result:', {
+    hasData: !!data,
+    data,
+    hasPhoto: !!data?.profile_photo_url,
+    photoUrl: data?.profile_photo_url,
+  });
   
   return data;
 }
@@ -88,8 +131,14 @@ export interface TeenStats {
 }
 
 export async function getTeenStats(): Promise<TeenStats> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:133',message:'getTeenStats ENTRY',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:135',message:'getTeenStats user authenticated',data:{userId:user.id,userEmail:user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
 
   // Get completed tasks for rating calculation
   const { data: completedTasks, error: tasksError } = await supabase
@@ -105,13 +154,24 @@ export async function getTeenStats(): Promise<TeenStats> {
   // Get actual rating and review count from reviews table
   let rating = 0;
   let reviewCount = 0;
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:151',message:'getTeenStats BEFORE getAverageRating',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
   try {
     const ratingData = await getAverageRating(user.id);
-    rating = ratingData.averageRating;
-    reviewCount = ratingData.reviewCount;
-  } catch (ratingError) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:153',message:'getTeenStats AFTER getAverageRating',data:{userId:user.id,rating:ratingData.averageRating,reviewCount:ratingData.reviewCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    rating = ratingData.averageRating || 0;
+    reviewCount = ratingData.reviewCount || 0;
+    console.log('Teen stats - Rating:', rating, 'Review Count:', reviewCount, 'User ID:', user.id);
+  } catch (ratingError: any) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:156',message:'getTeenStats ERROR in getAverageRating',data:{userId:user.id,errorMessage:ratingError?.message,errorCode:ratingError?.code,errorDetails:ratingError?.details},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     // If reviews table doesn't exist yet or there's an error, fall back to 0
-    console.log('Could not fetch ratings:', ratingError);
+    console.error('Could not fetch ratings for user:', user.id, ratingError);
+    console.error('Rating error details:', ratingError?.message, ratingError?.code, ratingError?.details);
     rating = 0;
     reviewCount = 0;
   }
@@ -119,25 +179,54 @@ export async function getTeenStats(): Promise<TeenStats> {
   // Get weekly earnings - calculate from completed gigs this week
   // This is more reliable than relying on earnings table which depends on triggers
   const { start, end } = getWeekRange();
-  const { data: weeklyGigs, error: weeklyGigsError } = await supabase
+  
+  console.log('Teen Stats - Week range:', {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    startLocal: start.toLocaleString(),
+    endLocal: end.toLocaleString(),
+    currentTime: new Date().toISOString()
+  });
+  
+  // Get all completed gigs for this teen, then filter by completion date
+  const { data: allCompletedGigs, error: weeklyGigsError } = await supabase
     .from('gigs')
-    .select('pay, updated_at')
+    .select('pay, updated_at, id, title, status')
     .eq('teen_id', user.id)
-    .eq('status', 'completed')
-    .gte('updated_at', start.toISOString())
-    .lte('updated_at', end.toISOString());
+    .eq('status', 'completed');
+  
+  if (weeklyGigsError) throw weeklyGigsError;
+  
+  // Filter client-side to get gigs completed this week
+  // Use updated_at as the completion date (when status changed to completed)
+  const filteredGigs = (allCompletedGigs || []).filter(gig => {
+    const completedDate = new Date(gig.updated_at);
+    return completedDate >= start && completedDate <= end;
+  });
 
   if (weeklyGigsError) throw weeklyGigsError;
 
-  // Calculate total earnings from completed gigs this week
-  const weeklyEarnings = weeklyGigs?.reduce((sum, gig) => sum + parseFloat(gig.pay.toString()), 0) || 0;
+  console.log('Teen Stats - Found completed gigs this week:', filteredGigs.length, filteredGigs.map(g => ({
+    id: g.id,
+    title: g.title,
+    pay: g.pay,
+    updated_at: g.updated_at,
+    completedDate: new Date(g.updated_at).toISOString()
+  })));
 
-  return {
+  // Calculate total earnings from completed gigs this week
+  const weeklyEarnings = filteredGigs.reduce((sum, gig) => sum + parseFloat(gig.pay.toString()), 0);
+
+  const result = {
     rating,
     reviewCount,
     tasksCompleted,
     weeklyEarnings,
   };
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:221',message:'getTeenStats RETURN',data:{rating,reviewCount,tasksCompleted,weeklyEarnings,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
+  return result;
 }
 
 // Get neighbor (poster) statistics

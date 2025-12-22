@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendButtonDark: {
-    backgroundColor: '#374151',
+    backgroundColor: '#111827',
   },
   sendButtonActive: {
     width: 44,

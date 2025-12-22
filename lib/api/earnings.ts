@@ -136,6 +136,15 @@ export async function getWeeklyEarnings(): Promise<WeeklyEarningsData> {
   const { start, end } = getWeekRange();
   const { start: prevStart, end: prevEnd } = getPreviousWeekRange();
 
+  console.log('Weekly Earnings - Week range:', {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    startLocal: start.toLocaleString(),
+    endLocal: end.toLocaleString(),
+    currentTime: new Date().toISOString(),
+    currentTimeLocal: new Date().toLocaleString()
+  });
+
   // Get current week earnings
   const { data: currentWeek, error: currentError } = await supabase
     .from('earnings')
@@ -143,6 +152,8 @@ export async function getWeeklyEarnings(): Promise<WeeklyEarningsData> {
     .eq('teen_id', user.id)
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString());
+
+  console.log('Weekly Earnings - Found earnings:', currentWeek?.length || 0, 'records');
 
   if (currentError) throw currentError;
 
@@ -159,10 +170,19 @@ export async function getWeeklyEarnings(): Promise<WeeklyEarningsData> {
   // Calculate daily breakdown
   const weekDates = getWeekDates();
   const dailyBreakdown = weekDates.map(date => {
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+    // Use UTC for day boundaries to match Supabase storage
+    const dayStart = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      0, 0, 0, 0
+    ));
+    const dayEnd = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      23, 59, 59, 999
+    ));
 
     const dayEarnings = (currentWeek || []).filter(e => {
       const earningDate = new Date(e.created_at);
@@ -170,7 +190,9 @@ export async function getWeeklyEarnings(): Promise<WeeklyEarningsData> {
     });
 
     const dayAmount = dayEarnings.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+    // Convert UTC date to local for display
+    const localDate = new Date(date.getTime() + (date.getTimezoneOffset() * 60000));
+    const dayName = localDate.toLocaleDateString('en-US', { weekday: 'short' });
 
     return {
       date,

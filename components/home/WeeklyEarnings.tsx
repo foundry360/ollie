@@ -8,9 +8,11 @@ export function WeeklyEarnings() {
   const isDark = colorScheme === 'dark';
   const { data: weeklyData, isLoading } = useWeeklyEarnings();
 
+  const cardBgStyle = isDark ? styles.cardBackgroundDark : styles.cardBackground;
+
   if (isLoading || !weeklyData) {
     return (
-      <View style={[styles.container, styles.cardBackground]}>
+      <View style={[styles.container, cardBgStyle]}>
         <View style={styles.content}>
           <Text style={styles.loadingText}>Loading earnings...</Text>
         </View>
@@ -22,7 +24,7 @@ export function WeeklyEarnings() {
   const isPositive = weeklyData.percentageChange >= 0;
 
   return (
-    <View style={[styles.container, styles.cardBackground]}>
+    <View style={[styles.container, cardBgStyle]}>
       <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.totalLabel}>This Week</Text>
@@ -84,6 +86,11 @@ const styles = StyleSheet.create({
   },
   cardBackground: {
     backgroundColor: '#73af17',
+  },
+  cardBackgroundDark: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#1F2937',
   },
   content: {
     padding: 16,
@@ -162,6 +169,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 });
+
+
 
 
 

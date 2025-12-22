@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#73af17',
   },
   tabDark: {
-    backgroundColor: '#374151',
+    backgroundColor: '#111827',
   },
   tabText: {
     fontSize: 14,
@@ -225,8 +225,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: '#1F2937',
-    borderColor: '#374151',
+    backgroundColor: 'transparent',
+    borderColor: '#1F2937',
   },
   activityItemNoBorder: {
     borderWidth: 0,
@@ -284,6 +284,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 });
+
+
 
 
 
