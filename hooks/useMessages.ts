@@ -42,7 +42,7 @@ export function useConversations() {
   return useQuery({
     queryKey: messageKeys.conversations(),
     queryFn: getConversations,
-    staleTime: Infinity, // Never consider stale - Realtime will handle updates
+    staleTime: 0, // Allow refetch when invalidated (Realtime triggers invalidations)
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
