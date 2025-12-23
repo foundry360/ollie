@@ -4,12 +4,15 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useConversations } from '@/hooks/useMessages';
 import { ConversationItem } from '@/components/messages/ConversationItem';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function MessagesScreen() {
   const { colorScheme } = useThemeStore();
+  const { user } = useAuthStore();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const isTeenlancer = user?.role === 'teen';
 
   // #region agent log
   useEffect(() => {
@@ -29,9 +32,11 @@ export default function MessagesScreen() {
 
   const renderConversation = ({ item }: { item: any }) => (
     <ConversationItem
-      task_id={item.task_id}
+      task_id={item.gig_id || item.task_id}
       task_title={item.task_title}
+      other_user_id={item.other_user_id}
       other_user_name={item.other_user_name}
+      other_user_photo={item.other_user_photo}
       last_message={item.last_message}
       unread_count={item.unread_count}
     />
@@ -50,7 +55,7 @@ export default function MessagesScreen() {
       <FlatList
         data={conversations}
         renderItem={renderConversation}
-        keyExtractor={(item) => `${item.task_id}-${item.other_user_id}`}
+        keyExtractor={(item) => `${item.gig_id || item.task_id}-${item.other_user_id}`}
         contentContainerStyle={[
           styles.listContent,
           conversations.length === 0 && styles.listContentEmpty,
@@ -68,7 +73,9 @@ export default function MessagesScreen() {
             <Text style={[styles.emptySubtext, isDark && styles.emptySubtextDark]}>
               {isLoading
                 ? 'Please wait while we fetch your conversations'
-                : 'Start a conversation from a task'}
+                : isTeenlancer
+                  ? 'Start a conversation with a neighbor'
+                  : 'Start a conversation with a teenlancer'}
             </Text>
           </View>
         }

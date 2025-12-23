@@ -1,9 +1,10 @@
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
 import { TeenlancerCard } from '@/components/teenlancers/TeenlancerCard';
 import { TeenlancerFilters } from '@/components/teenlancers/TeenlancerFilters';
+import { Loading } from '@/components/ui/Loading';
 import { getTeenlancers, TeenlancerFilters as TeenlancerFiltersType, TeenlancerProfile } from '@/lib/api/users';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -187,9 +188,7 @@ export default function SelectTeenlancerScreen() {
       )}
 
       {isLoading && teenlancers.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#73af17" />
-        </View>
+        <Loading />
       ) : (
         <FlatList
           data={teenlancers}
@@ -284,11 +283,6 @@ const styles = StyleSheet.create({
   emptySubtextDark: {
     color: '#9CA3AF',
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   filtersContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -341,6 +335,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+
+
+
+
+
+
 
 
 

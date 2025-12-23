@@ -165,9 +165,10 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
   };
 
   const handleMessagePress = () => {
-    if (existingGigId) {
-      // Navigate directly to the specific gig's chat, just like teenlancers do
-      router.push(`/chat/${existingGigId}`);
+    if (existingGigId && userId) {
+      // Navigate to chat with recipientId to ensure proper conversation routing
+      // This is especially important for open gigs where the neighbor needs to specify which applicant
+      router.push(`/chat/${existingGigId}?recipientId=${userId}`);
       onClose();
     } else {
       // Fallback to messages screen if no gig found

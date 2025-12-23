@@ -329,7 +329,30 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
 
   const handleChat = () => {
     if (!task) return;
+    console.log('GigDetailModal handleChat:', {
+      taskId: task.id,
+      taskStatus: task.status,
+      taskTeenId: task.teen_id,
+      taskPosterId: task.poster_id,
+      isNeighbor,
+      isTeenlancer,
+      isOpen,
+    });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/tasks/GigDetailModal.tsx:330',message:'handleChat called',data:{taskId:task.id,taskStatus:task.status,taskTeenId:task.teen_id,taskPosterId:task.poster_id,isNeighbor,isTeenlancer,isOpen},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
+    
     onClose();
+    
+    // For neighbors on open gigs, they need to select an applicant first
+    // Don't navigate to chat - show message or do nothing (they should use Message button on applicant)
+    if (isNeighbor && isOpen && !task.teen_id) {
+      console.log('GigDetailModal: Neighbor on open gig - cannot chat without selecting applicant');
+      // Don't navigate - they should click Message on an applicant card
+      return;
+    }
+    
     router.push(`/chat/${task.id}`);
   };
 
@@ -696,6 +719,17 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                             </View>
                             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
                           </Pressable>
+                          {/* Message button for neighbors to message applicants */}
+                          {isNeighbor && isOpen && (
+                            <View style={[styles.applicationActions, isDark && styles.applicationActionsDark]}>
+                              <Button
+                                title="Message"
+                                onPress={() => router.push(`/chat/${taskId}?recipientId=${application.teen_id}`)}
+                                variant="secondary"
+                                style={styles.messageButton}
+                              />
+                            </View>
+                          )}
                         </View>
                       ))
                     ) : (
@@ -1465,6 +1499,16 @@ const styles = StyleSheet.create({
   applicationActions: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  applicationActionsDark: {
+    borderTopColor: '#374151',
+  },
+  messageButton: {
+    flex: 1,
   },
   thumbsUpButton: {
     flex: 1,

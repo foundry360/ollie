@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useNeighborStats } from '@/hooks/useNeighborStats';
@@ -6,6 +7,7 @@ import { getGreeting } from '@/lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 
 export function NeighborHeader() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
@@ -20,6 +22,10 @@ export function NeighborHeader() {
   const labelStyle = isDark ? styles.labelDark : styles.labelLight;
   const valueStyle = isDark ? styles.valueDark : styles.valueLight;
 
+  const handleActivePress = () => {
+    router.push('/(tabs)/tasks');
+  };
+
   return (
     <View style={[styles.container, containerStyle]}>
       <View style={styles.headerRow}>
@@ -31,7 +37,11 @@ export function NeighborHeader() {
       </View>
 
       <View style={styles.statsRow}>
-        <View style={[styles.statCard, cardStyle]}>
+        <Pressable 
+          style={[styles.statCard, cardStyle]}
+          onPress={handleActivePress}
+          android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
+        >
           <Ionicons name="time" size={24} color="#fbbc04" />
           <Text 
             style={[styles.statValue, valueStyle]}
@@ -42,7 +52,7 @@ export function NeighborHeader() {
             {isLoading ? '...' : stats?.activeGigs || 0}
           </Text>
           <Text style={[styles.statLabel, labelStyle]}>Active</Text>
-        </View>
+        </Pressable>
 
         <View style={[styles.statCard, cardStyle]}>
           <Ionicons name="checkmark-circle" size={24} color="#73af17" />
@@ -141,6 +151,13 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 });
+
+
+
+
+
+
+
 
 
 

@@ -72,3 +72,42 @@ export interface Message {
   created_at: string;
 }
 
+export interface StripeAccount {
+  id: string;
+  user_id: string;
+  stripe_account_id: string;
+  onboarding_status: 'pending' | 'in_progress' | 'complete' | 'failed';
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+  email?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  user_id: string;
+  stripe_payment_method_id: string;
+  stripe_customer_id?: string;
+  type: 'card' | 'bank_account' | 'us_bank_account';
+  is_default: boolean;
+  card_brand?: string;
+  card_last4?: string;
+  card_exp_month?: number;
+  card_exp_year?: number;
+  bank_name?: string;
+  bank_last4?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentIntent {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  client_secret?: string;
+}
+
+export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded';
+

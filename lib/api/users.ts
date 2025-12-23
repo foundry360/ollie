@@ -61,25 +61,82 @@ export async function getPublicUserProfile(userId: string): Promise<User | null>
 
 // Get any user profile by ID (for messaging/chat - allows both teen and poster roles)
 export async function getUserProfileForChat(userId: string): Promise<User | null> {
-  console.log('getUserProfileForChat called for userId:', userId);
-  
-  // First, try to get the user's role to determine which policy applies
+  if (!userId) {
+    console.warn('getUserProfileForChat called with null/undefined userId');
+    return null;
+  }
+
   const { data: currentUser } = await supabase.auth.getUser();
   
+  if (!currentUser?.user?.id) {
+    console.warn('getUserProfileForChat: No authenticated user');
+    return null;
+  }
+  
+  // First, try direct query (should work if RLS allows via messages relationship)
   const { data, error } = await supabase
     .from('users')
     .select('id, full_name, profile_photo_url, role')
     .eq('id', userId)
     .maybeSingle();
 
-  // If data is null (RLS blocking or user doesn't exist), try workaround via gigs join
-  if (!data && !error && currentUser?.user?.id) {
-    // Try querying via the gigs relationship - this should work because
-    // we can read open gigs, and the join should allow us to get the poster profile
+  // If direct query works, return the data
+  if (data) {
+    return data;
+  }
+
+  // If data is null (RLS blocking), try workarounds via relationships
+  if (!data && !error) {
+    // Try 1: Query via messages relationship (works for both senders and recipients)
+    // Find a message where current user and target user are involved
+    // Try as sender first
+    const { data: messageAsSender } = await supabase
+      .from('messages')
+      .select(`
+        recipient:users!messages_recipient_id_fkey (
+          id,
+          full_name,
+          profile_photo_url,
+          role
+        )
+      `)
+      .eq('sender_id', currentUser.user.id)
+      .eq('recipient_id', userId)
+      .limit(1)
+      .maybeSingle();
+    
+    if (messageAsSender && (messageAsSender as any).recipient) {
+      return (messageAsSender as any).recipient as User;
+    }
+
+    // Try as recipient
+    const { data: messageAsRecipient } = await supabase
+      .from('messages')
+      .select(`
+        sender:users!messages_sender_id_fkey (
+          id,
+          full_name,
+          profile_photo_url,
+          role
+        )
+      `)
+      .eq('sender_id', userId)
+      .eq('recipient_id', currentUser.user.id)
+      .limit(1)
+      .maybeSingle();
+    
+    if (messageAsRecipient && (messageAsRecipient as any).sender) {
+      return (messageAsRecipient as any).sender as User;
+    }
+
+    // Try 2: Query via gigs relationship for posters
+    // Allow if: gig is open (anyone can see), or current user is assigned teen, or current user is the poster
     const { data: gigWithPoster, error: gigError } = await supabase
       .from('gigs')
       .select(`
         poster_id,
+        teen_id,
+        status,
         users!gigs_poster_id_fkey (
           id,
           full_name,
@@ -88,7 +145,7 @@ export async function getUserProfileForChat(userId: string): Promise<User | null
         )
       `)
       .eq('poster_id', userId)
-      .eq('status', 'open')
+      .or(`status.eq.open,teen_id.eq.${currentUser.user.id},poster_id.eq.${currentUser.user.id}`)
       .limit(1)
       .maybeSingle();
     
@@ -96,30 +153,46 @@ export async function getUserProfileForChat(userId: string): Promise<User | null
       const userData = (gigWithPoster as any).users as User;
       return userData;
     }
+
+    // Try 3: Query via gigs relationship for teenlancers (assigned or applicants)
+    const { data: gigWithTeen, error: teenGigError } = await supabase
+      .from('gigs')
+      .select(`
+        teen_id,
+        poster_id,
+        users!gigs_teen_id_fkey (
+          id,
+          full_name,
+          profile_photo_url,
+          role
+        )
+      `)
+      .eq('teen_id', userId)
+      .or(`poster_id.eq.${currentUser.user.id},status.eq.open`)
+      .limit(1)
+      .maybeSingle();
+    
+    if (gigWithTeen && (gigWithTeen as any).users) {
+      const userData = (gigWithTeen as any).users as User;
+      return userData;
+    }
   }
 
   if (error) {
-    console.log('getUserProfileForChat error:', {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-    });
     // Handle specific error codes
     if (error.code === 'PGRST116') {
+      // No rows returned - try workarounds
+      console.log(`getUserProfileForChat: Direct query returned no rows for ${userId}, trying workarounds`);
+    } else {
+      console.error(`getUserProfileForChat: Error fetching profile for ${userId}:`, error);
+      // Don't throw - return null so the UI can handle gracefully
       return null;
     }
-    throw error;
   }
   
-  console.log('getUserProfileForChat result:', {
-    hasData: !!data,
-    data,
-    hasPhoto: !!data?.profile_photo_url,
-    photoUrl: data?.profile_photo_url,
-  });
-  
-  return data;
+  // If we get here, all queries failed
+  console.warn(`getUserProfileForChat: Could not fetch profile for ${userId} via any method`);
+  return null;
 }
 
 // Get teen statistics (rating, tasks completed, weekly earnings)

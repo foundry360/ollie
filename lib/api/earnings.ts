@@ -16,6 +16,9 @@ export interface EarningsRecord {
   status: 'pending' | 'paid' | 'cancelled';
   created_at: string;
   paid_at: string | null;
+  payment_status?: 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded';
+  platform_fee_amount?: number;
+  payment_failed_reason?: string;
 }
 
 // Get earnings summary for a teen
@@ -82,6 +85,9 @@ export async function getEarningsHistory(filters?: {
       status,
       created_at,
       paid_at,
+      payment_status,
+      platform_fee_amount,
+      payment_failed_reason,
       gigs(id, title)
     `)
     .eq('teen_id', user.id)
@@ -117,6 +123,9 @@ export async function getEarningsHistory(filters?: {
     status: item.status,
     created_at: item.created_at,
     paid_at: item.paid_at,
+    payment_status: item.payment_status,
+    platform_fee_amount: item.platform_fee_amount ? parseFloat(item.platform_fee_amount.toString()) : undefined,
+    payment_failed_reason: item.payment_failed_reason,
   }));
 }
 
@@ -316,6 +325,9 @@ export async function getNeighborSpendingHistory(filters?: {
       status,
       created_at,
       paid_at,
+      payment_status,
+      platform_fee_amount,
+      payment_failed_reason,
       gigs!earnings_gig_id_fkey(id, title, poster_id),
       teen:users!earnings_teen_id_fkey(full_name)
     `);
@@ -356,6 +368,9 @@ export async function getNeighborSpendingHistory(filters?: {
       created_at: item.created_at,
       paid_at: item.paid_at,
       teen_name: item.teen?.full_name,
+      payment_status: item.payment_status,
+      platform_fee_amount: item.platform_fee_amount ? parseFloat(item.platform_fee_amount.toString()) : undefined,
+      payment_failed_reason: item.payment_failed_reason,
     }));
 
   return filteredData;

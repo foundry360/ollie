@@ -130,3 +130,13 @@ CREATE POLICY "Teens can accept open gigs" ON public.gigs
 
 
 
+
+
+
+
+
+
+
+
+
+

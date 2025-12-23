@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,15 +18,15 @@ const TIPS: Tip[] = [
   },
   {
     id: '2',
-    icon: 'time',
-    title: 'Set Your Availability',
-    description: 'Let neighbors know when you\'re available',
+    icon: 'star',
+    title: 'Build Your Rating',
+    description: 'Complete gigs on time to earn great reviews',
   },
   {
     id: '3',
-    icon: 'star',
-    title: 'Build Your Rating',
-    description: 'Complete tasks on time to earn great reviews',
+    icon: 'time',
+    title: 'Set Your Availability',
+    description: 'Let neighbors know when you\'re available',
   },
   {
     id: '4',
@@ -51,9 +51,35 @@ export function TipsCarousel() {
         {TIPS.map((tip) => (
           <View key={tip.id} style={[styles.tipCard, isDark && styles.tipCardDark]}>
             <View style={[styles.tipTopHalf, isDark && styles.tipTopHalfDark]}>
-              <View style={[styles.iconContainer, isDark && styles.iconContainerDark]}>
-                <Ionicons name={tip.icon} size={28} color={isDark ? '#A8D574' : '#73af17'} />
-              </View>
+              {tip.id === '1' ? (
+                <Image 
+                  source={require('@/assets/profile-img.jpg')} 
+                  style={styles.tipImageBackground}
+                  resizeMode="cover"
+                />
+              ) : tip.id === '2' ? (
+                <Image 
+                  source={require('@/assets/rating-img.jpg')} 
+                  style={styles.tipImageBackground}
+                  resizeMode="cover"
+                />
+              ) : tip.id === '3' ? (
+                <Image 
+                  source={require('@/assets/availability-img.jpg')} 
+                  style={styles.tipImageBackground}
+                  resizeMode="cover"
+                />
+              ) : tip.id === '4' ? (
+                <Image 
+                  source={require('@/assets/talk-img.jpg')} 
+                  style={styles.tipImageBackground}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.iconContainer, isDark && styles.iconContainerDark]}>
+                  <Ionicons name={tip.icon} size={28} color={isDark ? '#A8D574' : '#73af17'} />
+                </View>
+              )}
             </View>
             <View style={styles.tipBottomHalf}>
               <Text 
@@ -121,9 +147,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    overflow: 'hidden',
+    position: 'relative',
   },
   tipTopHalfDark: {
     backgroundColor: '#73af17',
+  },
+  tipImageBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   tipBottomHalf: {
     height: '50%',
@@ -138,9 +175,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8F5D9',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   iconContainerDark: {
     backgroundColor: '#2D4A1A',
+  },
+  iconContainerOverImage: {
+    backgroundColor: 'rgba(232, 245, 217, 0.9)',
   },
   tipTitle: {
     fontSize: 11,
@@ -165,6 +206,13 @@ const styles = StyleSheet.create({
     color: '#B8E584',
   },
 });
+
+
+
+
+
+
+
 
 
 

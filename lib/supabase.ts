@@ -17,6 +17,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 });
 
@@ -963,5 +968,5 @@ export async function sendParentApprovalEmail(parentEmail: string, token: string
 }
 
 // Re-export profile functions from api/users
-export { updateProfile, uploadProfilePhoto } from '@/lib/api/users';
+export { updateProfile, uploadProfilePhoto } from './api/users';
 

@@ -40,3 +40,10 @@ CREATE POLICY "Teens can read own applications" ON public.gig_applications
 
 
 
+
+
+
+
+
+
+

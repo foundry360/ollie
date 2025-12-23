@@ -103,7 +103,9 @@ export default function HomeScreen() {
             <>
               <NeighborHeader />
               <NeighborActiveGigs />
+              <View style={[styles.divider, isDark && styles.dividerDark]} />
               <NeighborUpcomingScheduledGigs />
+              <View style={[styles.divider, isDark && styles.dividerDark]} />
               <NeighborRecentActivity />
             </>
           )}
@@ -147,9 +149,11 @@ export default function HomeScreen() {
             <ActiveTaskCard />
             <WeeklyEarnings />
             <TasksNearYou />
+            <View style={[styles.divider, isDark && styles.dividerDark]} />
             <RecentActivity />
-            <UpcomingTasks />
+            <View style={[styles.divider, isDark && styles.dividerDark]} />
             <TipsCarousel />
+            <UpcomingTasks />
           </>
         )}
       </ScrollView>
@@ -188,7 +192,23 @@ const styles = StyleSheet.create({
   errorTextDark: {
     color: '#D1D5DB',
   },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 16,
+    marginHorizontal: 16,
+  },
+  dividerDark: {
+    backgroundColor: '#1F2937',
+  },
 });
+
+
+
+
+
+
+
 
 
 

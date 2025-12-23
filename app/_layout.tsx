@@ -11,8 +11,26 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Loading } from '@/components/ui/Loading';
 import { registerForPushNotifications, setupNotificationListeners } from '@/lib/notifications';
 
+// Conditionally import StripeProvider - will be available after native rebuild
+let StripeProvider: any;
+try {
+  const stripeModule = require('@stripe/stripe-react-native');
+  StripeProvider = stripeModule.StripeProvider;
+} catch (e) {
+  // Native module not available (Expo Go) - use passthrough component
+  StripeProvider = ({ children, ...props }: any) => children;
+}
+
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 60000, retry: 2 } }
+  defaultOptions: { 
+    queries: { 
+      staleTime: 30000, // 30 seconds default
+      retry: 2,
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+      refetchOnReconnect: true, // Only refetch on reconnect
+      refetchInterval: false, // EXPLICITLY disable polling globally
+    } 
+  }
 });
 
 export default function RootLayout() {
@@ -352,15 +370,22 @@ export default function RootLayout() {
     );
   }
 
+  const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
+  
   return (
-    <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#000000' : '#ffffff' }}>
-          <Slot />
-        </View>
-      </SafeAreaProvider>
-    </QueryClientProvider>
+    <StripeProvider 
+      publishableKey={stripePublishableKey}
+      urlScheme="ollie" // Required for 3D Secure redirects
+    >
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#000000' : '#ffffff' }}>
+            <Slot />
+          </View>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </StripeProvider>
   );
 }
 

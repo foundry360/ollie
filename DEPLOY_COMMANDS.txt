@@ -1,0 +1,109 @@
+# Complete Twilio Edge Functions Deployment Commands
+# Project Reference ID: enxxlckxhcttvsxnjfnw
+# Copy and paste these commands one by one into your terminal
+
+# ============================================
+# STEP 1: Check/Install Supabase CLI
+# ============================================
+supabase --version
+
+# If not installed, run:
+# npm install -g supabase
+
+# ============================================
+# STEP 2: Login to Supabase
+# ============================================
+supabase login
+
+# ============================================
+# STEP 3: Link Your Project
+# ============================================
+supabase link --project-ref enxxlckxhcttvsxnjfnw
+
+# ============================================
+# STEP 4: Deploy All Functions
+# ============================================
+supabase functions deploy generate-twilio-token
+
+supabase functions deploy manage-twilio-conversation
+
+supabase functions deploy send-twilio-message
+
+supabase functions deploy twilio-webhook
+
+supabase functions deploy get-twilio-messages
+
+# ============================================
+# STEP 5: Verify Deployment
+# ============================================
+supabase functions list
+
+# ============================================
+# STEP 6: Push Database Migrations
+# ============================================
+supabase db push
+
+# ============================================
+# DEPLOYMENT COMPLETE!
+# ============================================
+# 
+# Next Steps:
+# 
+# 1. Set secrets for each function in Supabase Dashboard:
+#    → Edge Functions → [Function Name] → Settings → Secrets
+# 
+# 2. Configure Twilio webhook URL in Twilio Console:
+#    https://enxxlckxhcttvsxnjfnw.supabase.co/functions/v1/twilio-webhook
+# 
+# 3. Your function URLs:
+#    • https://enxxlckxhcttvsxnjfnw.supabase.co/functions/v1/generate-twilio-token
+#    • https://enxxlckxhcttvsxnjfnw.supabase.co/functions/v1/manage-twilio-conversation
+#    • https://enxxlckxhcttvsxnjfnw.supabase.co/functions/v1/send-twilio-message
+#    • https://enxxlckxhcttvsxnjfnw.supabase.co/functions/v1/twilio-webhook
+#    • https://enxxlckxhcttvsxnjfnw.supabase.co/functions/v1/get-twilio-messages
+# 
+# ============================================
+# REQUIRED SECRETS FOR EACH FUNCTION
+# ============================================
+# 
+# generate-twilio-token:
+#   - TWILIO_ACCOUNT_SID
+#   - TWILIO_API_KEY_SID
+#   - TWILIO_API_KEY_SECRET
+#   - TWILIO_CONVERSATIONS_SERVICE_SID = IS3cf2fe8fe4a44558ba62ab0946b7555f
+#   - SUPABASE_URL
+#   - SUPABASE_ANON_KEY
+# 
+# manage-twilio-conversation:
+#   - TWILIO_ACCOUNT_SID
+#   - TWILIO_AUTH_TOKEN
+#   - TWILIO_CONVERSATIONS_SERVICE_SID = IS3cf2fe8fe4a44558ba62ab0946b7555f
+#   - SUPABASE_URL
+#   - SUPABASE_ANON_KEY
+#   - SUPABASE_SERVICE_ROLE_KEY
+# 
+# send-twilio-message:
+#   - TWILIO_ACCOUNT_SID
+#   - TWILIO_AUTH_TOKEN
+#   - SUPABASE_URL
+#   - SUPABASE_ANON_KEY
+# 
+# twilio-webhook:
+#   - TWILIO_AUTH_TOKEN
+#   - SUPABASE_SERVICE_ROLE_KEY
+#   - SUPABASE_URL
+# 
+# get-twilio-messages:
+#   - TWILIO_ACCOUNT_SID
+#   - TWILIO_AUTH_TOKEN
+#   - SUPABASE_URL
+#   - SUPABASE_ANON_KEY
+# 
+# ============================================
+
+
+
+
+
+
+

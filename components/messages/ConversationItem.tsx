@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -7,7 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 interface ConversationItemProps {
   task_id: string;
   task_title: string;
+  other_user_id: string;
   other_user_name: string;
+  other_user_photo?: string | null;
   last_message: {
     content: string;
     created_at: string;
@@ -18,7 +20,9 @@ interface ConversationItemProps {
 export function ConversationItem({
   task_id,
   task_title,
+  other_user_id,
   other_user_name,
+  other_user_photo,
   last_message,
   unread_count,
 }: ConversationItemProps) {
@@ -27,7 +31,11 @@ export function ConversationItem({
   const isDark = colorScheme === 'dark';
 
   const handlePress = () => {
-    router.push(`/chat/${task_id}`);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/messages/ConversationItem.tsx:33',message:'ConversationItem handlePress',data:{task_id,other_user_id,url:`/chat/${task_id}?recipientId=${other_user_id}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+    // #endregion
+    // Pass other_user_id as recipientId so the chat screen knows who to message
+    router.push(`/chat/${task_id}?recipientId=${other_user_id}`);
   };
 
   const containerStyle = isDark ? styles.containerDark : styles.containerLight;
@@ -41,31 +49,33 @@ export function ConversationItem({
       onPress={handlePress}
       android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
     >
-      <View style={styles.avatar}>
-        <Ionicons
-          name="person"
-          size={24}
-          color={isDark ? '#9CA3AF' : '#6B7280'}
+      {other_user_photo ? (
+        <Image
+          source={{ uri: other_user_photo }}
+          style={styles.avatar}
         />
-      </View>
+      ) : (
+        <View style={[styles.avatar, styles.avatarPlaceholder, isDark && styles.avatarPlaceholderDark]}>
+          <Ionicons
+            name="person"
+            size={24}
+            color={isDark ? '#9CA3AF' : '#6B7280'}
+          />
+        </View>
+      )}
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={[styles.title, titleStyle]} numberOfLines={1}>
             {task_title}
           </Text>
-          {last_message && (
-            <Text style={timeStyle}>
-              {formatDistanceToNow(new Date(last_message.created_at), { addSuffix: true })}
-            </Text>
-          )}
         </View>
         <View style={styles.footer}>
           <Text style={[styles.subtitle, subtitleStyle]} numberOfLines={1}>
             {other_user_name}
           </Text>
           {last_message && (
-            <Text style={[styles.message, subtitleStyle]} numberOfLines={1}>
-              {last_message.content}
+            <Text style={timeStyle}>
+              {formatDistanceToNow(new Date(last_message.created_at), { addSuffix: true })}
             </Text>
           )}
         </View>
@@ -93,17 +103,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#73af1720',
+    backgroundColor: 'transparent',
     borderBottomColor: '#1F2937',
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
+    marginRight: 12,
+    borderWidth: 1.5,
+    borderColor: '#73af17',
+  },
+  avatarPlaceholder: {
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+  },
+  avatarPlaceholderDark: {
+    backgroundColor: '#374151',
   },
   content: {
     flex: 1,
@@ -137,6 +154,7 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
   },
   subtitle: {

@@ -6,6 +6,9 @@ import { useAuthStore } from '@/stores/authStore';
 import { Drawer, DrawerContext } from '@/components/Drawer';
 import { HeaderLogo } from '@/components/ui/HeaderLogo';
 import { useContext, useEffect, useMemo } from 'react';
+import { useConversations, messageKeys } from '@/hooks/useMessages';
+import { supabase } from '@/lib/supabase';
+import { useQueryClient } from '@tanstack/react-query';
 
 function HeaderLeft() {
   const { openDrawer, drawerOpen } = useContext(DrawerContext);
@@ -107,6 +110,52 @@ export default function TabLayout() {
   
   // Check if user is a neighbor (poster) - they shouldn't see the Marketplace
   const isNeighbor = user?.role === 'poster';
+
+  // Get conversations to calculate unread message count
+  const queryClient = useQueryClient();
+  const { data: conversations = [] } = useConversations();
+  const unreadCount = useMemo(() => {
+    return conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0);
+  }, [conversations]);
+
+  // Set up real-time subscription for new messages to update badge
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('messages-badge-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        () => {
+          // Invalidate conversations to refetch and update badge
+          queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        () => {
+          // Invalidate on updates (e.g., read status changes)
+          queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   // #region agent log
   useEffect(() => {
@@ -246,7 +295,39 @@ export default function TabLayout() {
         options={{ 
           title: 'Messages',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-outline" size={size} color={color} />
+            <View style={{ position: 'relative' }}>
+              <Ionicons name="chatbubble-outline" size={size} color={color} />
+              {unreadCount > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -8,
+                  right: -10,
+                  backgroundColor: '#73af17',
+                  borderRadius: 12,
+                  minWidth: 22,
+                  height: 22,
+                  paddingHorizontal: 6,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: isDark ? '#000000' : '#FFFFFF',
+                  zIndex: 10,
+                  elevation: 5, // Android shadow
+                  shadowColor: '#000', // iOS shadow
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 3,
+                }}>
+                  <Text style={{
+                    color: '#FFFFFF',
+                    fontSize: 11,
+                    fontWeight: '700',
+                  }}>
+                    {unreadCount > 99 ? '99+' : unreadCount.toString()}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
           tabBarLabelStyle,
         }} 
@@ -269,6 +350,20 @@ export default function TabLayout() {
         name="qr-code" 
         options={{ 
           title: 'Share Profile',
+          href: null, // Hide from tab bar
+        }} 
+      />
+      <Tabs.Screen 
+        name="payment-setup" 
+        options={{ 
+          title: 'Payment Setup',
+          href: null, // Hide from tab bar
+        }} 
+      />
+      <Tabs.Screen 
+        name="payment-methods" 
+        options={{ 
+          title: 'Payment Methods',
           href: null, // Hide from tab bar
         }} 
       />

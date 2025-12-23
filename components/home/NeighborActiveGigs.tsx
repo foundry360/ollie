@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#000000',
   },
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   applicationsText: {
-    fontSize: 14,
+    fontSize: 10,
     color: '#73af17',
     fontWeight: '500',
   },
@@ -354,6 +354,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 });
+
+
+
+
+
+
+
 
 
 

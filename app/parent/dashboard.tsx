@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { usePendingApprovals, useApproveTask, useRejectTask } from '@/hooks/useParentApprovals';
+import { usePendingStripeAccountApprovals, useApproveStripeAccount, useRejectStripeAccount } from '@/hooks/useStripeAccountApprovals';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +19,8 @@ export default function ParentDashboardScreen() {
   const isDark = colorScheme === 'dark';
   const [rejectReason, setRejectReason] = useState('');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectingStripeId, setRejectingStripeId] = useState<string | null>(null);
+  const [stripeRejectReason, setStripeRejectReason] = useState('');
 
   const {
     data: approvals = [],
@@ -26,8 +29,17 @@ export default function ParentDashboardScreen() {
     refetch,
   } = usePendingApprovals();
 
+  const {
+    data: stripeApprovals = [],
+    isLoading: isLoadingStripe,
+    isRefetching: isRefetchingStripe,
+    refetch: refetchStripe,
+  } = usePendingStripeAccountApprovals();
+
   const approveMutation = useApproveTask();
   const rejectMutation = useRejectTask();
+  const approveStripeMutation = useApproveStripeAccount();
+  const rejectStripeMutation = useRejectStripeAccount();
 
   const handleApprove = async (approvalId: string) => {
     Alert.alert(
@@ -72,6 +84,51 @@ export default function ParentDashboardScreen() {
   const handleCancelReject = () => {
     setRejectingId(null);
     setRejectReason('');
+  };
+
+  const handleApproveStripe = async (approvalId: string) => {
+    Alert.alert(
+      'Approve Payment Account Setup',
+      'Are you sure you want to approve setting up a payment account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          onPress: async () => {
+            try {
+              await approveStripeMutation.mutateAsync(approvalId);
+              Alert.alert('Success', 'Payment account setup approved!');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to approve payment account setup');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRejectStripe = async (approvalId: string) => {
+    if (rejectingStripeId !== approvalId) {
+      setRejectingStripeId(approvalId);
+      return;
+    }
+
+    try {
+      await rejectStripeMutation.mutateAsync({
+        approvalId,
+        reason: stripeRejectReason || undefined,
+      });
+      Alert.alert('Success', 'Payment account setup rejected.');
+      setRejectingStripeId(null);
+      setStripeRejectReason('');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to reject payment account setup');
+    }
+  };
+
+  const handleCancelRejectStripe = () => {
+    setRejectingStripeId(null);
+    setStripeRejectReason('');
   };
 
   if (user?.role !== 'parent') {
@@ -156,25 +213,92 @@ export default function ParentDashboardScreen() {
     );
   };
 
+  const renderStripeApproval = ({ item }: { item: any }) => {
+    const isRejecting = rejectingStripeId === item.id;
+
+    return (
+      <View style={[styles.approvalCard, cardStyle]}>
+        <View style={styles.approvalHeader}>
+          <View style={styles.approvalInfo}>
+            <View style={styles.stripeApprovalTitle}>
+              <Ionicons name="card-outline" size={20} color={isDark ? '#D1D5DB' : '#374151'} />
+              <Text style={[styles.taskTitle, titleStyle]}>Payment Account Setup</Text>
+            </View>
+            <Text style={[styles.approvalDate, labelStyle]}>
+              {item.teen_name || 'Your teen'} • Requested {format(new Date(item.created_at), 'MMM d, yyyy')}
+            </Text>
+          </View>
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusText}>PENDING</Text>
+          </View>
+        </View>
+
+        <Text style={[styles.description, textStyle]}>
+          Your teen wants to set up a payment account to receive payments for completed gigs.
+        </Text>
+
+        {isRejecting ? (
+          <View style={styles.rejectForm}>
+            <Input
+              label="Reason for rejection (optional)"
+              value={stripeRejectReason}
+              onChangeText={setStripeRejectReason}
+              placeholder="Enter reason..."
+              multiline
+            />
+            <View style={styles.rejectActions}>
+              <Button
+                title="Cancel"
+                onPress={handleCancelRejectStripe}
+                variant="secondary"
+              />
+              <Button
+                title="Reject"
+                onPress={() => handleRejectStripe(item.id)}
+                variant="danger"
+                loading={rejectStripeMutation.isPending}
+              />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.approvalActions}>
+            <Button
+              title="Approve"
+              onPress={() => handleApproveStripe(item.id)}
+              loading={approveStripeMutation.isPending}
+              fullWidth
+            />
+            <Button
+              title="Reject"
+              onPress={() => handleRejectStripe(item.id)}
+              variant="danger"
+              fullWidth
+            />
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, containerStyle]}>
       <View style={[styles.header, isDark && styles.headerDark]}>
         <Text style={[styles.headerTitle, titleStyle]}>Parent Dashboard</Text>
         <Text style={[styles.headerSubtitle, textStyle]}>
-          Review and approve task requests
+          Review and approve requests
         </Text>
       </View>
 
-      {isLoading ? (
+      {isLoading || isLoadingStripe ? (
         <Loading />
       ) : (
         <FlatList
-          data={approvals}
-          renderItem={renderApproval}
-          keyExtractor={(item) => item.id}
+          data={[...stripeApprovals.map((item: any) => ({ ...item, type: 'stripe' })), ...approvals.map((item: any) => ({ ...item, type: 'gig' }))]}
+          renderItem={({ item }) => item.type === 'stripe' ? renderStripeApproval({ item }) : renderApproval({ item })}
+          keyExtractor={(item) => `${item.type}-${item.id}`}
           contentContainerStyle={[
             styles.listContent,
-            approvals.length === 0 && styles.listContentEmpty,
+            approvals.length === 0 && stripeApprovals.length === 0 && styles.listContentEmpty,
           ]}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -185,14 +309,17 @@ export default function ParentDashboardScreen() {
               />
               <Text style={[styles.emptyText, titleStyle]}>No pending approvals</Text>
               <Text style={[styles.emptySubtext, textStyle]}>
-                All task requests have been reviewed
+                All requests have been reviewed
               </Text>
             </View>
           }
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
+              refreshing={isRefetching || isRefetchingStripe}
+              onRefresh={() => {
+                refetch();
+                refetchStripe();
+              }}
               tintColor="#73af17"
             />
           }
@@ -336,5 +463,15 @@ const styles = StyleSheet.create({
   },
   errorSubtextDark: {
     color: '#9CA3AF',
+  },
+  stripeApprovalTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
   },
 });

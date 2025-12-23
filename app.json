@@ -36,7 +36,13 @@
       "expo-router",
       "expo-video",
       "expo-web-browser",
-      "expo-maps"
+      "expo-maps",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.foundry360.ollie"
+        }
+      ]
     ],
     "extra": {
       "router": {},

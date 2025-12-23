@@ -18,3 +18,10 @@ CREATE POLICY "Users can read relevant earnings" ON public.earnings
 
 
 
+
+
+
+
+
+
+

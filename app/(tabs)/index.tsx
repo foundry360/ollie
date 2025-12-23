@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Pressable, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -7,6 +7,7 @@ import { TaskCard } from '@/components/tasks/TaskCard';
 import { TaskFilters } from '@/components/tasks/TaskFilters';
 import { GigDetailModal } from '@/components/tasks/GigDetailModal';
 import { MarketplaceMap } from '@/components/marketplace/MarketplaceMap';
+import { Loading } from '@/components/ui/Loading';
 import { Task } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -234,9 +235,7 @@ export default function MarketplaceScreen() {
 
       {viewMode === 'list' ? (
         isLoading && gigs.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#73af17" />
-          </View>
+          <Loading />
         ) : (
           <FlatList
             data={gigs}
@@ -265,9 +264,7 @@ export default function MarketplaceScreen() {
         />
       ) : (
         savedLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#73af17" />
-          </View>
+          <Loading />
         ) : (
           <FlatList
             data={savedGigs}
@@ -392,11 +389,6 @@ const styles = StyleSheet.create({
   },
   emptySubtextDark: {
     color: '#9CA3AF',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   tabBar: {
     flexDirection: 'row',

@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#000000',
   },
@@ -354,19 +354,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginTop: 12,
     marginBottom: 4,
     color: '#000000',
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: 12,
     textAlign: 'center',
     color: '#6B7280',
     paddingHorizontal: 16,
   },
 });
+
+
+
+
+
+
+
 
 
 

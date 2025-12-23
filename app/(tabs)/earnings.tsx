@@ -180,16 +180,30 @@ export default function EarningsScreen() {
             <View
               style={[
                 styles.statusBadge,
-                item.status === 'paid' && styles.statusBadgePaid,
-                item.status === 'pending' && styles.statusBadgePending,
+                item.payment_status === 'succeeded' && styles.statusBadgePaid,
+                (item.payment_status === 'pending' || item.payment_status === 'processing') && styles.statusBadgePending,
+                item.payment_status === 'failed' && styles.statusBadgeFailed,
               ]}
             >
               <Text style={styles.statusText}>
-                {item.status === 'paid' ? 'Paid' : 'Pending'}
+                {item.payment_status === 'succeeded' ? 'Paid' :
+                 item.payment_status === 'processing' ? 'Processing' :
+                 item.payment_status === 'failed' ? 'Failed' :
+                 item.status === 'paid' ? 'Paid' : 'Pending'}
               </Text>
             </View>
           </View>
         </View>
+        {item.platform_fee_amount && item.platform_fee_amount > 0 && (
+          <Text style={[styles.feeText, labelStyle]}>
+            Platform fee: ${item.platform_fee_amount.toFixed(2)} • Net: ${(item.amount - item.platform_fee_amount).toFixed(2)}
+          </Text>
+        )}
+        {item.payment_failed_reason && (
+          <Text style={[styles.errorText, { color: '#EF4444' }]}>
+            Payment failed: {item.payment_failed_reason}
+          </Text>
+        )}
         {item.paid_at && (
           <Text style={[styles.paidDate, labelStyle]}>
             {isNeighbor ? 'Payment sent on' : 'Paid on'} {format(new Date(item.paid_at), 'MMM d, yyyy')}
@@ -545,6 +559,19 @@ const styles = StyleSheet.create({
   },
   statusBadgePending: {
     backgroundColor: '#FEF3C7',
+  },
+  statusBadgeFailed: {
+    backgroundColor: '#FEE2E2',
+  },
+  feeText: {
+    fontSize: 12,
+    marginTop: 4,
+    color: '#6B7280',
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   statusText: {
     fontSize: 10,

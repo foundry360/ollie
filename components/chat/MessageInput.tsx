@@ -14,9 +14,31 @@ export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
   const [message, setMessage] = useState('');
 
   const handleSend = () => {
-    if (message.trim() && !disabled) {
-      onSend(message.trim());
+    const trimmedMessage = message.trim();
+    console.log('[MessageInput] handleSend called:', {
+      hasMessage: !!trimmedMessage,
+      messageLength: trimmedMessage.length,
+      disabled,
+      messagePreview: trimmedMessage.substring(0, 50),
+    });
+    
+    if (!trimmedMessage) {
+      console.log('[MessageInput] ❌ Not sending - message is empty');
+      return;
+    }
+    
+    if (disabled) {
+      console.log('[MessageInput] ❌ Not sending - input is disabled');
+      return;
+    }
+    
+    console.log('[MessageInput] ✅ Calling onSend with message');
+    try {
+      onSend(trimmedMessage);
       setMessage('');
+      console.log('[MessageInput] ✅ Message sent, input cleared');
+    } catch (error) {
+      console.error('[MessageInput] ❌ Error in onSend:', error);
     }
   };
 
@@ -60,16 +82,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopWidth: 0,
     gap: 12,
   },
   containerLight: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   containerDark: {
-    backgroundColor: '#1F2937',
-    borderTopColor: '#374151',
+    backgroundColor: 'transparent',
   },
   input: {
     flex: 1,
@@ -82,12 +102,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   inputLight: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
     borderColor: '#D1D5DB',
     color: '#111827',
   },
   inputDark: {
-    backgroundColor: '#374151',
+    backgroundColor: 'transparent',
     borderColor: '#4B5563',
     color: '#FFFFFF',
   },

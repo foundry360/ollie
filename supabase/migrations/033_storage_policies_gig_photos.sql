@@ -31,3 +31,11 @@ CREATE POLICY "Users can delete own gig photos"
 ON storage.objects FOR DELETE
 TO authenticated
 USING (bucket_id = 'gig-photos');
+
+
+
+
+
+
+
+

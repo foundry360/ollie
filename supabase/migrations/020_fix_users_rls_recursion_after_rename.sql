@@ -36,3 +36,13 @@ CREATE POLICY "Users can read related profiles" ON public.users
 
 
 
+
+
+
+
+
+
+
+
+
+

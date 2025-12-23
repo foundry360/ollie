@@ -1,21 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+import { PaymentSetupContent } from '@/components/payments/PaymentSetupContent';
+import { PaymentMethodsContent } from '@/components/payments/PaymentMethodsContent';
 import { Ionicons } from '@expo/vector-icons';
+import type { User } from '@/types';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { colorScheme } = useThemeStore();
+  const { user: authUser } = useAuthStore();
   const isDark = colorScheme === 'dark';
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [showPaymentSetup, setShowPaymentSetup] = useState(false);
+  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
+
+  useEffect(() => {
+    loadUserProfile();
+  }, [authUser]);
+
+  const loadUserProfile = async () => {
+    if (!authUser) return;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+      if (error) throw error;
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
 
   const handleChangePassword = async () => {
     if (!newPassword || !confirmPassword) {
@@ -90,16 +119,30 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
           </Pressable>
 
-          <Pressable 
-            style={[styles.menuItem, styles.menuItemWithBorder, isDark && styles.menuItemBorderDark]}
-            onPress={() => handleMenuItemPress('Billing & Payments')}
-          >
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="card" size={20} color="#73af17" />
-              <Text style={[styles.menuItemLabel, labelStyle]}>Billing & Payments</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
-          </Pressable>
+          {userProfile?.role === 'teen' && (
+            <Pressable 
+              style={[styles.menuItem, styles.menuItemWithBorder, isDark && styles.menuItemBorderDark]}
+              onPress={() => setShowPaymentSetup(true)}
+            >
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="wallet" size={20} color="#73af17" />
+                <Text style={[styles.menuItemLabel, labelStyle]}>Payment Setup</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+            </Pressable>
+          )}
+          {userProfile?.role === 'poster' && (
+            <Pressable 
+              style={[styles.menuItem, styles.menuItemWithBorder, isDark && styles.menuItemBorderDark]}
+              onPress={() => setShowPaymentMethods(true)}
+            >
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="card" size={20} color="#73af17" />
+                <Text style={[styles.menuItemLabel, labelStyle]}>Payment Methods</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+            </Pressable>
+          )}
 
           <Pressable 
             style={styles.menuItem} 
@@ -227,6 +270,22 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={showPaymentSetup}
+        onClose={() => setShowPaymentSetup(false)}
+        title="Payment Setup"
+      >
+        <PaymentSetupContent />
+      </BottomSheet>
+
+      <BottomSheet
+        visible={showPaymentMethods}
+        onClose={() => setShowPaymentMethods(false)}
+        title="Payment Methods"
+      >
+        <PaymentMethodsContent />
       </BottomSheet>
     </SafeAreaView>
   );

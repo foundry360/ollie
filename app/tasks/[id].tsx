@@ -123,6 +123,30 @@ export default function TaskDetailScreen() {
   };
 
   const handleChat = () => {
+    console.log('TaskDetailScreen handleChat:', {
+      taskId: task?.id,
+      taskStatus: task?.status,
+      taskTeenId: task?.teen_id,
+      taskPosterId: task?.poster_id,
+      userId: user?.id,
+      isPoster,
+      isTeen,
+    });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/tasks/[id].tsx:125',message:'handleChat called',data:{taskId:task?.id,taskStatus:task?.status,taskTeenId:task?.teen_id,taskPosterId:task?.poster_id,userId:user?.id,isPoster,isTeen},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
+    
+    // For neighbors on open gigs, they need to select an applicant first
+    if (isPoster && task?.status === 'open' && !task?.teen_id) {
+      console.log('TaskDetailScreen: Neighbor on open gig - cannot chat without selecting applicant');
+      Alert.alert(
+        'Select an Applicant',
+        'To start a conversation, please go to the gig details and click "Message" on an applicant\'s profile.'
+      );
+      return;
+    }
+    
     router.push(`/chat/${task?.id}`);
   };
 

@@ -67,14 +67,6 @@ export default function RoleSelectionScreen() {
       />
       <SafeAreaView style={styles.safeContent} edges={[]}>
         <View style={styles.content}>
-          <Pressable
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
-            <Text style={[styles.backButtonText, isDark && styles.backButtonTextDark]}>Back</Text>
-          </Pressable>
-          
           <View style={styles.spacerTop} />
 
           <View style={styles.header}>
@@ -338,21 +330,6 @@ const styles = StyleSheet.create({
   },
   loginLinkTextDark: {
     color: '#73af17',
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 0,
-    alignSelf: 'flex-start',
-    gap: 4,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#000000',
-  },
-  backButtonTextDark: {
-    color: '#FFFFFF',
   },
 });
 

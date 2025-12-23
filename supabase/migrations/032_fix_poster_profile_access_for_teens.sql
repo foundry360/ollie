@@ -32,3 +32,11 @@ CREATE POLICY "Users can read related profiles" ON public.users
       -- Parent-child access should be handled through separate policies or functions
     )
   );
+
+
+
+
+
+
+
+
