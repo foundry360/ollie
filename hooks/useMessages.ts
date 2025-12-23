@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import {
   getTaskMessages,
   getConversations,
@@ -16,13 +17,24 @@ export const messageKeys = {
 };
 
 // Get messages for a task
-export function useTaskMessages(taskId: string) {
-  return useQuery({
-    queryKey: messageKeys.task(taskId),
-    queryFn: () => getTaskMessages(taskId),
+export function useTaskMessages(taskId: string, recipientId?: string) {
+  const stableRecipientId = useMemo(() => recipientId || 'all', [recipientId]);
+  const queryKey = useMemo(() => [...messageKeys.task(taskId), stableRecipientId], [taskId, stableRecipientId]);
+  
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      return getTaskMessages(taskId, stableRecipientId === 'all' ? undefined : stableRecipientId);
+    },
     enabled: !!taskId,
-    refetchInterval: 5000, // Poll every 5 seconds for new messages
+    staleTime: Infinity, // Never consider stale - Realtime will handle updates
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: false, // No polling - Realtime only
   });
+  
+  return query;
 }
 
 // Get conversations
@@ -30,7 +42,11 @@ export function useConversations() {
   return useQuery({
     queryKey: messageKeys.conversations(),
     queryFn: getConversations,
-    staleTime: 30000,
+    staleTime: Infinity, // Never consider stale - Realtime will handle updates
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: false, // No polling - Realtime only
   });
 }
 
@@ -39,10 +55,25 @@ export function useCreateMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreateMessageData) => createMessage(data),
-    onSuccess: (data) => {
-      // Invalidate task messages
-      queryClient.invalidateQueries({ queryKey: messageKeys.task(data.task_id) });
+    mutationFn: async (data: CreateMessageData) => {
+      return createMessage(data);
+    },
+    onSuccess: (newMessage, variables) => {
+      // Update the messages cache optimistically
+      const stableRecipientId = variables.recipient_id || 'all';
+      const queryKey = [...messageKeys.task(variables.gig_id), stableRecipientId];
+      
+      queryClient.setQueryData(queryKey, (oldData: Message[] | undefined) => {
+        if (!oldData) return [newMessage];
+        // Check if message already exists
+        if (oldData.some(msg => msg.id === newMessage.id)) return oldData;
+        // Add new message and sort by created_at
+        return [...oldData, newMessage].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      });
+      
+      // Invalidate conversations list
       queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
     },
   });
@@ -56,9 +87,8 @@ export function useMarkMessagesAsRead() {
     mutationFn: ({ taskId, senderId }: { taskId: string; senderId: string }) =>
       markMessagesAsRead(taskId, senderId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: messageKeys.task(variables.taskId) });
+      // Only invalidate conversations, not messages (prevents refetch)
       queryClient.invalidateQueries({ queryKey: messageKeys.conversations() });
     },
   });
 }
-
