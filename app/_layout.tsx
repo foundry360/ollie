@@ -3,7 +3,7 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { supabase, getUserProfile, createUserProfile } from '@/lib/supabase';
 import { getNeighborApplicationByUserId } from '@/lib/api/neighborApplications';
 import { useAuthStore } from '@/stores/authStore';
@@ -11,13 +11,18 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Loading } from '@/components/ui/Loading';
 import { registerForPushNotifications, setupNotificationListeners } from '@/lib/notifications';
 
-// Conditionally import StripeProvider - will be available after native rebuild
+// Conditionally import StripeProvider - only on native platforms (not web)
 let StripeProvider: any;
-try {
-  const stripeModule = require('@stripe/stripe-react-native');
-  StripeProvider = stripeModule.StripeProvider;
-} catch (e) {
-  // Native module not available (Expo Go) - use passthrough component
+if (Platform.OS !== 'web') {
+  try {
+    const stripeModule = require('@stripe/stripe-react-native');
+    StripeProvider = stripeModule.StripeProvider;
+  } catch (e) {
+    // Native module not available (Expo Go) - use passthrough component
+    StripeProvider = ({ children, ...props }: any) => children;
+  }
+} else {
+  // Web platform - Stripe not supported, use passthrough
   StripeProvider = ({ children, ...props }: any) => children;
 }
 

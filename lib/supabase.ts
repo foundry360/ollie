@@ -384,23 +384,132 @@ export async function getPendingSignupByTokenAnyStatus(token: string) {
 }
 
 export async function approveTeenSignup(token: string) {
-  // Get pending signup
-  const pendingSignup = await getPendingSignupByToken(token);
-  if (!pendingSignup) throw new Error('Pending signup not found or already processed.');
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:386',message:'approveTeenSignup called',data:{token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
+  // Use database function that bypasses RLS (SECURITY DEFINER)
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:390',message:'Before RPC call',data:{hasToken:!!token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
+  const { data, error } = await supabase.rpc('approve_teen_signup', {
+    p_token: token
+  });
 
-  // Just update status to approved - don't create account yet
-  // The teen will create the account after approval
-  const { error: updateError } = await supabase
-    .from('pending_teen_signups')
-    .update({
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:395',message:'After RPC call',data:{hasError:!!error,errorMessage:error?.message,errorCode:error?.code,hasData:!!data,dataLength:data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+
+  if (error) {
+    console.error('Error approving teen signup:', error);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:407',message:'RPC error, trying fallback',data:{errorMessage:error.message,errorCode:error.code,errorDetails:error.details,errorHint:error.hint},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    
+    // If RPC function fails, fall back to direct update (for backwards compatibility)
+    // Try fallback for most errors except clear auth/permission errors
+    // This handles: function doesn't exist, ambiguous column errors, etc.
+    const isAuthError = error.code === 'PGRST301' || error.code === '42501' || error.code === 'PGRST301'; // Permission denied codes
+    
+    // Try fallback unless it's clearly an auth error
+    if (!isAuthError) {
+      console.warn('RPC function not found, using direct update fallback');
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:414',message:'Using direct update fallback',data:{token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
+      // #endregion
+      
+      // Get pending signup first
+      const { data: signupData, error: fetchError } = await supabase
+        .from('pending_teen_signups')
+        .select('*')
+        .eq('approval_token', token)
+        .eq('status', 'pending')
+        .single();
+      
+      if (fetchError) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:425',message:'Fallback fetch error',data:{fetchError:fetchError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+        // #endregion
+        throw new Error('Pending signup not found or already processed');
+      }
+      
+      if (!signupData) {
+        throw new Error('Pending signup not found');
+      }
+      
+      // Check if expired
+      if (new Date(signupData.token_expires_at) < new Date()) {
+        await supabase
+          .from('pending_teen_signups')
+          .update({ status: 'expired' })
+          .eq('id', signupData.id);
+        throw new Error('Approval token has expired');
+      }
+      
+      // Update to approved
+      const { error: updateError } = await supabase
+        .from('pending_teen_signups')
+        .update({
+          status: 'approved',
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', signupData.id);
+      
+      if (updateError) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:446',message:'Fallback update error',data:{updateError:updateError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O'})}).catch(()=>{});
+        // #endregion
+        throw updateError;
+      }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:467',message:'Fallback update success, returning',data:{signupId:signupData.id,signupFullName:signupData.full_name,signupParentEmail:signupData.parent_email},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'U'})}).catch(()=>{});
+      // #endregion
+      
+      const returnValue = {
+        pendingSignup: {
+          id: signupData.id,
+          full_name: signupData.full_name,
+          parent_email: signupData.parent_email,
+          status: 'approved' as const,
+          approved_at: new Date().toISOString()
+        }
+      };
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:480',message:'Returning from fallback',data:{hasPendingSignup:!!returnValue.pendingSignup,returnStatus:returnValue.pendingSignup.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'V'})}).catch(()=>{});
+      // #endregion
+      
+      return returnValue;
+    }
+    
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:405',message:'No data returned, throwing',data:{hasData:!!data,dataLength:data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+    throw new Error('Failed to approve signup');
+  }
+
+  const result = data[0];
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:412',message:'Success, returning result',data:{hasResult:!!result,resultId:result?.id,resultStatus:result?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+  // #endregion
+  
+  // Return the result directly - no need to query again
+  return { 
+    pendingSignup: {
+      id: result.id,
+      full_name: result.full_name,
+      parent_email: result.parent_email,
       status: 'approved',
-      approved_at: new Date().toISOString()
-    })
-    .eq('id', pendingSignup.id);
-
-  if (updateError) throw updateError;
-
-  return { pendingSignup };
+      approved_at: result.approved_at
+    }
+  };
 }
 
 export async function completeTeenSignup(parentEmail: string, email: string, password: string) {
@@ -411,46 +520,156 @@ export async function completeTeenSignup(parentEmail: string, email: string, pas
     throw new Error('No approved signup found for this parent email.');
   }
 
-  // Create the actual account
-  const { user, error: signUpError } = await signUp(email, password, {
+  // Create the actual teen account
+  const signUpData = await signUp(email, password, {
     full_name: pendingSignup.full_name,
     role: 'teen'
   });
 
-  if (signUpError) throw signUpError;
-  if (!user) throw new Error('Failed to create user account');
+  if (!signUpData?.user) throw new Error('Failed to create user account');
+  const user = signUpData.user;
 
-  // Create user profile
+  // Create or get parent account (silently - no email sent)
+  let parentId: string | null = null;
+  
+  try {
+    // Validate pendingSignup has required data
+    if (!pendingSignup.parent_email) {
+      console.warn('⚠️ [completeTeenSignup] No parent_email in pendingSignup:', pendingSignup);
+      // Don't throw - continue without parent account
+    } else {
+      // Get session for authenticated request
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn('⚠️ [completeTeenSignup] No session available for parent account creation');
+        // Don't throw - continue without parent account
+      } else {
+        // Call edge function to create/get parent account
+        const requestBody = {
+          parent_email: pendingSignup.parent_email,
+          teen_name: pendingSignup.full_name
+        };
+        
+        console.log('📤 [completeTeenSignup] Calling create-parent-account with:', {
+          parent_email: requestBody.parent_email,
+          teen_name: requestBody.teen_name,
+          hasParentEmail: !!requestBody.parent_email,
+          pendingSignupKeys: Object.keys(pendingSignup)
+        });
+    
+        const { data: parentAccountData, error: parentError } = await supabase.functions.invoke(
+          'create-parent-account',
+          {
+            body: requestBody,
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          }
+        );
+        
+        if (parentError) {
+      console.error('Failed to create parent account:', parentError);
+      // Try to get more details from the error
+      try {
+        // FunctionsHttpError has a context property with the response
+        const errorAny = parentError as any;
+        if (errorAny?.context) {
+          try {
+            const response = errorAny.context;
+            if (response && typeof response.json === 'function') {
+              const errorBody = await response.json();
+              console.error('Parent account creation error response:', errorBody);
+            } else if (response) {
+              console.error('Parent account creation error context:', response);
+            }
+          } catch (parseError) {
+            console.error('Could not parse error response:', parseError);
+          }
+        }
+        // Also log the error object structure
+        console.error('Error object keys:', Object.keys(errorAny));
+        console.error('Error message:', errorAny.message);
+        console.error('Error name:', errorAny.name);
+      } catch (e) {
+        console.error('Error extracting error details:', e);
+      }
+          // Don't fail teen signup if parent account creation fails
+          // We'll still create the teen account with parent_email
+        } else if (parentAccountData?.parent_id) {
+          parentId = parentAccountData.parent_id;
+          console.log('Successfully created/found parent account:', parentId);
+        }
+      }
+    }
+  } catch (parentAccountError: any) {
+    console.error('Error creating parent account (catch block):', parentAccountError);
+    console.error('Error type:', parentAccountError?.constructor?.name);
+    console.error('Error message:', parentAccountError?.message);
+    console.error('Error stack:', parentAccountError?.stack);
+    // Continue with teen signup even if parent account creation fails
+  }
+
+  // Create teen user profile
   let profile;
   try {
     profile = await createUserProfile(user.id, {
-    email: email,
-    full_name: pendingSignup.full_name,
-    role: 'teen',
-    date_of_birth: pendingSignup.date_of_birth,
-    parent_email: pendingSignup.parent_email
-  });
+      email: email,
+      full_name: pendingSignup.full_name,
+      role: 'teen',
+      date_of_birth: pendingSignup.date_of_birth,
+      parent_email: pendingSignup.parent_email
+    });
   } catch (profileError: any) {
     throw profileError;
   }
 
-  // Note: We don't update the pending signup with email/password anymore
-  // since those fields have been removed from the table
+  // Update teen profile with parent_id if we successfully created/found parent account
+  if (parentId) {
+    try {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ parent_id: parentId })
+        .eq('id', user.id);
 
-  return { user, profile, pendingSignup };
+      if (updateError) {
+        console.error('Failed to update teen profile with parent_id:', updateError);
+        // Don't throw - profile was created successfully, just missing parent_id link
+      } else {
+        // Update the profile object to reflect the change
+        profile = { ...profile, parent_id: parentId };
+      }
+    } catch (updateError: any) {
+      console.error('Error updating teen profile with parent_id:', updateError);
+      // Continue - profile was created successfully
+    }
+  }
+
+  return { user, profile, pendingSignup, parentId };
 }
 
 export async function rejectTeenSignup(token: string) {
-  const { data, error } = await supabase
-    .from('pending_teen_signups')
-    .update({ status: 'rejected' })
-    .eq('approval_token', token)
-    .eq('status', 'pending')
-    .select()
-    .single();
+  // Use database function that bypasses RLS (SECURITY DEFINER)
+  const { data, error } = await supabase.rpc('reject_teen_signup', {
+    p_token: token
+  });
 
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error('Error rejecting teen signup:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Failed to reject signup');
+  }
+
+  // Return the result directly - no need to query again
+  const result = data[0];
+  return {
+    id: result.id,
+    full_name: result.full_name,
+    parent_email: result.parent_email,
+    status: 'rejected'
+  };
 }
 
 export async function getPendingSignupByParentEmail(parentEmail: string) {
@@ -759,9 +978,6 @@ export async function sendPhoneOTP(phone: string) {
   }
   if (data?.session) {
     console.log('📱 [sendPhoneOTP] Session object present:', !!data.session);
-  }
-  if (data?.message) {
-    console.log('📱 [sendPhoneOTP] Message:', data.message);
   }
   
   // Note: {user: null, session: null} is NORMAL for OTP requests

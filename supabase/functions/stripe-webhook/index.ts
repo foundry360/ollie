@@ -83,81 +83,6 @@ serve(async (req) => {
 
     // Handle different event types
     switch (event.type) {
-      case 'account.updated': {
-        const account = event.data.object
-        
-        // Determine onboarding status
-        let onboardingStatus: 'pending' | 'in_progress' | 'complete' | 'failed' = 'pending'
-        
-        if (account.details_submitted) {
-          if (account.charges_enabled && account.payouts_enabled) {
-            onboardingStatus = 'complete'
-          } else if (account.requirements?.currently_due?.length === 0 && 
-                     account.requirements?.past_due?.length === 0) {
-            // Account is in good standing but may be pending verification
-            onboardingStatus = account.charges_enabled || account.payouts_enabled 
-              ? 'in_progress' 
-              : 'pending'
-          } else {
-            onboardingStatus = 'in_progress'
-          }
-        } else {
-          onboardingStatus = 'pending'
-        }
-
-        // Check for account rejection/deactivation
-        if (account.details_submitted && !account.charges_enabled && !account.payouts_enabled) {
-          // Check if there are requirements that can't be met
-          const hasPastDue = account.requirements?.past_due?.length > 0
-          const hasDisabledReason = account.requirements?.disabled_reason
-          
-          if (hasPastDue || hasDisabledReason) {
-            onboardingStatus = 'failed'
-          }
-        }
-        
-        // Update stripe_accounts table
-        const { error: updateError } = await supabase
-          .from('stripe_accounts')
-          .update({
-            onboarding_status: onboardingStatus,
-            charges_enabled: account.charges_enabled || false,
-            payouts_enabled: account.payouts_enabled || false,
-            email: account.email || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('stripe_account_id', account.id)
-
-        if (updateError) {
-          console.error('Error updating stripe account:', updateError)
-        } else {
-          console.log(`Updated Stripe account ${account.id}: status=${onboardingStatus}, charges=${account.charges_enabled}, payouts=${account.payouts_enabled}`)
-        }
-
-        break
-      }
-      
-      case 'account.application.deauthorized': {
-        const account = event.data.object
-        
-        // Handle account deauthorization
-        const { error: updateError } = await supabase
-          .from('stripe_accounts')
-          .update({
-            onboarding_status: 'failed',
-            charges_enabled: false,
-            payouts_enabled: false,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('stripe_account_id', account.id)
-
-        if (updateError) {
-          console.error('Error updating deauthorized stripe account:', updateError)
-        }
-
-        break
-      }
-
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object
         
@@ -207,24 +132,47 @@ serve(async (req) => {
         break
       }
 
-      case 'transfer.created': {
-        const transfer = event.data.object
+      case 'payout.paid': {
+        const payout = event.data.object
         
-        // Find earnings record by transfer ID
-        const { data: earnings } = await supabase
+        // Find earnings records by payout ID
+        const { data: earningsList } = await supabase
           .from('earnings')
           .select('*')
-          .eq('stripe_transfer_id', transfer.id)
-          .single()
+          .eq('stripe_payout_id', payout.id)
 
-        if (earnings && !earnings.stripe_transfer_id) {
-          // Update earnings with transfer ID if not already set
+        if (earningsList && earningsList.length > 0) {
+          // Update all earnings records for this payout
           await supabase
             .from('earnings')
             .update({
-              stripe_transfer_id: transfer.id,
+              payout_status: 'paid',
+              paid_at: new Date().toISOString(),
             })
-            .eq('id', earnings.id)
+            .eq('stripe_payout_id', payout.id)
+        }
+
+        break
+      }
+
+      case 'payout.failed': {
+        const payout = event.data.object
+        
+        // Find earnings records by payout ID
+        const { data: earningsList } = await supabase
+          .from('earnings')
+          .select('*')
+          .eq('stripe_payout_id', payout.id)
+
+        if (earningsList && earningsList.length > 0) {
+          // Update all earnings records for this failed payout
+          await supabase
+            .from('earnings')
+            .update({
+              payout_status: 'failed',
+              payout_failed_reason: payout.failure_message || 'Payout failed',
+            })
+            .eq('stripe_payout_id', payout.id)
         }
 
         break

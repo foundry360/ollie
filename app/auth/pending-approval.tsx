@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -31,36 +31,160 @@ export default function PendingApprovalScreen() {
   const [status, setStatus] = useState<'pending' | 'approved' | 'rejected' | 'expired'>('pending');
 
   useEffect(() => {
-    // Check if account was created (means approved)
-    const checkApprovalStatus = async () => {
-      if (!params.parentEmail) {
-        setIsChecking(false);
-        return;
-      }
+    if (!params.parentEmail) {
+      setIsChecking(false);
+      return;
+    }
 
-      try {
-        // Check if user account exists (means it was approved)
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          setStatus('approved');
-          router.replace('/(tabs)/home');
-          return;
+    let signupId: string | null = null;
+    let pollingInterval: NodeJS.Timeout | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let currentStatus: 'pending' | 'approved' | 'rejected' | 'expired' = 'pending';
+
+    // Handle status change and redirect
+    const handleStatusChange = async (newStatus: string) => {
+      currentStatus = newStatus as 'pending' | 'approved' | 'rejected' | 'expired';
+      setStatus(currentStatus);
+      
+      if (newStatus === 'approved') {
+        console.log('✅ [pending-approval] Status is approved, redirecting to complete-account...');
+        try {
+          await AsyncStorage.removeItem('pending_signup_parent_email');
+          router.replace(`/auth/complete-account?parentEmail=${encodeURIComponent(params.parentEmail)}`);
+        } catch (error) {
+          console.error('❌ [pending-approval] Error redirecting:', error);
         }
+      } else if (newStatus === 'rejected' || newStatus === 'expired') {
+        console.log('❌ [pending-approval] Status is rejected/expired, clearing storage');
+        await AsyncStorage.removeItem('pending_signup_parent_email');
+      }
+    };
 
+    // Set up realtime subscription
+    const setupRealtimeSubscription = (id: string | null) => {
+      if (!id && !params.parentEmail) return;
+
+      const normalizedEmail = params.parentEmail.trim().toLowerCase();
+      console.log('🔔 [pending-approval] Setting up realtime subscription for:', normalizedEmail, 'signupId:', id);
+      
+      // Try to use ID-based filter if we have the signup ID (more reliable)
+      // Otherwise fall back to email-based filter
+      const filter = id 
+        ? `id=eq.${id}`
+        : `parent_email=eq.${normalizedEmail}`;
+      
+      channel = supabase
+        .channel(`pending-signup-${id || normalizedEmail}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'pending_teen_signups',
+            filter: filter,
+          },
+          async (payload) => {
+            console.log('🔔 [pending-approval] Realtime update received:', payload);
+            console.log('🔔 [pending-approval] Payload new status:', payload.new?.status);
+            console.log('🔔 [pending-approval] Payload new parent_email:', payload.new?.parent_email);
+            console.log('🔔 [pending-approval] Payload old status:', payload.old?.status);
+            
+            const newStatus = payload.new?.status;
+            if (!newStatus) {
+              console.warn('⚠️ [pending-approval] No status in payload.new');
+              return;
+            }
+            
+            // Only process if status actually changed
+            if (payload.old?.status === newStatus) {
+              console.log('⚠️ [pending-approval] Status unchanged, ignoring');
+              return;
+            }
+            
+            console.log(`🔄 [pending-approval] Status changed from ${payload.old?.status} to ${newStatus}`);
+            
+            // Stop polling if realtime is working
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+              pollingInterval = null;
+            }
+            
+            await handleStatusChange(newStatus);
+          }
+        )
+        .subscribe((subscriptionStatus) => {
+          console.log('🔔 [pending-approval] Subscription status:', subscriptionStatus);
+          if (subscriptionStatus === 'SUBSCRIBED') {
+            console.log('✅ [pending-approval] Successfully subscribed to realtime updates');
+          } else if (subscriptionStatus === 'CHANNEL_ERROR') {
+            console.error('❌ [pending-approval] Channel subscription error, will use polling fallback');
+            // If realtime fails, ensure polling is active
+            if (!pollingInterval) {
+              setupPollingFallback();
+            }
+          } else if (subscriptionStatus === 'TIMED_OUT') {
+            console.warn('⚠️ [pending-approval] Realtime subscription timed out, will use polling fallback');
+            if (!pollingInterval) {
+              setupPollingFallback();
+            }
+          }
+        });
+    };
+
+    // Set up polling as fallback (checks every 5 seconds)
+    const setupPollingFallback = () => {
+      if (pollingInterval) return; // Already polling
+      
+      console.log('🔄 [pending-approval] Setting up polling fallback (every 5 seconds)');
+      pollingInterval = setInterval(async () => {
+        try {
+          const pendingSignup = await getPendingSignupByParentEmailAnyStatus(params.parentEmail);
+          if (pendingSignup && pendingSignup.status !== currentStatus) {
+            console.log(`🔄 [pending-approval] Polling detected status change: ${currentStatus} -> ${pendingSignup.status}`);
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+              pollingInterval = null;
+            }
+            await handleStatusChange(pendingSignup.status);
+          }
+        } catch (error) {
+          console.error('❌ [pending-approval] Error polling status:', error);
+        }
+      }, 5000); // Poll every 5 seconds
+    };
+
+    // Check approval status from pending signup
+    const checkApprovalStatus = async () => {
+      try {
         // Check pending signup status by parent email (any status)
+        // Note: We don't check for existing user account here because the teen
+        // hasn't created their account yet - they're waiting for parent approval
         const pendingSignup = await getPendingSignupByParentEmailAnyStatus(params.parentEmail);
         if (pendingSignup) {
-          setStatus(pendingSignup.status as 'pending' | 'approved' | 'rejected' | 'expired');
+          signupId = pendingSignup.id;
+          currentStatus = pendingSignup.status as 'pending' | 'approved' | 'rejected' | 'expired';
+          setStatus(currentStatus);
+          
           if (pendingSignup.status === 'approved') {
             // Approved, redirect to complete account screen
             await AsyncStorage.removeItem('pending_signup_parent_email');
             router.replace(`/auth/complete-account?parentEmail=${encodeURIComponent(params.parentEmail)}`);
+            return;
           } else if (pendingSignup.status === 'rejected') {
             // Show rejected message, clear storage
             await AsyncStorage.removeItem('pending_signup_parent_email');
+            return;
           } else if (pendingSignup.status === 'expired') {
             // Show expired message, clear storage
             await AsyncStorage.removeItem('pending_signup_parent_email');
+            return;
+          }
+          
+          // If status is still pending, set up realtime and polling
+          if (pendingSignup.status === 'pending') {
+            setupRealtimeSubscription(signupId);
+            // Also set up polling as a fallback
+            setupPollingFallback();
           }
         }
       } catch (error) {
@@ -70,12 +194,19 @@ export default function PendingApprovalScreen() {
       }
     };
 
+    // Initial status check
     checkApprovalStatus();
 
-    // Poll every 10 seconds for status updates
-    const interval = setInterval(checkApprovalStatus, 10000);
-
-    return () => clearInterval(interval);
+    return () => {
+      if (channel) {
+        console.log('🧹 [pending-approval] Cleaning up realtime subscription');
+        supabase.removeChannel(channel);
+      }
+      if (pollingInterval) {
+        console.log('🧹 [pending-approval] Cleaning up polling interval');
+        clearInterval(pollingInterval);
+      }
+    };
   }, [params.parentEmail, router]);
 
   const handleResendEmail = async () => {

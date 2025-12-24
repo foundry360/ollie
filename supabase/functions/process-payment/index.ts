@@ -71,27 +71,6 @@ serve(async (req) => {
       )
     }
 
-    // Get teen's Stripe account
-    const { data: stripeAccount, error: accountError } = await supabase
-      .from('stripe_accounts')
-      .select('*')
-      .eq('user_id', gig.teen_id)
-      .single()
-
-    if (accountError || !stripeAccount) {
-      return new Response(
-        JSON.stringify({ error: 'Teenlancer Stripe account not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    if (stripeAccount.onboarding_status !== 'complete' || !stripeAccount.charges_enabled) {
-      return new Response(
-        JSON.stringify({ error: 'Teenlancer Stripe account not ready for payments' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
     // Get neighbor's default payment method
     const { data: paymentMethod, error: pmError } = await supabase
       .from('payment_methods')
@@ -133,15 +112,14 @@ serve(async (req) => {
       .update({ payment_status: 'processing' })
       .eq('id', earnings_id)
 
-    // Create Payment Intent with application fee
+    // Create Payment Intent (platform receives all funds, will payout to teenlancer separately)
     const paymentIntentParams = new URLSearchParams()
     paymentIntentParams.append('amount', Math.round(gig.pay * 100).toString()) // Convert to cents
     paymentIntentParams.append('currency', 'usd')
     paymentIntentParams.append('payment_method', paymentMethod.stripe_payment_method_id)
     paymentIntentParams.append('confirmation_method', 'automatic')
     paymentIntentParams.append('confirm', 'true')
-    paymentIntentParams.append('application_fee_amount', Math.round(platformFeeAmount * 100).toString())
-    paymentIntentParams.append('transfer_data[destination]', stripeAccount.stripe_account_id)
+    // Note: Platform receives full amount, payout to teenlancer will be handled separately
     paymentIntentParams.append('metadata[gig_id]', gig.id)
     paymentIntentParams.append('metadata[earnings_id]', earnings_id)
     paymentIntentParams.append('metadata[teen_id]', gig.teen_id)
@@ -179,18 +157,12 @@ serve(async (req) => {
       )
     }
 
-    // Get transfer ID from payment intent
-    let transferId = null
-    if (paymentIntent.charges?.data?.[0]?.transfer) {
-      transferId = paymentIntent.charges.data[0].transfer
-    }
-
     // Update earnings with payment info
+    // Note: Platform fee and payout will be handled separately via payout creation
     const { data: updatedEarnings, error: updateError } = await supabase
       .from('earnings')
       .update({
         stripe_payment_intent_id: paymentIntent.id,
-        stripe_transfer_id: transferId,
         platform_fee_amount: platformFeeAmount,
         payment_status: paymentIntent.status === 'succeeded' ? 'succeeded' : 'processing',
         paid_at: paymentIntent.status === 'succeeded' ? new Date().toISOString() : null,

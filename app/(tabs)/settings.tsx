@@ -9,7 +9,6 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { BottomSheet } from '@/components/ui/BottomSheet';
-import { PaymentSetupContent } from '@/components/payments/PaymentSetupContent';
 import { PaymentMethodsContent } from '@/components/payments/PaymentMethodsContent';
 import { Ionicons } from '@expo/vector-icons';
 import type { User } from '@/types';
@@ -24,7 +23,6 @@ export default function SettingsScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [userProfile, setUserProfile] = useState<User | null>(null);
-  const [showPaymentSetup, setShowPaymentSetup] = useState(false);
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
 
   useEffect(() => {
@@ -122,7 +120,7 @@ export default function SettingsScreen() {
           {userProfile?.role === 'teen' && (
             <Pressable 
               style={[styles.menuItem, styles.menuItemWithBorder, isDark && styles.menuItemBorderDark]}
-              onPress={() => setShowPaymentSetup(true)}
+              onPress={() => router.push('/(tabs)/payment-setup')}
             >
               <View style={styles.menuItemLeft}>
                 <Ionicons name="wallet" size={20} color="#73af17" />
@@ -270,14 +268,6 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
-      </BottomSheet>
-
-      <BottomSheet
-        visible={showPaymentSetup}
-        onClose={() => setShowPaymentSetup(false)}
-        title="Payment Setup"
-      >
-        <PaymentSetupContent />
       </BottomSheet>
 
       <BottomSheet

@@ -72,17 +72,19 @@ export interface Message {
   created_at: string;
 }
 
-export interface StripeAccount {
-  id: string;
-  user_id: string;
-  stripe_account_id: string;
-  onboarding_status: 'pending' | 'in_progress' | 'complete' | 'failed';
-  charges_enabled: boolean;
-  payouts_enabled: boolean;
-  email?: string;
-  created_at: string;
-  updated_at: string;
-}
+// StripeAccount interface removed - no longer using Stripe Connect Express accounts
+// Keeping for reference during migration period
+// export interface StripeAccount {
+//   id: string;
+//   user_id: string;
+//   stripe_account_id: string;
+//   onboarding_status: 'pending' | 'in_progress' | 'complete' | 'failed';
+//   charges_enabled: boolean;
+//   payouts_enabled: boolean;
+//   email?: string;
+//   created_at: string;
+//   updated_at: string;
+// }
 
 export interface PaymentMethod {
   id: string;

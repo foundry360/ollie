@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, AppState } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, AppState, Platform } from 'react-native';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { getPaymentMethods, setDefaultPaymentMethod, removePaymentMethod, createSetupIntent, addPaymentMethod } from '@/lib/api/payments';
@@ -7,17 +7,26 @@ import { Loading } from '@/components/ui/Loading';
 import { supabase } from '@/lib/supabase';
 import type { PaymentMethod } from '@/types';
 
-// Conditionally import Stripe - will be available after native rebuild
+// Conditionally import Stripe - only on native platforms (not web)
 let useStripe: any;
-try {
-  const stripeModule = require('@stripe/stripe-react-native');
-  useStripe = stripeModule.useStripe;
-} catch (e) {
-  // Native module not available (Expo Go) - will work after rebuild
+if (Platform.OS !== 'web') {
+  try {
+    const stripeModule = require('@stripe/stripe-react-native');
+    useStripe = stripeModule.useStripe;
+  } catch (e) {
+    // Native module not available (Expo Go) - will work after rebuild
+    useStripe = () => ({
+      initPaymentSheet: () => Promise.resolve({ error: null }),
+      presentPaymentSheet: () => Promise.resolve({ error: { code: 'NativeModuleNotAvailable', message: 'Please rebuild app with dev client' } }),
+      retrieveSetupIntent: () => Promise.resolve({ error: { code: 'NativeModuleNotAvailable' } }),
+    });
+  }
+} else {
+  // Web platform - Stripe not supported
   useStripe = () => ({
-    initPaymentSheet: () => Promise.resolve({ error: null }),
-    presentPaymentSheet: () => Promise.resolve({ error: { code: 'NativeModuleNotAvailable', message: 'Please rebuild app with dev client' } }),
-    retrieveSetupIntent: () => Promise.resolve({ error: { code: 'NativeModuleNotAvailable' } }),
+    initPaymentSheet: () => Promise.resolve({ error: { code: 'WebNotSupported', message: 'Payment methods not supported on web' } }),
+    presentPaymentSheet: () => Promise.resolve({ error: { code: 'WebNotSupported' } }),
+    retrieveSetupIntent: () => Promise.resolve({ error: { code: 'WebNotSupported' } }),
   });
 }
 
