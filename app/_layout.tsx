@@ -126,6 +126,13 @@ export default function RootLayout() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Skip updating auth store if we're suppressing navigation (e.g., during OTP verification)
+      const { suppressingNavigation } = useAuthStore.getState();
+      if (suppressingNavigation) {
+        console.log('Skipping auth state change update due to navigation suppression');
+        return;
+      }
+      
       if (session?.user) {
         try {
           let profile;
@@ -296,8 +303,10 @@ export default function RootLayout() {
       
       // Protect main app (tabs) - only allow if user is logged in
       // BUT: Check for active session first - if session exists but no profile, check for pending application
+      // Skip navigation if we're suppressing navigation (e.g., during OTP verification)
+      const { suppressingNavigation } = useAuthStore.getState();
       if (inTabs) {
-        if (!user && !isNavigating) {
+        if (!user && !isNavigating && !suppressingNavigation) {
           setIsNavigating(true);
           // Check if there's an active session but no profile (neighbor signup in progress)
           supabase.auth.getSession().then(async ({ data: { session } }) => {

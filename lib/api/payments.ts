@@ -209,89 +209,115 @@ export interface BankAccountApprovalStatus {
 
 /**
  * Request parent approval for bank account setup
- * Sends an OTP code to the parent's phone number
+ * Sends an OTP code to the parent's phone number using Supabase auth (same as neighbor signup)
  */
 export async function requestBankAccountApproval(): Promise<{
   success: boolean;
   expires_at: string;
   parent_phone_masked?: string;
 }> {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:214',message:'requestBankAccountApproval entry',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
   const { data: { session } } = await supabase.auth.getSession();
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:220',message:'Session check',data:{hasSession:!!session,hasAccessToken:!!session?.access_token,tokenLength:session?.access_token?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-  
   if (!session) throw new Error('User not authenticated');
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:225',message:'Before edge function invoke',data:{functionName:'send-bank-account-approval-otp',hasBody:true,hasAuthHeader:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
+  // Get teen user profile to find parent
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not found');
 
-  // Explicitly pass Authorization header - functions.invoke() doesn't always include it automatically in React Native
-  const { data, error } = await supabase.functions.invoke('send-bank-account-approval-otp', {
-    body: {},
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-  });
+  const { data: teenUser, error: teenError } = await supabase
+    .from('users')
+    .select('id, parent_id, role')
+    .eq('id', user.id)
+    .single();
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:235',message:'After edge function invoke',data:{hasError:!!error,hasData:!!data,errorMessage:error?.message,errorName:error?.name,errorStatus:(error as any)?.status,dataSuccess:data?.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-
-  if (error) {
-    console.error('Edge Function error:', error);
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:241',message:'Error details extraction',data:{errorMessage:error.message,errorName:error.name,errorContext:(error as any)?.context,errorDetails:(error as any)?.details,errorKeys:Object.keys(error || {})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    
-    // Try to extract more details from the error
-    // Check if data contains error information (sometimes errors are returned in data)
-    if (data && (data as any).error) {
-      const errorData = data as any;
-      console.error('Error in response data:', errorData);
-      throw new Error(errorData.error || errorData.message || errorData.details || 'Failed to send OTP code');
-    }
-    
-    // Try to extract from error object
-    const errorAny = error as any;
-    const errorMessage = errorAny.message || error.message || 'Unknown error';
-    const errorDetails = errorAny.context?.message || errorAny.details || errorAny.error;
-    
-    // Log full error structure for debugging
-    console.error('Full error object:', {
-      message: errorMessage,
-      details: errorDetails,
-      context: errorAny.context,
-      keys: Object.keys(errorAny || {})
-    });
-    
-    throw new Error(errorDetails || errorMessage);
+  if (teenError || !teenUser) {
+    throw new Error('User profile not found');
   }
 
-  if (!data) {
-    throw new Error('No response from server');
+  if (teenUser.role !== 'teen') {
+    throw new Error('Only teens can request bank account approval');
   }
 
-  if (!data.success) {
-    throw new Error(data.error || 'Failed to send OTP code');
+  if (!teenUser.parent_id) {
+    throw new Error('No parent associated with this account');
   }
 
-  return {
-    success: data.success,
-    expires_at: data.expires_at,
-    parent_phone_masked: data.parent_phone_masked,
-  };
+  // Get parent's phone number using database function (bypasses RLS)
+  // Migration 032 removed parent-child queries from RLS to avoid recursion
+  // So we use a SECURITY DEFINER function to safely get the parent's phone
+  const { data: parentPhoneResult, error: parentPhoneError } = await supabase
+    .rpc('get_parent_phone_for_bank_approval');
+
+  if (parentPhoneError) {
+    console.error('Error fetching parent phone:', parentPhoneError);
+    throw new Error(`Failed to fetch parent phone: ${parentPhoneError.message}`);
+  }
+
+  // The function returns a single TEXT value (the phone number)
+  const parentPhone = parentPhoneResult?.trim() || '';
+  if (!parentPhone) {
+    throw new Error('Parent phone number not found. Please ensure the parent account exists and has a phone number.');
+  }
+
+  // Normalize phone number (ensure E.164 format)
+  const normalizedPhone = parentPhone.trim().replace(/\s+/g, '');
+  const finalParentPhone = normalizedPhone.startsWith('+') ? normalizedPhone : `+${normalizedPhone}`;
+
+  // Set expiration to 15 minutes from now
+  const expiresAt = new Date();
+  expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+  // Create or update approval record
+  const { data: approval, error: approvalError } = await supabase
+    .from('bank_account_approvals')
+    .upsert({
+      teen_id: teenUser.id,
+      parent_phone: finalParentPhone,
+      otp_code: null, // Will be set after OTP is sent (if needed for tracking)
+      status: 'pending',
+      expires_at: expiresAt.toISOString(),
+      attempts: 0,
+      verified_at: null,
+    }, {
+      onConflict: 'teen_id',
+      ignoreDuplicates: false,
+    })
+    .select()
+    .single();
+
+  if (approvalError) {
+    console.error('Error creating approval record:', approvalError);
+    throw new Error('Failed to create approval record');
+  }
+
+  // Send OTP using Supabase auth (same as neighbor signup)
+  // This uses Twilio Verify automatically through Supabase's phone provider
+  const { sendPhoneOTP } = await import('@/lib/supabase');
+  
+  try {
+    await sendPhoneOTP(finalParentPhone);
+    
+    // Mask phone number for display
+    const maskedPhone = finalParentPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1***$2****');
+    
+    return {
+      success: true,
+      expires_at: expiresAt.toISOString(),
+      parent_phone_masked: maskedPhone,
+    };
+  } catch (error: any) {
+    // Update approval status to reflect failure
+    await supabase
+      .from('bank_account_approvals')
+      .update({ status: 'expired' })
+      .eq('id', approval.id);
+    
+    throw error;
+  }
 }
 
 /**
  * Verify the OTP code for bank account approval
+ * Uses Supabase auth.verifyOtp (same as neighbor signup)
  * @param otpCode - The 6-digit OTP code received by the parent
  */
 export async function verifyBankAccountApprovalOTP(otpCode: string): Promise<{
@@ -301,35 +327,185 @@ export async function verifyBankAccountApprovalOTP(otpCode: string): Promise<{
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('User not authenticated');
 
-  // Explicitly pass Authorization header
-  const { data, error } = await supabase.functions.invoke('verify-bank-account-approval-otp', {
-    body: {
-      otp_code: otpCode,
-    },
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-  });
+  // Get teen user profile to find parent
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not found');
 
-  if (error) {
-    console.error('Edge Function error:', error);
-    const errorMessage = error.message || 'Unknown error';
-    const errorDetails = (error as any).context?.message || (error as any).details;
-    throw new Error(errorDetails || errorMessage);
+  const { data: teenUser, error: teenError } = await supabase
+    .from('users')
+    .select('id, parent_id, role')
+    .eq('id', user.id)
+    .single();
+
+  if (teenError || !teenUser) {
+    throw new Error('User profile not found');
   }
 
-  if (!data) {
-    throw new Error('No response from server');
+  if (teenUser.role !== 'teen') {
+    throw new Error('Only teens can verify bank account approval OTP');
   }
 
-  if (!data.success || !data.approved) {
-    throw new Error(data.error || 'OTP verification failed');
+  // Get pending approval
+  const { data: approval, error: approvalError } = await supabase
+    .from('bank_account_approvals')
+    .select('*')
+    .eq('teen_id', teenUser.id)
+    .single();
+
+  if (approvalError || !approval) {
+    throw new Error('No approval request found. Please request a new OTP code.');
   }
 
-  return {
-    approved: data.approved,
-    verified_at: data.verified_at,
-  };
+  // Check if already approved
+  if (approval.status === 'approved') {
+    return {
+      approved: true,
+      verified_at: approval.verified_at || new Date().toISOString(),
+    };
+  }
+
+  // Check if expired
+  const expiresAt = new Date(approval.expires_at);
+  if (expiresAt <= new Date()) {
+    await supabase
+      .from('bank_account_approvals')
+      .update({ status: 'expired' })
+      .eq('id', approval.id);
+    throw new Error('OTP code has expired. Please request a new code.');
+  }
+
+  // Check max attempts
+  if (approval.attempts >= 5) {
+    await supabase
+      .from('bank_account_approvals')
+      .update({ status: 'expired' })
+      .eq('id', approval.id);
+    throw new Error('Maximum verification attempts reached. Please request a new OTP code.');
+  }
+
+  // Verify OTP using Supabase auth, but restore session immediately to prevent redirect
+  // Since we're using sendPhoneOTP (Supabase auth), we need to verify with verifyPhoneOTP
+  // However, this might create a session for the parent's phone, so we restore the teen's session after
+  const { verifyPhoneOTP } = await import('@/lib/supabase');
+
+  // Save current session and user ID before verification
+  const { data: { session: currentSession } } = await supabase.auth.getSession();
+  if (!currentSession) throw new Error('User not authenticated');
+  
+  const { data: { user: currentUser } } = await supabase.auth.getUser();
+  const currentUserId = currentUser?.id;
+
+  // Set flag to suppress navigation during OTP verification
+  const { useAuthStore } = await import('@/stores/authStore');
+  useAuthStore.getState().setSuppressingNavigation(true);
+
+  try {
+    // Verify the code - this uses Twilio Verify through Supabase
+    // It might create a session for the parent's phone, so we'll restore the teen's session after
+    await verifyPhoneOTP(approval.parent_phone, otpCode);
+    
+    // Check if session changed (user ID might have changed)
+    const { data: { user: userAfterVerify } } = await supabase.auth.getUser();
+    const userIdAfterVerify = userAfterVerify?.id;
+    
+    // If the user ID changed, we need to restore the original session immediately
+    if (userIdAfterVerify !== currentUserId) {
+      console.log('Session changed after OTP verification, restoring original session...');
+      
+      // Immediately restore the original session to prevent navigation
+      const { error: restoreError } = await supabase.auth.setSession({
+        access_token: currentSession.access_token,
+        refresh_token: currentSession.refresh_token,
+      });
+      
+      if (restoreError) {
+        console.error('Failed to restore session after OTP verification:', restoreError);
+        // Try to sign out and sign back in with the original session
+        await supabase.auth.signOut();
+        const { error: restoreError2 } = await supabase.auth.setSession({
+          access_token: currentSession.access_token,
+          refresh_token: currentSession.refresh_token,
+        });
+        
+        if (restoreError2) {
+          console.error('Failed to restore session on second attempt:', restoreError2);
+          throw new Error('Session restoration failed. Please try again.');
+        }
+      }
+      
+      // Verify we're back to the original user
+      const { data: { user: userAfterRestore } } = await supabase.auth.getUser();
+      if (userAfterRestore?.id !== currentUserId) {
+        console.error('Session restoration failed - user ID mismatch');
+        throw new Error('Session restoration failed. Please try again.');
+      }
+      
+      // Refresh user profile in auth store immediately to prevent navigation issues
+      // The onAuthStateChange listener might have updated it with the wrong user
+      if (currentUserId) {
+        try {
+          const { getUserProfile } = await import('@/lib/supabase');
+          const refreshedProfile = await getUserProfile(currentUserId);
+          // Immediately update auth store to prevent navigation redirects
+          // Update store BEFORE clearing suppression flag
+          useAuthStore.getState().setUser(refreshedProfile);
+          
+          // Small delay to ensure store update is processed
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (profileError) {
+          console.warn('Failed to refresh user profile after session restoration:', profileError);
+          // Continue anyway - the session is restored
+        }
+      }
+      
+      // Clear navigation suppression flag AFTER auth store is updated
+      useAuthStore.getState().setSuppressingNavigation(false);
+    }
+    
+    // OTP is valid! Update approval status
+    const verifiedAt = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from('bank_account_approvals')
+      .update({
+        status: 'approved',
+        verified_at: verifiedAt,
+        attempts: approval.attempts + 1,
+      })
+      .eq('id', approval.id);
+
+    if (updateError) {
+      console.error('Error updating approval:', updateError);
+      throw new Error('Failed to update approval status');
+    }
+
+    return {
+      approved: true,
+      verified_at: verifiedAt,
+    };
+  } catch (error: any) {
+    // Always clear navigation suppression flag on error
+    const { useAuthStore } = await import('@/stores/authStore');
+    useAuthStore.getState().setSuppressingNavigation(false);
+    
+    // Increment attempts
+    const newAttempts = approval.attempts + 1;
+    await supabase
+      .from('bank_account_approvals')
+      .update({
+        attempts: newAttempts,
+        status: newAttempts >= 5 ? 'expired' : approval.status,
+      })
+      .eq('id', approval.id);
+
+    // Re-throw with helpful message
+    if (error.message?.toLowerCase().includes('expired')) {
+      throw new Error('This verification code has expired. Please request a new one.');
+    }
+    if (error.message?.toLowerCase().includes('invalid')) {
+      throw new Error('Invalid verification code. Please check and try again.');
+    }
+    throw error;
+  }
 }
 
 /**

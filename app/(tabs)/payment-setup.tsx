@@ -103,12 +103,28 @@ export default function PaymentSetupScreen() {
     setOtpError('');
     try {
       await verifyBankAccountApprovalOTP(otpCode);
+      
+      // Refresh user profile to ensure auth store has correct user after session restoration
+      try {
+        const { getUserProfile, supabase: supabaseClient } = await import('@/lib/supabase');
+        const { useAuthStore } = await import('@/stores/authStore');
+        const { data: { user: currentAuthUser } } = await supabaseClient.auth.getUser();
+        if (currentAuthUser) {
+          const refreshedProfile = await getUserProfile(currentAuthUser.id);
+          useAuthStore.getState().setUser(refreshedProfile);
+        }
+      } catch (profileError) {
+        console.warn('Failed to refresh user profile:', profileError);
+      }
+      
+      // Refresh data immediately (before alert) to update UI
+      await loadData();
+      
       Alert.alert(
         'Approved!',
         'Your bank account setup has been approved. You can now add your bank account.',
         [{ text: 'OK', onPress: () => {
           setOtpCode('');
-          loadData();
         }}]
       );
     } catch (error: any) {
@@ -162,14 +178,18 @@ export default function PaymentSetupScreen() {
   // Reload data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (user?.role === 'teen') {
+      // Skip reload if we're suppressing navigation (during OTP verification)
+      const { suppressingNavigation } = useAuthStore.getState();
+      if (user?.role === 'teen' && !suppressingNavigation) {
         loadData();
       }
     }, [user])
   );
 
   // Only show to teenlancers
-  if (user?.role !== 'teen') {
+  // But skip this check if we're suppressing navigation (during OTP verification)
+  const { suppressingNavigation } = useAuthStore();
+  if (user?.role !== 'teen' && !suppressingNavigation) {
     return (
       <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['bottom', 'left', 'right']}>
         <View style={styles.centered}>
@@ -177,6 +197,15 @@ export default function PaymentSetupScreen() {
             This feature is only available for teenlancers.
           </Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+  
+  // If suppressing navigation, show loading to prevent flash of wrong content
+  if (suppressingNavigation && user?.role !== 'teen') {
+    return (
+      <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['bottom', 'left', 'right']}>
+        <Loading />
       </SafeAreaView>
     );
   }
@@ -317,8 +346,9 @@ export default function PaymentSetupScreen() {
           </View>
         )}
 
-        {/* Bank Account Info Section - Show when approved or no approval needed */}
-        {(!needsParentApproval || approvalStatus?.status === 'approved') && (
+        {/* Bank Account Info Section - Show when bank account exists, or when no approval needed */}
+        {/* Bank Account Info Section - Only show when bank account exists, or when no approval needed */}
+        {(bankAccount || !needsParentApproval) && (
           <View style={[styles.section, cardStyle]}>
             <View style={styles.statusHeader}>
               <Ionicons 
