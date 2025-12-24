@@ -13,12 +13,32 @@ import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 
+// Phone validation: E.164 format (e.g., +1234567890)
+const phoneRegex = /^\+[1-9]\d{1,14}$/;
+
 const requestSchema = z.object({
   full_name: z.string().min(2, 'Name must be at least 2 characters'),
   date_of_birth: z.date({
     required_error: 'Date of birth is required',
   }),
   parent_email: z.string().email('Please enter a valid parent email address'),
+  parent_phone: z.string()
+    .min(10, 'Parent phone number is required')
+    .refine((val) => {
+      // Remove spaces and non-digits (except +)
+      let cleaned = val.trim().replace(/\s+/g, '').replace(/[^\d+]/g, '');
+      
+      // Auto-add +1 for US numbers if 10 digits without country code
+      if (!cleaned.startsWith('+')) {
+        if (cleaned.length === 10) {
+          cleaned = `+1${cleaned}`;
+        } else {
+          cleaned = `+${cleaned}`;
+        }
+      }
+      
+      return phoneRegex.test(cleaned);
+    }, 'Please enter a valid phone number (10 digits for US/Canada, or include country code)'),
 });
 
 type RequestFormData = z.infer<typeof requestSchema>;
@@ -39,6 +59,7 @@ export default function RequestApprovalScreen() {
       full_name: '',
       date_of_birth: new Date(2005, 0, 1),
       parent_email: '',
+      parent_phone: '',
     },
   });
 
@@ -95,10 +116,21 @@ export default function RequestApprovalScreen() {
       const dateStr = data.date_of_birth.toISOString().split('T')[0];
       console.log('Submitting with date_of_birth:', dateStr, 'from date:', data.date_of_birth);
       
+      // Normalize phone number to E.164 format
+      let normalizedPhone = data.parent_phone.trim().replace(/\s+/g, '').replace(/[^\d+]/g, '');
+      if (!normalizedPhone.startsWith('+')) {
+        if (normalizedPhone.length === 10) {
+          normalizedPhone = `+1${normalizedPhone}`;
+        } else {
+          normalizedPhone = `+${normalizedPhone}`;
+        }
+      }
+      
       const pendingSignup = await createPendingTeenSignup({
         full_name: data.full_name,
         date_of_birth: dateStr,
         parent_email: data.parent_email,
+        parent_phone: normalizedPhone,
       });
 
       // Send approval email to parent
@@ -247,6 +279,24 @@ export default function RequestApprovalScreen() {
               autoCapitalize="none"
               autoComplete="email"
               placeholder="parent@example.com"
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="parent_phone"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <Input
+              label="Your Parent's Phone Number"
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              error={errors.parent_phone?.message}
+              required
+              keyboardType="phone-pad"
+              autoComplete="tel"
+              placeholder="+1234567890"
             />
           )}
         />

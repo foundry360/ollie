@@ -56,12 +56,18 @@ serve(async (req: Request) => {
       )
     }
 
-    const { parent_email, teen_name } = body
+    const { parent_email, parent_phone, teen_name } = body
     
     console.log('📧 [create-parent-account] Extracted values:', {
       parent_email: parent_email || 'MISSING',
+      parent_phone: parent_phone ?? 'MISSING', // Use ?? instead of || to catch null
+      parent_phone_length: parent_phone?.length ?? 0,
+      parent_phone_type: typeof parent_phone,
+      parent_phone_is_null: parent_phone === null,
+      parent_phone_is_undefined: parent_phone === undefined,
       teen_name: teen_name || 'MISSING',
-      bodyKeys: Object.keys(body || {})
+      bodyKeys: Object.keys(body || {}),
+      fullBody: JSON.stringify(body)
     })
     
     if (!parent_email) {
@@ -74,8 +80,28 @@ serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
+    
+    // Normalize email and phone the same way - always save both
     const normalizedEmail = parent_email.trim().toLowerCase()
+    // ALWAYS normalize phone - return trimmed string or null (never undefined)
+    const normalizedPhone = (parent_phone !== undefined && parent_phone !== null && parent_phone.trim() !== '')
+      ? parent_phone.trim()
+      : null  // Always return null (never undefined) so we can always include it
+    
+    console.log('📞 Phone normalization result:', {
+      original: parent_phone,
+      normalized: normalizedPhone,
+      originalType: typeof parent_phone,
+      normalizedType: typeof normalizedPhone,
+      willAlwaysSave: true  // We always save phone now
+    })
+    
+    console.log('📧 Normalized values:', {
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      phoneLength: normalizedPhone?.length || 0
+    })
+    
     console.log('Creating/getting parent account for:', normalizedEmail)
 
     // Use service role client to create user with Admin API
@@ -90,6 +116,9 @@ serve(async (req: Request) => {
       }
     )
 
+    // Normalize email (already done above, but ensure it's set)
+    // normalizedEmail is already set above
+    
     // First check if parent profile already exists in users table (more efficient)
     const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
       .from('users')
@@ -104,6 +133,48 @@ serve(async (req: Request) => {
       // Parent account already exists with correct role
       console.log('Parent profile already exists:', existingProfile.id)
       parentUserId = existingProfile.id
+      
+      // UPDATE: Always update email and phone for existing profiles too!
+      const updateData: any = {
+        role: 'parent',
+        email: normalizedEmail,  // Always update email
+        phone: normalizedPhone   // ALWAYS include phone
+      }
+      
+      console.log('Updating existing parent profile:', {
+        id: parentUserId,
+        role: updateData.role,
+        email: updateData.email,
+        phone: updateData.phone,
+        phoneLength: updateData.phone?.length || 0
+      })
+      
+      const { error: updateError } = await supabaseAdmin
+        .from('users')
+        .update(updateData)
+        .eq('id', parentUserId)
+
+      if (updateError) {
+        console.error('❌ Error updating existing parent profile:', updateError)
+        throw updateError
+      }
+      
+      console.log('✅ Existing parent profile updated successfully')
+      
+      // Verify phone was saved
+      const { data: verified } = await supabaseAdmin
+        .from('users')
+        .select('phone, email')
+        .eq('id', parentUserId)
+        .single()
+      
+      console.log('📞 Verification (existing profile):', {
+        savedPhone: verified?.phone,
+        expectedPhone: normalizedPhone,
+        phoneMatch: verified?.phone === normalizedPhone,
+        savedEmail: verified?.email,
+        expectedEmail: normalizedEmail
+      })
     } else {
       // Profile doesn't exist, try to create auth user
       // If user already exists, we'll find their ID
@@ -195,7 +266,7 @@ serve(async (req: Request) => {
       // Now check if profile exists and create/update as needed
       const { data: existingUserProfile, error: profileCheckError2 } = await supabaseAdmin
         .from('users')
-        .select('id, role')
+        .select('id, role, phone')
         .eq('id', parentUserId)
         .maybeSingle()
 
@@ -205,30 +276,67 @@ serve(async (req: Request) => {
       }
 
       if (existingUserProfile) {
-        // Profile exists - check if role needs updating
-        if (existingUserProfile.role !== 'parent') {
-          console.log('Updating profile role to parent')
-          const { error: updateError } = await supabaseAdmin
-            .from('users')
-            .update({ role: 'parent' })
-            .eq('id', parentUserId)
-
-          if (updateError) {
-            console.error('Error updating parent role:', updateError)
-            throw updateError
-          }
+        // Profile exists - update role, email, and phone (ALWAYS include phone, no conditions)
+        const updateData: any = {
+          role: 'parent',
+          email: normalizedEmail,  // Always update email
+          phone: normalizedPhone  // ALWAYS include phone (normalizedPhone is always null or string, never undefined)
         }
+        
+        console.log('Updating parent profile:', {
+          role: updateData.role,
+          email: updateData.email,
+          phone: updateData.phone,
+          phoneLength: updateData.phone?.length || 0
+        })
+        
+        const { error: updateError } = await supabaseAdmin
+          .from('users')
+          .update(updateData)
+          .eq('id', parentUserId)
+
+        if (updateError) {
+          console.error('❌ Error updating parent profile:', updateError)
+          throw updateError
+        }
+        
+        console.log('✅ Parent profile updated successfully')
+        
+        // Verify phone was saved (same as we would verify email)
+        const { data: verified } = await supabaseAdmin
+          .from('users')
+          .select('phone, email')
+          .eq('id', parentUserId)
+          .single()
+        
+        console.log('📞 Verification:', {
+          savedPhone: verified?.phone,
+          expectedPhone: normalizedPhone,
+          phoneMatch: verified?.phone === normalizedPhone,
+          savedEmail: verified?.email,
+          expectedEmail: normalizedEmail
+        })
       } else {
-        // No profile exists, create it
-        console.log('Creating parent profile')
+        // No profile exists, create it with email and phone (ALWAYS include phone, no conditions)
+        const insertData: any = {
+          id: parentUserId,
+          email: normalizedEmail,  // Always include email
+          full_name: teen_name ? `Parent of ${teen_name}` : 'Parent',
+          role: 'parent',
+          phone: normalizedPhone  // ALWAYS include phone (normalizedPhone is always null or string, never undefined)
+        }
+        
+        console.log('Creating parent profile:', {
+          id: parentUserId,
+          email: insertData.email,
+          phone: insertData.phone,
+          phoneLength: insertData.phone?.length || 0,
+          role: insertData.role
+        })
+        
         const { error: insertError } = await supabaseAdmin
           .from('users')
-          .insert({
-            id: parentUserId,
-            email: normalizedEmail,
-            full_name: teen_name ? `Parent of ${teen_name}` : 'Parent',
-            role: 'parent'
-          })
+          .insert(insertData)
 
         if (insertError) {
           console.error('Error creating parent profile:', insertError)

@@ -216,8 +216,21 @@ export async function requestBankAccountApproval(): Promise<{
   expires_at: string;
   parent_phone_masked?: string;
 }> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:214',message:'requestBankAccountApproval entry',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
   const { data: { session } } = await supabase.auth.getSession();
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:220',message:'Session check',data:{hasSession:!!session,hasAccessToken:!!session?.access_token,tokenLength:session?.access_token?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
   if (!session) throw new Error('User not authenticated');
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:225',message:'Before edge function invoke',data:{functionName:'send-bank-account-approval-otp',hasBody:true,hasAuthHeader:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
 
   // Explicitly pass Authorization header - functions.invoke() doesn't always include it automatically in React Native
   const { data, error } = await supabase.functions.invoke('send-bank-account-approval-otp', {
@@ -227,11 +240,38 @@ export async function requestBankAccountApproval(): Promise<{
     },
   });
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:235',message:'After edge function invoke',data:{hasError:!!error,hasData:!!data,errorMessage:error?.message,errorName:error?.name,errorStatus:(error as any)?.status,dataSuccess:data?.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
   if (error) {
     console.error('Edge Function error:', error);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/payments.ts:241',message:'Error details extraction',data:{errorMessage:error.message,errorName:error.name,errorContext:(error as any)?.context,errorDetails:(error as any)?.details,errorKeys:Object.keys(error || {})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
     // Try to extract more details from the error
-    const errorMessage = error.message || 'Unknown error';
-    const errorDetails = (error as any).context?.message || (error as any).details;
+    // Check if data contains error information (sometimes errors are returned in data)
+    if (data && (data as any).error) {
+      const errorData = data as any;
+      console.error('Error in response data:', errorData);
+      throw new Error(errorData.error || errorData.message || errorData.details || 'Failed to send OTP code');
+    }
+    
+    // Try to extract from error object
+    const errorAny = error as any;
+    const errorMessage = errorAny.message || error.message || 'Unknown error';
+    const errorDetails = errorAny.context?.message || errorAny.details || errorAny.error;
+    
+    // Log full error structure for debugging
+    console.error('Full error object:', {
+      message: errorMessage,
+      details: errorDetails,
+      context: errorAny.context,
+      keys: Object.keys(errorAny || {})
+    });
+    
     throw new Error(errorDetails || errorMessage);
   }
 

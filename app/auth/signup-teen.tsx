@@ -176,12 +176,13 @@ export default function SignupTeenScreen() {
 
     try {
       // Create pending signup (doesn't create account yet)
+      // Note: parent_phone should be collected on Request Approval page
+      // For this direct signup flow, parent_phone is optional
       const pendingSignup = await createPendingTeenSignup({
-        email: data.email,
         full_name: data.full_name,
-        password: data.password,
         date_of_birth: data.date_of_birth.toISOString().split('T')[0],
         parent_email: data.parent_email,
+        // parent_phone not collected in this flow - should use Request Approval page instead
       });
 
       // Send approval email to parent

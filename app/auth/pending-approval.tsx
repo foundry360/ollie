@@ -160,35 +160,54 @@ export default function PendingApprovalScreen() {
         // Note: We don't check for existing user account here because the teen
         // hasn't created their account yet - they're waiting for parent approval
         const pendingSignup = await getPendingSignupByParentEmailAnyStatus(params.parentEmail);
+        
+        console.log('🔍 [pending-approval] checkApprovalStatus result:', {
+          hasPendingSignup: !!pendingSignup,
+          status: pendingSignup?.status,
+          statusType: typeof pendingSignup?.status,
+          id: pendingSignup?.id
+        });
+        
         if (pendingSignup) {
           signupId = pendingSignup.id;
           currentStatus = pendingSignup.status as 'pending' | 'approved' | 'rejected' | 'expired';
           setStatus(currentStatus);
           
+          console.log('📊 [pending-approval] Setting status to:', currentStatus);
+          
           if (pendingSignup.status === 'approved') {
             // Approved, redirect to complete account screen
+            console.log('✅ [pending-approval] Status is approved, redirecting...');
             await AsyncStorage.removeItem('pending_signup_parent_email');
             router.replace(`/auth/complete-account?parentEmail=${encodeURIComponent(params.parentEmail)}`);
             return;
           } else if (pendingSignup.status === 'rejected') {
             // Show rejected message, clear storage
+            console.log('❌ [pending-approval] Status is rejected');
             await AsyncStorage.removeItem('pending_signup_parent_email');
             return;
           } else if (pendingSignup.status === 'expired') {
             // Show expired message, clear storage
+            console.log('⏰ [pending-approval] Status is expired');
             await AsyncStorage.removeItem('pending_signup_parent_email');
             return;
           }
           
           // If status is still pending, set up realtime and polling
           if (pendingSignup.status === 'pending') {
+            console.log('⏳ [pending-approval] Status is pending, setting up realtime and polling');
             setupRealtimeSubscription(signupId);
             // Also set up polling as a fallback
             setupPollingFallback();
+          } else {
+            console.warn('⚠️ [pending-approval] Unexpected status:', pendingSignup.status);
           }
+        } else {
+          console.warn('⚠️ [pending-approval] No pending signup found for:', params.parentEmail);
         }
       } catch (error) {
-        console.error('Error checking approval status:', error);
+        console.error('❌ [pending-approval] Error checking approval status:', error);
+        // Don't redirect on error - show the pending screen
       } finally {
         setIsChecking(false);
       }

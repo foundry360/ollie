@@ -191,11 +191,23 @@ export async function createPendingTeenSignup(signupData: {
   full_name: string;
   date_of_birth: string;
   parent_email: string;
+  parent_phone?: string;
 }) {
   // Normalize parent email (trim and lowercase) for consistent storage and searching
   const normalizedParentEmail = signupData.parent_email.trim().toLowerCase();
   // Normalize full name (trim and lowercase) for consistent matching
   const normalizedFullName = signupData.full_name.trim().toLowerCase();
+  // Normalize phone number (already normalized in onSubmit, but ensure it's in E.164 format)
+  // If not provided, use empty string (will be stored as NULL in database)
+  let normalizedPhone = signupData.parent_phone?.trim().replace(/\s+/g, '') || '';
+  
+  // Log phone normalization for debugging
+  console.log('📞 [createPendingTeenSignup] Phone normalization:', {
+    original: signupData.parent_phone,
+    normalized: normalizedPhone,
+    hasPhone: !!signupData.parent_phone,
+    willStore: normalizedPhone || null
+  });
 
   // Check for existing pending signups with the same parent email AND full name
   // This ensures we're matching the same teen, not just the same parent
@@ -250,6 +262,9 @@ export async function createPendingTeenSignup(signupData: {
     date_of_birth: signupData.date_of_birth,
     parent_email: signupData.parent_email,
     normalized_parent_email: normalizedParentEmail,
+    parent_phone: normalizedPhone,
+    parent_phone_length: normalizedPhone?.length || 0,
+    will_store_phone: normalizedPhone || null,
     approval_token: approvalToken,
     token_expires_at: expiresAt.toISOString(),
     status: 'pending'
@@ -261,6 +276,7 @@ export async function createPendingTeenSignup(signupData: {
       full_name: signupData.full_name,
       date_of_birth: signupData.date_of_birth,
       parent_email: normalizedParentEmail,
+      parent_phone: normalizedPhone || null, // Store NULL if empty string
       approval_token: approvalToken,
       token_expires_at: expiresAt.toISOString(),
       status: 'pending'
@@ -519,6 +535,17 @@ export async function completeTeenSignup(parentEmail: string, email: string, pas
   if (!pendingSignup || pendingSignup.status !== 'approved') {
     throw new Error('No approved signup found for this parent email.');
   }
+  
+  // Log the pending signup data to verify phone is present
+  console.log('📋 [completeTeenSignup] Pending signup data:', {
+    id: pendingSignup.id,
+    parent_email: pendingSignup.parent_email,
+    parent_phone: pendingSignup.parent_phone,
+    parent_phone_type: typeof pendingSignup.parent_phone,
+    parent_phone_length: pendingSignup.parent_phone?.length || 0,
+    hasParentPhone: !!pendingSignup.parent_phone,
+    allKeys: Object.keys(pendingSignup)
+  });
 
   // Create the actual teen account
   const signUpData = await signUp(email, password, {
@@ -545,16 +572,33 @@ export async function completeTeenSignup(parentEmail: string, email: string, pas
         // Don't throw - continue without parent account
       } else {
         // Call edge function to create/get parent account
+        // ALWAYS send parent_phone (preserve null, send null if undefined)
         const requestBody = {
           parent_email: pendingSignup.parent_email,
+          parent_phone: pendingSignup.parent_phone ?? null, // ALWAYS send phone (null if undefined, preserve null)
           teen_name: pendingSignup.full_name
         };
         
+        // Debug: Log exactly what we're sending
+        console.log('📤 [completeTeenSignup] Request body details:', {
+          hasParentPhone: 'parent_phone' in requestBody,
+          parentPhoneValue: requestBody.parent_phone,
+          parentPhoneType: typeof requestBody.parent_phone,
+          parentPhoneLength: requestBody.parent_phone?.length,
+          isNull: requestBody.parent_phone === null,
+          isUndefined: requestBody.parent_phone === undefined
+        });
+        
         console.log('📤 [completeTeenSignup] Calling create-parent-account with:', {
           parent_email: requestBody.parent_email,
+          parent_phone: requestBody.parent_phone,
+          parent_phone_length: requestBody.parent_phone?.length || 0,
           teen_name: requestBody.teen_name,
           hasParentEmail: !!requestBody.parent_email,
-          pendingSignupKeys: Object.keys(pendingSignup)
+          hasParentPhone: !!requestBody.parent_phone,
+          pendingSignupKeys: Object.keys(pendingSignup),
+          pendingSignupParentPhone: pendingSignup.parent_phone,
+          pendingSignupParentPhoneType: typeof pendingSignup.parent_phone
         });
     
         const { data: parentAccountData, error: parentError } = await supabase.functions.invoke(
@@ -597,7 +641,41 @@ export async function completeTeenSignup(parentEmail: string, email: string, pas
           // We'll still create the teen account with parent_email
         } else if (parentAccountData?.parent_id) {
           parentId = parentAccountData.parent_id;
-          console.log('Successfully created/found parent account:', parentId);
+          
+          // SIMPLE FIX: Directly update the users table with phone from pending_teen_signups
+          // This ensures phone is always saved, regardless of what the edge function did
+          if (pendingSignup.parent_phone && pendingSignup.parent_phone.trim() !== '') {
+            console.log('📞 [completeTeenSignup] Directly updating parent phone in users table:', pendingSignup.parent_phone);
+            
+            const { error: phoneUpdateError } = await supabase
+              .from('users')
+              .update({ phone: pendingSignup.parent_phone.trim() })
+              .eq('id', parentId);
+            
+            if (phoneUpdateError) {
+              console.error('❌ [completeTeenSignup] Failed to update parent phone:', phoneUpdateError);
+              // Don't throw - parent account was created, phone update is secondary
+            } else {
+              console.log('✅ [completeTeenSignup] Successfully updated parent phone in users table');
+              
+              // Verify it was saved
+              const { data: verified } = await supabase
+                .from('users')
+                .select('phone')
+                .eq('id', parentId)
+                .single();
+              
+              console.log('📞 [completeTeenSignup] Phone verification:', {
+                saved: verified?.phone,
+                expected: pendingSignup.parent_phone.trim(),
+                match: verified?.phone === pendingSignup.parent_phone.trim()
+              });
+            }
+          } else {
+            console.warn('⚠️ [completeTeenSignup] No parent_phone in pendingSignup to update');
+          }
+        } else {
+          console.log('⚠️ [completeTeenSignup] Parent account created but no parent_id returned');
         }
       }
     }
@@ -754,19 +832,34 @@ export async function getPendingSignupByParentEmailAnyStatus(parentEmail: string
   }
   
   // Try exact match with normalized email (NO STATUS FILTER - any status)
+  // Explicitly select all columns including parent_phone
+  // IMPORTANT: Order by created_at DESC to get the MOST RECENT signup first
+  // This ensures we get the current pending signup, not an old approved one
   let { data, error } = await supabase
     .from('pending_teen_signups')
-    .select('*')
+    .select('id, full_name, parent_email, parent_phone, date_of_birth, status, approval_token, token_expires_at, approved_at, created_at')
     .eq('parent_email', normalizedEmail)
     // NOTE: NO .eq('status', ...) filter - we want ANY status
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }) // Most recent first
     .limit(1)
     .maybeSingle();
+  
+  // Log what we got
+  console.log('📋 [getPendingSignupByParentEmailAnyStatus] Query result:', {
+    hasData: !!data,
+    hasParentPhone: !!data?.parent_phone,
+    parentPhone: data?.parent_phone,
+    parentPhoneType: typeof data?.parent_phone,
+    status: data?.status,
+    statusType: typeof data?.status,
+    allKeys: data ? Object.keys(data) : []
+  });
 
   console.log('📊 [getPendingSignupByParentEmailAnyStatus] Exact match result:', { 
     hasData: !!data, 
     hasError: !!error,
     errorCode: error?.code,
+    status: data?.status,
   });
 
   // If no exact match, fetch all and filter in JavaScript (more reliable)
@@ -780,13 +873,19 @@ export async function getPendingSignupByParentEmailAnyStatus(parentEmail: string
       
       if (match) {
         console.log('✅ [getPendingSignupByParentEmailAnyStatus] Found via JS filter:', match);
-        // Fetch full record
+        // Fetch full record with explicit column selection
         const { data: fullData } = await supabase
           .from('pending_teen_signups')
-          .select('*')
+          .select('id, full_name, parent_email, parent_phone, date_of_birth, status, approval_token, token_expires_at, approved_at, created_at')
           .eq('id', match.id)
           .single();
         data = fullData || null;
+        
+        console.log('📋 [getPendingSignupByParentEmailAnyStatus] Full record fetched:', {
+          hasData: !!data,
+          hasParentPhone: !!data?.parent_phone,
+          parentPhone: data?.parent_phone
+        });
       } else {
         console.log('❌ [getPendingSignupByParentEmailAnyStatus] No match in JS filter');
         console.log('📋 [getPendingSignupByParentEmailAnyStatus] Searched:', normalizedEmail);
