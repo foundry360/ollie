@@ -26,3 +26,4 @@ VALUES
   ('stripe_connect_enabled', 'true', 'Whether Stripe Connect is enabled for the platform')
 ON CONFLICT (key) DO NOTHING;
 
+

@@ -52,3 +52,4 @@ CREATE TRIGGER ensure_single_default_payment_method_trigger
   FOR EACH ROW
   EXECUTE FUNCTION ensure_single_default_payment_method();
 
+

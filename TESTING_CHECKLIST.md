@@ -144,3 +144,4 @@ After each step, verify data in Supabase:
    - Ensure migrations 054 and 055 are run
    - Check for table conflicts
 
+

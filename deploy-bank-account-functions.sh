@@ -33,3 +33,4 @@ echo "   2. Verify Supabase secrets are configured (STRIPE_SECRET_KEY, TWILIO_*)
 echo "   3. Start your app: npm start"
 echo "   4. Navigate to Payment Setup screen to test"
 
+

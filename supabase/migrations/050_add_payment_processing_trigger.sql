@@ -106,3 +106,4 @@ GRANT EXECUTE ON FUNCTION trigger_payment_processing(UUID, UUID) TO authenticate
 -- 
 -- Or set them via Supabase Dashboard → Database → Settings → Database Settings
 
+
