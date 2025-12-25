@@ -12,7 +12,7 @@ export default function ChatLayout() {
         headerShown: true,
         headerTitle: () => <HeaderLogo />,
         headerStyle: {
-          backgroundColor: isDark ? '#000000' : '#73af17',
+          backgroundColor: isDark ? '#111827' : '#73af17',
           borderBottomWidth: 0,
           height: 120,
           elevation: 0,
@@ -28,7 +28,7 @@ export default function ChatLayout() {
           paddingBottom: 24,
         },
         headerShadowVisible: false,
-        headerTintColor: isDark ? '#FFFFFF' : '#000000',
+        headerTintColor: '#FFFFFF',
         headerBackTitleVisible: false,
       }}
     >

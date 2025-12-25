@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, Dimensions } from 'react-native';
+import { useRef, useEffect } from 'react';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -39,60 +40,127 @@ const TIPS: Tip[] = [
 export function TipsCarousel() {
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
+  const flatListRef = useRef<FlatList>(null);
+
+  const screenWidth = Dimensions.get('window').width;
+  const cardWidth = 200;
+  const cardGap = 12;
+  const snapInterval = cardWidth + cardGap;
+  const sidePadding = (screenWidth - cardWidth) / 2;
+
+  // Create infinite loop by duplicating the tips array
+  const loopedTips = [...TIPS, ...TIPS, ...TIPS];
+  const initialIndex = TIPS.length; // Start at the middle set
+
+  useEffect(() => {
+    // Scroll to the middle set on mount
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+    }, 100);
+  }, []);
+
+  const handleScroll = (event: any) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const currentIndex = Math.round(contentOffsetX / snapInterval);
+    
+    // If we're at the first set, jump to the middle set
+    if (currentIndex < TIPS.length / 2) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({ 
+          index: currentIndex + TIPS.length, 
+          animated: false 
+        });
+      }, 50);
+    }
+    // If we're at the last set, jump to the middle set
+    else if (currentIndex >= TIPS.length * 2.5) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({ 
+          index: currentIndex - TIPS.length, 
+          animated: false 
+        });
+      }, 50);
+    }
+  };
+
+  const renderTip = ({ item: tip }: { item: Tip }) => (
+    <View style={[styles.tipCard, isDark && styles.tipCardDark, { marginHorizontal: cardGap / 2 }]}>
+      <View style={[styles.tipTopHalf, isDark && styles.tipTopHalfDark]}>
+        {tip.id === '1' ? (
+          <Image 
+            source={require('@/assets/profile-img.jpg')} 
+            style={styles.tipImageBackground}
+            resizeMode="cover"
+          />
+        ) : tip.id === '2' ? (
+          <Image 
+            source={require('@/assets/rating-img.jpg')} 
+            style={styles.tipImageBackground}
+            resizeMode="cover"
+          />
+        ) : tip.id === '3' ? (
+          <Image 
+            source={require('@/assets/availability-img.jpg')} 
+            style={styles.tipImageBackground}
+            resizeMode="cover"
+          />
+        ) : tip.id === '4' ? (
+          <Image 
+            source={require('@/assets/talk-img.jpg')} 
+            style={styles.tipImageBackground}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.iconContainer, isDark && styles.iconContainerDark]}>
+            <Ionicons name={tip.icon} size={28} color={isDark ? '#A8D574' : '#73af17'} />
+          </View>
+        )}
+      </View>
+      <View style={styles.tipBottomHalf}>
+        <Text 
+          style={[styles.tipTitle, isDark && styles.tipTitleDark]}
+          numberOfLines={2}
+        >
+          {tip.title}
+        </Text>
+        <Text style={[styles.tipDescription, isDark && styles.tipDescriptionDark]}>{tip.description}</Text>
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
       <Text style={[styles.sectionTitle, isDark && styles.titleDark]}>Tips for Success</Text>
-      <ScrollView
+      <FlatList
+        ref={flatListRef}
+        data={loopedTips}
+        renderItem={renderTip}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {TIPS.map((tip) => (
-          <View key={tip.id} style={[styles.tipCard, isDark && styles.tipCardDark]}>
-            <View style={[styles.tipTopHalf, isDark && styles.tipTopHalfDark]}>
-              {tip.id === '1' ? (
-                <Image 
-                  source={require('@/assets/profile-img.jpg')} 
-                  style={styles.tipImageBackground}
-                  resizeMode="cover"
-                />
-              ) : tip.id === '2' ? (
-                <Image 
-                  source={require('@/assets/rating-img.jpg')} 
-                  style={styles.tipImageBackground}
-                  resizeMode="cover"
-                />
-              ) : tip.id === '3' ? (
-                <Image 
-                  source={require('@/assets/availability-img.jpg')} 
-                  style={styles.tipImageBackground}
-                  resizeMode="cover"
-                />
-              ) : tip.id === '4' ? (
-                <Image 
-                  source={require('@/assets/talk-img.jpg')} 
-                  style={styles.tipImageBackground}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.iconContainer, isDark && styles.iconContainerDark]}>
-                  <Ionicons name={tip.icon} size={28} color={isDark ? '#A8D574' : '#73af17'} />
-                </View>
-              )}
-            </View>
-            <View style={styles.tipBottomHalf}>
-              <Text 
-                style={[styles.tipTitle, isDark && styles.tipTitleDark]}
-                numberOfLines={2}
-              >
-                {tip.title}
-              </Text>
-              <Text style={[styles.tipDescription, isDark && styles.tipDescriptionDark]}>{tip.description}</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+        snapToInterval={snapInterval}
+        snapToAlignment="center"
+        decelerationRate="fast"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingHorizontal: sidePadding }
+        ]}
+        getItemLayout={(data, index) => ({
+          length: snapInterval,
+          offset: snapInterval * index,
+          index,
+        })}
+        initialScrollIndex={initialIndex}
+        onScrollToIndexFailed={(info) => {
+          // Handle scroll to index failure
+          const wait = new Promise(resolve => setTimeout(resolve, 500));
+          wait.then(() => {
+            flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+          });
+        }}
+      />
     </View>
   );
 }
@@ -111,11 +179,10 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   titleDark: {
-    color: '#FFFFFF',
+    color: '#000000',
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    gap: 12,
+    gap: 0,
   },
   tipCard: {
     width: 200,
@@ -135,10 +202,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tipCardDark: {
-    backgroundColor: '#1F3A0F',
-    borderColor: '#2D5A1A',
-    shadowColor: '#A8D574',
-    shadowOpacity: 0.2,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOpacity: 0.1,
   },
   tipTopHalf: {
     height: '50%',
@@ -193,7 +260,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   tipTitleDark: {
-    color: '#A8D574',
+    color: '#000000',
   },
   tipDescription: {
     fontSize: 11,
@@ -203,7 +270,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   tipDescriptionDark: {
-    color: '#B8E584',
+    color: '#374151',
   },
 });
 

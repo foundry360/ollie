@@ -42,7 +42,7 @@ export function NeighborHeader() {
           onPress={handleActivePress}
           android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
         >
-          <Ionicons name="time" size={24} color="#fbbc04" />
+          <Ionicons name="time" size={24} color="#111827" />
           <Text 
             style={[styles.statValue, valueStyle]}
             numberOfLines={1}
@@ -68,7 +68,7 @@ export function NeighborHeader() {
         </View>
 
         <View style={[styles.statCard, cardStyle]}>
-          <Ionicons name="cash" size={24} color="#F59E0B" />
+          <Ionicons name="cash" size={24} color="#73af17" />
           <Text 
             style={[styles.statValue, valueStyle]}
             numberOfLines={1}

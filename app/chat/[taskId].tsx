@@ -337,7 +337,9 @@ export default function ChatScreen() {
       <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
         <View style={styles.header}>
           <Pressable onPress={() => router.push('/(tabs)/messages')} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+            <View>
+              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            </View>
           </Pressable>
           {headerAvatar && (
             <Image source={{ uri: headerAvatar }} style={styles.headerAvatar} />
@@ -357,7 +359,9 @@ export default function ChatScreen() {
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
       <View style={[styles.header, isDark && styles.headerDark]}>
         <Pressable onPress={() => router.push('/(tabs)/messages')} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+          <View>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </View>
         </Pressable>
         {headerAvatar && (
           <Image source={{ uri: headerAvatar }} style={styles.headerAvatar} />
@@ -436,7 +440,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   header: {
     flexDirection: 'row',

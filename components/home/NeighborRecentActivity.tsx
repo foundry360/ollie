@@ -69,20 +69,20 @@ export function NeighborRecentActivity() {
         </Pressable>
       </View>
 
-      <View style={styles.tabs}>
+      <View style={[styles.tabs, isDark && styles.tabsDark]}>
         <Pressable
-          style={[styles.tab, activeTab === 'completed' && styles.tabActive, isDark && activeTab !== 'completed' && styles.tabDark]}
+          style={[styles.tab, activeTab === 'completed' && styles.tabActive]}
           onPress={() => setActiveTab('completed')}
         >
-          <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive, isDark && activeTab !== 'completed' && styles.tabTextDark]}>
+          <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive, isDark && styles.tabTextDark]}>
             Completed
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.tab, activeTab === 'accepted' && styles.tabActive, isDark && activeTab !== 'accepted' && styles.tabDark]}
+          style={[styles.tab, activeTab === 'accepted' && styles.tabActive]}
           onPress={() => setActiveTab('accepted')}
         >
-          <Text style={[styles.tabText, activeTab === 'accepted' && styles.tabTextActive, isDark && activeTab !== 'accepted' && styles.tabTextDark]}>
+          <Text style={[styles.tabText, activeTab === 'accepted' && styles.tabTextActive, isDark && styles.tabTextDark]}>
             Accepted
           </Text>
         </Pressable>
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   titleDark: {
-    color: '#FFFFFF',
+    color: '#000000',
   },
   viewAllText: {
     fontSize: 14,
@@ -182,34 +182,34 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
     marginBottom: 16,
-    gap: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  tabsDark: {
+    backgroundColor: '#FFFFFF',
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   tabActive: {
-    backgroundColor: '#73af17',
-  },
-  tabDark: {
-    backgroundColor: '#111827',
+    borderBottomColor: '#73af17',
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  tabTextDark: {
     color: '#6B7280',
   },
   tabTextActive: {
-    color: '#FFFFFF',
-  },
-  tabTextDark: {
-    color: '#D1D5DB',
+    color: '#73af17',
+    fontWeight: '600',
   },
   activitiesList: {
     paddingHorizontal: 16,
@@ -225,8 +225,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: 'transparent',
-    borderColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
   },
   activityItemNoBorder: {
     borderWidth: 0,
@@ -262,10 +262,10 @@ const styles = StyleSheet.create({
   },
   activityTime: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: '#6B7280',
   },
   textDark: {
-    color: '#D1D5DB',
+    color: '#374151',
   },
   emptyContainer: {
     alignItems: 'center',

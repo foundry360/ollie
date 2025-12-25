@@ -35,7 +35,7 @@ export default function AuthLayout() {
     headerShown: true,
     headerTitle: () => <HeaderLogo />,
     headerStyle: {
-      backgroundColor: isDark ? '#000000' : '#73af17',
+      backgroundColor: isDark ? '#111827' : '#73af17',
       borderBottomWidth: 0,
       height: 120,
       elevation: 0,

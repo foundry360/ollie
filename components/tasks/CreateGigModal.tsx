@@ -339,7 +339,7 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
                 {isEditMode ? 'Edit Gig' : 'Create New Gig'}
               </Text>
               <Pressable onPress={handleClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#111827'} />
+                <Ionicons name="close" size={24} color="#FFFFFF" />
               </Pressable>
             </View>
             <Text style={[styles.subtitle, subtitleStyle]}>
@@ -411,7 +411,7 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
                     ? `${selectedSkills.length} skill${selectedSkills.length > 1 ? 's' : ''} selected`
                     : 'Select skills'}
                 </Text>
-                <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#6B7280'} />
               </Pressable>
               {selectedSkills.length > 0 && (
                 <View style={styles.selectedSkillsContainer}>
@@ -427,7 +427,7 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
                         }}
                         style={styles.removeSkillButton}
                       >
-                        <Ionicons name="close-circle" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                        <Ionicons name="close-circle" size={18} color={isDark ? '#FFFFFF' : '#6B7280'} />
                       </Pressable>
                     </View>
                   ))}
@@ -748,7 +748,7 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
                     {skill}
                   </Text>
                   {isSelected && (
-                    <Ionicons name="checkmark-circle" size={20} color="#73af17" />
+                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
                   )}
                 </Pressable>
               );
@@ -774,7 +774,7 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(17, 24, 39, 0.5)',
     justifyContent: 'flex-end',
   },
   overlayPressable: {
@@ -786,29 +786,36 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     height: Dimensions.get('window').height * 0.9,
     paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    overflow: 'hidden',
   },
   modalDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   modalHeader: {
     paddingTop: 12,
     paddingHorizontal: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
+    backgroundColor: '#73af17',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   modalHeaderLight: {
     borderBottomColor: '#E5E7EB',
+    backgroundColor: '#73af17',
   },
   modalHeaderDark: {
     borderBottomColor: '#374151',
+    backgroundColor: '#73af17',
   },
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 16,
+    opacity: 0.5,
   },
   headerRow: {
     flexDirection: 'row',
@@ -822,7 +829,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   titleLight: {
-    color: '#000000',
+    color: '#FFFFFF',
   },
   titleDark: {
     color: '#FFFFFF',
@@ -835,10 +842,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   subtitleLight: {
-    color: '#666666',
+    color: '#FFFFFF',
   },
   subtitleDark: {
-    color: '#9CA3AF',
+    color: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
@@ -869,7 +876,7 @@ const styles = StyleSheet.create({
     minHeight: 100,
   },
   textAreaDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
     borderColor: '#4B5563',
   },
   textAreaInput: {
@@ -1022,7 +1029,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   containerLight: {
     backgroundColor: '#FFFFFF',
@@ -1043,7 +1050,7 @@ const styles = StyleSheet.create({
   },
   skillsButtonDark: {
     borderColor: '#4B5563',
-    backgroundColor: '#111827',
+    backgroundColor: 'transparent',
   },
   skillsButtonText: {
     fontSize: 16,
@@ -1068,7 +1075,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   skillChipDark: {
-    backgroundColor: '#1E3A8A',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#4B5563',
   },
   skillChipText: {
     fontSize: 12,
@@ -1076,7 +1085,7 @@ const styles = StyleSheet.create({
     color: '#73af17',
   },
   skillChipTextDark: {
-    color: '#93C5FD',
+    color: '#FFFFFF',
   },
   removeSkillButton: {
     marginLeft: 2,
@@ -1110,7 +1119,7 @@ const styles = StyleSheet.create({
     minWidth: '45%',
   },
   skillOptionChipSelected: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#73af17',
     borderColor: '#73af17',
     borderWidth: 2,
   },
@@ -1119,7 +1128,7 @@ const styles = StyleSheet.create({
     borderColor: '#4B5563',
   },
   skillOptionChipSelectedDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#73af17',
     borderColor: '#73af17',
   },
   skillOptionText: {
@@ -1129,7 +1138,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   skillOptionTextSelected: {
-    color: '#73af17',
+    color: '#FFFFFF',
   },
   skillOptionTextDark: {
     color: '#D1D5DB',

@@ -41,15 +41,15 @@ export function Loading() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
   },
   containerLight: {
     backgroundColor: '#F9FAFB',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   circle: {
     width: 40,

@@ -67,6 +67,7 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
   const buttonTextStyle = isDark ? styles.buttonTextDark : styles.buttonTextLight;
   const modalStyle = isDark ? styles.modalDark : styles.modalLight;
   const titleStyle = isDark ? styles.titleDark : styles.titleLight;
+  const clearButtonStyle = isDark ? styles.clearButtonDark : styles.clearButton;
 
   return (
     <>
@@ -101,7 +102,7 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, modalStyle]}>
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, isDark && styles.modalHeaderDark]}>
               <Text style={[styles.modalTitle, titleStyle]}>Filter Gigs</Text>
               <Pressable onPress={() => setShowModal(false)}>
                 <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#111827'} />
@@ -209,7 +210,7 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
 
             <View style={styles.modalFooter}>
               <Pressable
-                style={[styles.footerButton, styles.clearButton]}
+                style={[styles.footerButton, clearButtonStyle]}
                 onPress={clearFilters}
               >
                 <Text style={styles.clearButtonText}>Clear</Text>
@@ -277,19 +278,20 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(17, 24, 39, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
+    overflow: 'hidden',
   },
   modalLight: {
     backgroundColor: '#FFFFFF',
   },
   modalDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
     borderWidth: 1,
     borderColor: '#374151',
   },
@@ -300,6 +302,10 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+  },
+  modalHeaderDark: {
+    backgroundColor: '#73af17',
+    borderBottomColor: '#73af17',
   },
   modalTitle: {
     fontSize: 20,
@@ -405,8 +411,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
   },
   footerButton: {
     flex: 1,
@@ -415,7 +419,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clearButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  clearButtonDark: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#4B5563',
   },
   clearButtonText: {
     fontSize: 16,

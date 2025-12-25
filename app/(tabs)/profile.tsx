@@ -946,7 +946,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   scrollView: {
     flex: 1,

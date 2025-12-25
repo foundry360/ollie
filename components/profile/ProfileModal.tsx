@@ -289,7 +289,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
           <View style={[styles.modalHeader, headerStyle, isNeighbor && styles.modalHeaderWithGreen]}>
             {/* #region agent log */}
             {(() => {
-              const headerBg = isNeighbor ? 'transparent' : (isDark ? '#000000' : '#FFFFFF');
+              const headerBg = isNeighbor ? 'transparent' : (isDark ? '#111827' : '#FFFFFF');
               fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:284',message:'Header render - BEFORE ScrollView (original solution)',data:{isNeighbor,isDark,headerBg,zIndex:100,position:'absolute',renderedBeforeScrollView:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
               return null;
             })()}
@@ -662,7 +662,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(17, 24, 39, 0.5)',
     justifyContent: 'flex-end',
     maxHeight: Dimensions.get('window').height,
   },
@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   modalDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   greenHeaderBackground: {
     position: 'absolute',
@@ -718,7 +718,7 @@ const styles = StyleSheet.create({
   },
   modalHeaderDark: {
     borderBottomColor: '#374151',
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   handle: {
     width: 40,

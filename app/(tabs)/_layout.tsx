@@ -39,13 +39,13 @@ function HeaderLeft() {
       style={{ marginLeft: 16, padding: 4 }}
     >
       {isProfileOrSettings ? (
-        <Ionicons name="chevron-back" size={28} color={isDark ? '#FFFFFF' : '#000000'} />
+        <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
       ) : (
         <>
           {user?.profile_photo_url ? (
             <Image 
               source={{ uri: user.profile_photo_url }} 
-              style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: '#73af17' }} 
+              style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#73af17' }} 
             />
           ) : (
             <View style={{ 
@@ -55,7 +55,7 @@ function HeaderLeft() {
               backgroundColor: isDark ? '#374151' : '#F3F4F6',
               alignItems: 'center',
               justifyContent: 'center',
-              borderWidth: 1.5,
+              borderWidth: 2,
               borderColor: '#73af17'
             }}>
               <Ionicons name="person" size={24} color={isDark ? '#9CA3AF' : '#6B7280'} />
@@ -95,7 +95,7 @@ function HeaderRight() {
         style={{ padding: 4 }}
         disabled={!showNotification}
       >
-        <Ionicons name="notifications-outline" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+        <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
       </Pressable>
     </View>
   );
@@ -166,22 +166,45 @@ export default function TabLayout() {
 
   // Memoize header style config to prevent recreation on every render
   const headerStyleConfig = useMemo(() => ({
-    backgroundColor: isDark ? '#000000' : '#73af17',
+    backgroundColor: '#111827',
     borderBottomWidth: 0,
     height: 120,
     elevation: 0,
     shadowOpacity: 0,
   }), [isDark]);
 
+  // Get current route to determine tab bar background
+  const currentRoute = segments[segments.length - 1];
+  const isHomeScreen = currentRoute === 'home';
+  
   // Memoize tab bar style to prevent recreation on every render
-  const tabBarStyle = useMemo(() => ({
-    backgroundColor: isDark ? '#000000' : '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: isDark ? '#374151' : '#E5E7EB',
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-    height: Platform.OS === 'ios' ? 88 : 60,
-  }), [isDark]);
+  const tabBarStyle = useMemo(() => {
+    if (isDark) {
+      // Dark mode: white on home screen, blue on other screens
+      return {
+        backgroundColor: !isHomeScreen ? '#111827' : '#FFFFFF',
+        borderTopWidth: 0,
+        borderWidth: 0,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+        height: Platform.OS === 'ios' ? 88 : 60,
+        elevation: 0,
+        shadowOpacity: 0,
+      };
+    } else {
+      // Light mode: blue on all screens
+      return {
+        backgroundColor: '#111827',
+        borderTopWidth: 0,
+        borderWidth: 0,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+        height: Platform.OS === 'ios' ? 88 : 60,
+        elevation: 0,
+        shadowOpacity: 0,
+      };
+    }
+  }, [isDark, isHomeScreen]);
 
   // Memoize header container styles to prevent recreation
   const headerTitleContainerStyle = useMemo(() => ({

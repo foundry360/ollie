@@ -84,20 +84,20 @@ export function RecentActivity() {
         </Pressable>
       </View>
 
-      <View style={styles.tabs}>
+      <View style={[styles.tabs, isDark && styles.tabsDark]}>
         <Pressable
-          style={[styles.tab, activeTab === 'payments' && styles.tabActive, isDark && activeTab !== 'payments' && styles.tabDark]}
+          style={[styles.tab, activeTab === 'payments' && styles.tabActive]}
           onPress={() => setActiveTab('payments')}
         >
-          <Text style={[styles.tabText, activeTab === 'payments' && styles.tabTextActive, isDark && activeTab !== 'payments' && styles.tabTextDark]}>
+          <Text style={[styles.tabText, activeTab === 'payments' && styles.tabTextActive, isDark && styles.tabTextDark]}>
             Payments
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.tab, activeTab === 'completed' && styles.tabActive, isDark && activeTab !== 'completed' && styles.tabDark]}
+          style={[styles.tab, activeTab === 'completed' && styles.tabActive]}
           onPress={() => setActiveTab('completed')}
         >
-          <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive, isDark && activeTab !== 'completed' && styles.tabTextDark]}>
+          <Text style={[styles.tabText, activeTab === 'completed' && styles.tabTextActive, isDark && styles.tabTextDark]}>
             Completed Gigs
           </Text>
         </Pressable>
@@ -143,7 +143,7 @@ export function RecentActivity() {
                     <Text style={[styles.activityDescription, textStyle]}>
                       {activity.description}
                     </Text>
-                    <Text style={[styles.activityTime, textStyle]}>
+                    <Text style={[styles.activityTime, isDark && styles.activityTimeDark]}>
                       {formatTimeAgo(activity.timestamp)}
                     </Text>
                   </View>
@@ -169,10 +169,10 @@ export function RecentActivity() {
                     )}
                     <Text style={[styles.activityTitle, titleStyle]}>{activity.title}</Text>
                   </View>
-                  <Text style={[styles.activityDescription, textStyle]} numberOfLines={2}>
+                  <Text style={[styles.activityDescription, isDark && styles.activityDescriptionDark]} numberOfLines={2}>
                     {activity.description}
                   </Text>
-                  <Text style={[styles.activityTime, textStyle]}>
+                  <Text style={[styles.activityTime, isDark && styles.activityTimeDark]}>
                     {formatTimeAgo(activity.timestamp)}
                   </Text>
                 </View>
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   titleDark: {
-    color: '#FFFFFF',
+    color: '#000000',
   },
   viewAllText: {
     fontSize: 14,
@@ -225,32 +225,33 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
     marginBottom: 16,
-    gap: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  tabsDark: {
+    backgroundColor: '#FFFFFF',
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    paddingVertical: 12,
     alignItems: 'center',
-  },
-  tabDark: {
-    backgroundColor: '#111827',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   tabActive: {
-    backgroundColor: '#73af17',
+    borderBottomColor: '#73af17',
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#6B7280',
   },
   tabTextDark: {
-    color: '#9CA3AF',
+    color: '#6B7280',
   },
   tabTextActive: {
-    color: '#FFFFFF',
+    color: '#73af17',
+    fontWeight: '600',
   },
   timeline: {
     paddingLeft: 0,
@@ -298,12 +299,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     color: '#6B7280',
   },
+  activityDescriptionDark: {
+    color: '#374151',
+  },
   textDark: {
-    color: '#9CA3AF',
+    color: '#000000',
   },
   activityTime: {
     fontSize: 11,
     color: '#9CA3AF',
+  },
+  activityTimeDark: {
+    color: '#6B7280',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -339,8 +346,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: 'transparent',
-    borderColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
   },
   timelineLine: {
     position: 'absolute',

@@ -167,62 +167,44 @@ export function TasksNearYou() {
             onPress={() => handleTaskPress(task.id)}
             android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
           >
-            {task.photos && task.photos.length > 0 ? (
-              <Image 
-                source={{ uri: task.photos[0] }} 
-                style={styles.taskImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={[styles.taskImagePlaceholder, isDark && styles.taskImagePlaceholderDark]}>
-                <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
-              </View>
-            )}
+            <View style={styles.imageContainer}>
+              {task.photos && task.photos.length > 0 ? (
+                <Image 
+                  source={{ uri: task.photos[0] }} 
+                  style={styles.taskImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.taskImagePlaceholder, isDark && styles.taskImagePlaceholderDark]}>
+                  <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
+                </View>
+              )}
+            </View>
             <View style={styles.taskContent}>
               <Text style={[styles.taskTitle, titleStyle]} numberOfLines={2}>
                 {task.title}
               </Text>
+              <Text style={[styles.description, isDark && styles.descriptionDark]} numberOfLines={1}>
+                {task.description}
+              </Text>
               <View style={styles.taskMeta}>
-                <View style={styles.metaLeft}>
-                  <View style={styles.metaRow}>
-                    <Ionicons name="cash" size={14} color="#73af17" />
-                    <Text style={[styles.metaText, textStyle]}>${task.pay.toFixed(2)}</Text>
-                  </View>
-                  <View style={styles.metaRow}>
-                    <Ionicons name="location" size={14} color="#73af17" />
-                    <Text style={[styles.metaText, textStyle]} numberOfLines={1}>
-                      {task.distance.toFixed(1)} mi
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.timeText, textStyle]}>
-                  {formatTimeAgo(task.created_at)}
-                </Text>
-              </View>
-              {((task.required_skills && task.required_skills.length > 0) || task.status === 'open') && (
-                <View style={styles.skillsRow}>
-                  {task.required_skills && task.required_skills.length > 0 && (
-                    <View style={styles.skillsContainer}>
-                      {task.required_skills.slice(0, 2).map((skill, idx) => (
-                        <View key={idx} style={[styles.skillTag, isDark && styles.skillTagDark]}>
-                          <Text style={[styles.skillText, isDark && styles.skillTextDark]}>
-                            {skill}
-                          </Text>
-                        </View>
-                      ))}
+                  <View style={styles.metaLeft}>
+                    <View style={styles.metaRow}>
+                      <Ionicons name="cash" size={14} color="#73af17" />
+                      <Text style={[styles.metaText, textStyle]}>${task.pay.toFixed(2)}</Text>
                     </View>
-                  )}
-                  {task.status === 'open' && (
-                    <View style={styles.applicantRow}>
-                      <Ionicons name="people" size={14} color="#73af17" />
-                      <Text style={[styles.applicantText, isDark && styles.applicantTextDark]}>
-                        Applicants ({applicationCounts.get(task.id) || 0})
+                    <View style={styles.metaRow}>
+                      <Ionicons name="location" size={14} color="#73af17" />
+                      <Text style={[styles.metaText, textStyle]} numberOfLines={1}>
+                        {task.distance.toFixed(1)} mi
                       </Text>
                     </View>
-                  )}
+                  </View>
+                  <Text style={[styles.timeText, isDark && styles.timeTextDark]}>
+                    {formatTimeAgo(task.created_at)}
+                  </Text>
                 </View>
-              )}
-            </View>
+              </View>
           </Pressable>
         ))}
       </View>
@@ -245,7 +227,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
@@ -261,7 +243,7 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   titleDark: {
-    color: '#FFFFFF',
+    color: '#000000',
   },
   seeAllText: {
     fontSize: 14,
@@ -280,43 +262,63 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: '#FFFFFF',
     borderColor: '#E5E7EB',
-    minHeight: 120,
+    alignItems: 'stretch',
   },
   cardDark: {
-    backgroundColor: 'transparent',
-    borderColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  imageContainer: {
+    width: 100,
+    padding: 10,
+    justifyContent: 'center',
+    alignSelf: 'stretch',
   },
   taskImage: {
-    width: 120,
-    alignSelf: 'stretch',
+    width: '100%',
+    aspectRatio: 1,
     backgroundColor: '#F3F4F6',
+    borderRadius: 8,
   },
   taskImagePlaceholder: {
-    width: 120,
-    alignSelf: 'stretch',
+    width: '100%',
+    aspectRatio: 1,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
   },
   taskImagePlaceholderDark: {
     backgroundColor: '#1F2937',
   },
   taskContent: {
     flex: 1,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 10,
+    justifyContent: 'center',
   },
   taskTitle: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 2,
     color: '#000000',
+  },
+  description: {
+    fontSize: 12,
+    marginBottom: 4,
+    lineHeight: 16,
+    color: '#6B7280',
+  },
+  descriptionDark: {
+    color: '#374151',
   },
   taskMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 0,
   },
   metaLeft: {
     flexDirection: 'row',
@@ -333,7 +335,7 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   textDark: {
-    color: '#D1D5DB',
+    color: '#000000',
   },
   skillsRow: {
     flexDirection: 'row',
@@ -370,6 +372,9 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 10,
+    color: '#6B7280',
+  },
+  timeTextDark: {
     color: '#6B7280',
   },
   applicantRow: {

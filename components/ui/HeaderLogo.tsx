@@ -14,7 +14,7 @@ export function HeaderLogo() {
 
   return (
     <Image 
-      source={isDark ? require('@/assets/logo.png') : require('@/assets/logo-dark.png')} 
+      source={require('@/assets/logo.png')} 
       style={styles.logo}
       resizeMode="contain"
     />

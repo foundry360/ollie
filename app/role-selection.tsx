@@ -61,8 +61,8 @@ export default function RoleSelectionScreen() {
         nativeControls={false}
       />
       <LinearGradient
-        colors={['transparent', 'rgba(0, 0, 0, 0.2)', 'rgba(0, 0, 0, 0.6)', 'rgba(0, 0, 0, 0.95)', '#000000']}
-        locations={[0, 0.3, 0.6, 0.85, 1]}
+        colors={['transparent', 'rgba(30, 58, 95, 0.4)', 'rgba(45, 74, 111, 0.85)', 'rgba(17, 24, 39, 1)', '#111827']}
+        locations={[0, 0.5, 0.7, 0.9, 1]}
         style={styles.gradient}
       />
       <SafeAreaView style={styles.safeContent} edges={[]}>
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   backgroundVideo: {
     position: 'absolute',

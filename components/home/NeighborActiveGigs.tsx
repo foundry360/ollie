@@ -88,7 +88,7 @@ export function NeighborActiveGigs() {
   }
 
   const containerStyle = isDark ? styles.containerDark : styles.containerLight;
-  const titleStyle = isDark ? styles.titleDark : styles.gigTitle;
+  const titleStyle = isDark ? styles.titleDark : undefined;
   const cardStyle = isDark ? styles.cardDark : styles.gigCard;
   const textStyle = isDark ? styles.textDark : styles.metaText;
 
@@ -111,61 +111,46 @@ export function NeighborActiveGigs() {
             >
               {/* Left side: Image with info below */}
               <View style={[styles.leftSection, isDark && styles.leftSectionDark]}>
-                {item.photos && item.photos.length > 0 ? (
-                  <Image 
-                    source={{ uri: item.photos[0] }} 
-                    style={styles.image}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={[styles.imagePlaceholder, isDark && styles.imagePlaceholderDark]}>
-                    <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
-                  </View>
-                )}
-                
+                <View style={styles.imageContainer}>
+                  {item.photos && item.photos.length > 0 ? (
+                    <Image 
+                      source={{ uri: item.photos[0] }} 
+                      style={styles.image}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.imagePlaceholder, isDark && styles.imagePlaceholderDark]}>
+                      <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
+                    </View>
+                  )}
+                </View>
               </View>
 
               {/* Right side: Title, status, and details */}
               <View style={styles.content}>
-                <Text style={styles.postedText} allowFontScaling={false}>
-                  Posted {formatTimeAgo(new Date(item.created_at))}
-                </Text>
-                <Text style={[styles.gigTitle, titleStyle]} numberOfLines={2}>
-                  {item.title}
-                </Text>
-                <View style={styles.headerRow}>
-                  <View style={styles.leftInfo}>
-                    {item.estimated_hours && (
-                      <View style={styles.metaItem}>
-                        <Ionicons name="time" size={14} color="#73af17" />
-                        <Text style={[styles.metaText, textStyle]}>{item.estimated_hours}h</Text>
-                      </View>
-                    )}
-                    <View style={styles.metaItem}>
-                      <Ionicons name="cash" size={14} color="#73af17" />
-                      <Text style={[styles.metaText, textStyle]}>${item.pay.toFixed(2)}</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
+                <View style={styles.postedRow}>
+                  <Text style={styles.postedText} allowFontScaling={false}>
+                    Posted {formatTimeAgo(new Date(item.created_at))}
+                  </Text>
+                  <View style={styles.statusBadge}>
                     <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
                     <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
                       {getStatusLabel(item.status)}
                     </Text>
                   </View>
                 </View>
-                <View style={styles.applicationsRow}>
-                  {item.status === 'open' && (
-                    <Text style={[styles.applicationsText, textStyle]}>
-                      Applicants ({applicationCounts.get(item.id) || 0})
-                    </Text>
-                  )}
-                  {item.teen_id && (
-                    <View style={styles.assignedRow}>
-                      <Ionicons name="person" size={14} color="#F97316" />
-                      <Text style={[styles.assignedText, textStyle]}>Assigned</Text>
-                    </View>
-                  )}
-                </View>
+                <Text style={[styles.gigTitle, titleStyle]} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.description, textStyle]} numberOfLines={1}>
+                  {item.description}
+                </Text>
+                {item.teen_id && (
+                  <View style={styles.assignedRow}>
+                    <Ionicons name="person" size={14} color="#F97316" />
+                    <Text style={[styles.assignedText, textStyle]}>Assigned</Text>
+                  </View>
+                )}
               </View>
             </Pressable>
           ))}
@@ -189,7 +174,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
@@ -205,7 +190,7 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   titleDark: {
-    color: '#FFFFFF',
+    color: '#000000',
   },
   viewAllText: {
     fontSize: 14,
@@ -221,37 +206,45 @@ const styles = StyleSheet.create({
     padding: 0,
     borderRadius: 12,
     borderWidth: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     borderColor: '#E5E7EB',
     overflow: 'hidden',
   },
   cardDark: {
-    backgroundColor: 'transparent',
-    borderColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
   },
   leftSection: {
     width: 100,
     flexDirection: 'column',
-    backgroundColor: '#F0F9E8',
+    backgroundColor: 'transparent',
     alignSelf: 'stretch',
   },
   leftSectionDark: {
-    backgroundColor: '#111827',
+    backgroundColor: '#FFFFFF',
+  },
+  imageContainer: {
+    padding: 8,
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#FFFFFF',
   },
   image: {
-    width: 100,
-    flex: 1,
-    resizeMode: 'cover',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
   },
   imagePlaceholder: {
-    width: 100,
-    flex: 1,
-    backgroundColor: '#F3F4F6',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 8,
   },
   imagePlaceholderDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
   },
   metaItem: {
     flexDirection: 'row',
@@ -263,7 +256,7 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   textDark: {
-    color: '#D1D5DB',
+    color: '#000000',
   },
   content: {
     flex: 1,
@@ -275,37 +268,35 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     color: '#000000',
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 4,
-  },
-  leftInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
+  description: {
+    fontSize: 12,
+    marginBottom: 8,
+    lineHeight: 16,
+    color: '#6B7280',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 6,
+    gap: 4,
+    backgroundColor: 'transparent',
   },
   applicationsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 0,
+    marginTop: 4,
+    gap: 8,
+  },
+  postedRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+    width: '100%',
   },
   postedText: {
     fontSize: 11,
     color: '#6B7280',
-    marginBottom: 4,
   },
   applicationsText: {
     fontSize: 10,
@@ -323,12 +314,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
   },
   gigDetails: {

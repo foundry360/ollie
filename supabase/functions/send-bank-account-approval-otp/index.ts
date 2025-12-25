@@ -8,16 +8,7 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 }
 
-const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
-const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
-
-/**
- * Generate a random 6-digit OTP code
- */
-function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
-}
+// Note: OTP code generation removed - Twilio Verify generates the code automatically
 
 serve(async (req: Request) => {
   // #region agent log
@@ -92,7 +83,7 @@ serve(async (req: Request) => {
       .single()
 
     // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:70',message:'After teen user query',data:{hasTeenUser:!!teenUser,hasError:!!teenError,errorMessage:teenError?.message,teenRole:teenUser?.role,hasParentId:!!teenUser?.parent_id,parentId:teenUser?.parent_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})).catch(()=>{});
+    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:70',message:'After teen user query',data:{hasTeenUser:!!teenUser,hasError:!!teenError,errorMessage:teenError?.message,teenRole:teenUser?.role,hasParentId:!!teenUser?.parent_id,parentId:teenUser?.parent_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'}));
     // #endregion
 
     if (teenError || !teenUser) {
@@ -118,7 +109,7 @@ serve(async (req: Request) => {
       )
     }
 
-    // Get parent's phone number
+    // Get parent's phone number from users table
     const { data: parentUser, error: parentError } = await supabase
       .from('users')
       .select('id, phone, full_name, email')
@@ -140,85 +131,45 @@ serve(async (req: Request) => {
       )
     }
 
-    // Check if parent has phone number, if not, try to get it from pending_teen_signups as fallback
-    let parentPhone = parentUser.phone?.trim() || ''
+    // Get parent phone from users table - this is the source of truth
+    const parentPhone = parentUser.phone?.trim() || ''
     
     if (!parentPhone) {
-      console.log('📞 Parent phone missing from users table, checking pending_teen_signups as fallback...')
-      
-      // Try to get phone from pending_teen_signups table
-      const { data: pendingSignup, error: pendingError } = await supabase
-        .from('pending_teen_signups')
-        .select('parent_phone, parent_email')
-        .eq('parent_email', parentUser.email?.toLowerCase() || '')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      
-      if (!pendingError && pendingSignup?.parent_phone) {
-        parentPhone = pendingSignup.parent_phone.trim()
-        console.log('✅ Found parent phone in pending_teen_signups, using it:', parentPhone)
-        
-        // Update the users table with the phone number for future use
-        // This ensures phone is always synced between both tables
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ phone: parentPhone.trim() })
-          .eq('id', parentUser.id)
-        
-        if (updateError) {
-          console.warn('⚠️ Failed to update users table with phone from pending_teen_signups:', updateError)
-          // Continue anyway - we have the phone number to use
-        } else {
-          console.log('✅ Successfully synced phone from pending_teen_signups to users table:', parentPhone)
-          
-          // Verify the sync worked
-          const { data: verifiedUser } = await supabase
-            .from('users')
-            .select('phone')
-            .eq('id', parentUser.id)
-            .single()
-          
-          console.log('📞 Phone sync verification:', {
-            phoneInUsers: verifiedUser?.phone,
-            phoneMatches: verifiedUser?.phone === parentPhone.trim()
-          })
-        }
-      } else {
-        console.error('❌ Parent phone number missing from both users and pending_teen_signups:', { 
-          parentId: parentUser.id,
-          parentEmail: parentUser.email,
-          pendingError: pendingError?.message
-        })
-        return new Response(
-          JSON.stringify({ 
-            error: 'Parent phone number not found',
-            message: 'Parent phone number is required for bank account approval. Please contact support to update the parent profile with a phone number.',
-            details: 'The parent account does not have a phone number on file. This is required to send the OTP code for bank account approval.'
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+      console.error('❌ Parent phone number missing from users table:', { 
+        parentId: parentUser.id,
+        parentEmail: parentUser.email,
+        parentName: parentUser.full_name
+      })
+      return new Response(
+        JSON.stringify({ 
+          error: 'Parent phone number not found',
+          message: 'Parent phone number is required for bank account approval. The parent account does not have a phone number on file in the users table.',
+          details: 'Please ensure the parent profile has a phone number set in the users table. This is required to send the OTP code for bank account approval.'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Normalize phone number (ensure E.164 format with +)
-    // Use parentPhone variable which may have been set from fallback
+    // Parent phone is retrieved from users table - this is the source of truth
     const normalizedPhone = parentPhone.trim().replace(/\s+/g, '')
     const finalParentPhone = normalizedPhone.startsWith('+') ? normalizedPhone : `+${normalizedPhone}`
 
-    // Generate OTP code
-    const otpCode = generateOTP()
-
-    // Set expiration to 15 minutes from now
+    // Set expiration to 15 minutes from now (Twilio Verify default is 10 minutes, but we'll track our own)
     const expiresAt = new Date()
     expiresAt.setMinutes(expiresAt.getMinutes() + 15)
 
     // Check if there's an existing pending approval
-    const { data: existingApproval } = await supabase
+    const { data: existingApproval, error: existingApprovalError } = await supabase
       .from('bank_account_approvals')
       .select('id, status, expires_at, attempts')
       .eq('teen_id', teenUser.id)
-      .single()
+      .maybeSingle()
+    
+    // Log any error (but don't fail - maybeSingle returns null if no record exists)
+    if (existingApprovalError && existingApprovalError.code !== 'PGRST116') {
+      console.error('Error checking existing approval:', existingApprovalError)
+    }
 
     // If there's an existing pending approval that hasn't expired, check rate limiting
     if (existingApproval && existingApproval.status === 'pending') {
@@ -240,7 +191,7 @@ serve(async (req: Request) => {
           .from('bank_account_approvals')
           .select('updated_at')
           .eq('teen_id', teenUser.id)
-          .single()
+          .maybeSingle()
         
         if (lastRequest) {
           const lastRequestTime = new Date(lastRequest.updated_at)
@@ -262,15 +213,21 @@ serve(async (req: Request) => {
     }
 
     // Insert or update bank_account_approval record
-    const approvalData = {
+    // Note: otp_code will be set to verification SID after Twilio Verify sends the code
+    // Use temporary placeholder if column is still NOT NULL (will be updated after Twilio call)
+    const approvalData: any = {
       teen_id: teenUser.id,
       parent_phone: finalParentPhone,
-      otp_code: otpCode,
       status: 'pending',
       expires_at: expiresAt.toISOString(),
       attempts: 0,
       verified_at: null,
     }
+    
+    // Only include otp_code if migration has been run (column is nullable)
+    // Otherwise, we'll update it after the Twilio Verify call succeeds
+    // For now, use a placeholder that will be replaced
+    approvalData.otp_code = 'PENDING_VERIFICATION'
 
     // #region agent log
     console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:178',message:'Before upsert approval',data:{teenId:approvalData.teen_id,hasParentPhone:!!approvalData.parent_phone},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'}));
@@ -297,34 +254,62 @@ serve(async (req: Request) => {
       )
     }
 
-    // Send SMS via Twilio
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-      console.warn('Twilio not configured. OTP code generated but SMS not sent.')
+    // Read Twilio config inside the handler (in case of timing issues)
+    console.log('📞 [send-bank-account-approval-otp] Reading Twilio environment variables...')
+    const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
+    const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
+    const TWILIO_VERIFY_SERVICE_SID = Deno.env.get('TWILIO_VERIFY_SERVICE_SID')
+
+    // Debug: Check what Twilio secrets are available
+    const allEnvKeys = Object.keys(Deno.env.toObject())
+    const twilioKeys = allEnvKeys.filter((k: string) => k.includes('TWILIO'))
+    
+    console.log('🔍 [send-bank-account-approval-otp] Twilio config check:', JSON.stringify({
+      hasAccountSid: !!TWILIO_ACCOUNT_SID,
+      hasAuthToken: !!TWILIO_AUTH_TOKEN,
+      hasVerifyServiceSid: !!TWILIO_VERIFY_SERVICE_SID,
+      accountSidLength: TWILIO_ACCOUNT_SID?.length || 0,
+      authTokenLength: TWILIO_AUTH_TOKEN?.length || 0,
+      verifyServiceSidLength: TWILIO_VERIFY_SERVICE_SID?.length || 0,
+      allTwilioKeys: twilioKeys,
+      accountSidFirstChars: TWILIO_ACCOUNT_SID ? TWILIO_ACCOUNT_SID.substring(0, 3) : 'N/A',
+      authTokenFirstChars: TWILIO_AUTH_TOKEN ? TWILIO_AUTH_TOKEN.substring(0, 3) : 'N/A'
+    }));
+
+    // Send OTP via Twilio Verify
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_VERIFY_SERVICE_SID) {
+      console.error('❌ Twilio Verify not configured. Missing secrets:', {
+        hasAccountSid: !!TWILIO_ACCOUNT_SID,
+        hasAuthToken: !!TWILIO_AUTH_TOKEN,
+        hasVerifyServiceSid: !!TWILIO_VERIFY_SERVICE_SID
+      })
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Twilio not configured',
-          message: 'OTP code generated but SMS not sent. Configure Twilio credentials in Edge Function secrets.',
-          otp_code: otpCode, // Only return in dev/testing
+          error: 'Twilio Verify not configured',
+          message: 'Configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID in Edge Function secrets.',
           expires_at: expiresAt.toISOString(),
-          note: 'In production, OTP codes should only be sent via SMS, never returned in API response.'
         }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    // Format SMS message
-    const smsBody = `Your teen ${teenUser.full_name} requested bank account setup approval on Ollie. OTP code: ${otpCode}. This code expires in 15 minutes.`
-
-    // Send SMS via Twilio
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
     
-    const formData = new URLSearchParams()
-    formData.append('From', TWILIO_PHONE_NUMBER)
-    formData.append('To', finalParentPhone)
-    formData.append('Body', smsBody)
+    console.log('✅ Twilio Verify configured. Sending OTP via Verify API...')
 
-    const twilioResponse = await fetch(twilioUrl, {
+    // Send OTP via Twilio Verify API
+    const verifyUrl = `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY_SERVICE_SID}/Verifications`
+
+    const formData = new URLSearchParams()
+    formData.append('To', finalParentPhone)
+    formData.append('Channel', 'sms')
+
+    console.log('📤 [send-bank-account-approval-otp] Sending OTP via Twilio Verify:', {
+      to: finalParentPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1***$2****'), // Mask for privacy
+      serviceSid: TWILIO_VERIFY_SERVICE_SID,
+      channel: 'sms'
+    })
+
+    const verifyResponse = await fetch(verifyUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
@@ -333,42 +318,62 @@ serve(async (req: Request) => {
       body: formData.toString(),
     })
 
-    const twilioData = await twilioResponse.json()
+    const verifyData = await verifyResponse.json()
+    
+    console.log('📥 [send-bank-account-approval-otp] Twilio Verify API response:', JSON.stringify({
+      ok: verifyResponse.ok,
+      httpStatus: verifyResponse.status,
+      verificationSid: verifyData.sid,
+      status: verifyData.status,
+      error: verifyData.error_message || verifyData.message
+    }, null, 2))
 
-    if (!twilioResponse.ok) {
-      console.error('Twilio API error:', twilioData)
+    if (!verifyResponse.ok) {
+      console.error('❌ Twilio Verify API error:', JSON.stringify(verifyData, null, 2))
       
       // Update approval status to reflect SMS failure
       await supabase
         .from('bank_account_approvals')
-        .update({ status: 'expired' }) // Mark as expired so they can retry
+        .update({ status: 'expired' })
         .eq('id', approval.id)
 
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Failed to send SMS',
-          twilioError: twilioData.message || twilioData.error_message,
+          error: 'Failed to send OTP via Twilio Verify',
+          twilioError: verifyData.message || verifyData.error_message,
+          twilioErrorCode: verifyData.code,
           message: 'Could not send OTP code to parent phone. Please check phone number and try again.'
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('OTP SMS sent successfully:', {
-      to: finalParentPhone,
+    // Store the verification SID instead of OTP code (Twilio Verify handles the code)
+    // Update the approval record to store verification SID
+    await supabase
+      .from('bank_account_approvals')
+      .update({ 
+        otp_code: verifyData.sid, // Store verification SID instead of generated code
+        parent_phone: finalParentPhone 
+      })
+      .eq('id', approval.id)
+
+    console.log('✅ OTP sent via Twilio Verify:', {
+      to: finalParentPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1***$2****'),
       teenName: teenUser.full_name,
-      messageSid: twilioData.sid,
-      status: twilioData.status,
+      verificationSid: verifyData.sid,
+      status: verifyData.status,
       expiresAt: expiresAt.toISOString(),
     })
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'OTP code sent to parent phone',
+        message: 'OTP code sent to parent phone via Twilio Verify',
         expires_at: expiresAt.toISOString(),
-        parent_phone_masked: finalParentPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1***$2****') // Mask phone for privacy
+        parent_phone_masked: finalParentPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1***$2****'),
+        verification_sid: verifyData.sid // Include for tracking
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

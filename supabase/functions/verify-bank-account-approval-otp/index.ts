@@ -28,16 +28,6 @@ serve(async (req: Request) => {
       )
     }
 
-    // Clean OTP code (remove spaces, only digits)
-    const cleanOTP = otp_code.toString().replace(/\s+/g, '').replace(/\D/g, '')
-
-    if (cleanOTP.length !== 6) {
-      return new Response(
-        JSON.stringify({ error: 'OTP code must be 6 digits' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
     // Get authenticated user
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -150,8 +140,72 @@ serve(async (req: Request) => {
       )
     }
 
-    // Verify OTP code
-    if (approval.otp_code !== cleanOTP) {
+    // Verify OTP code using Twilio Verify API
+    const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
+    const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
+    const TWILIO_VERIFY_SERVICE_SID = Deno.env.get('TWILIO_VERIFY_SERVICE_SID')
+    const verificationSid = approval.otp_code // This should be the verification SID (starts with VE...)
+
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_VERIFY_SERVICE_SID) {
+      return new Response(
+        JSON.stringify({ error: 'Twilio Verify not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Check if we have a valid verification SID (starts with VE)
+    // Also handle placeholder value used before migration is run
+    if (!verificationSid || verificationSid === 'PENDING_VERIFICATION' || !verificationSid.startsWith('VE')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Verification not initialized. Please request a new OTP code.',
+          details: 'The verification SID is missing or invalid. This may happen if the OTP request failed.'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Clean OTP code (remove spaces, only digits)
+    const cleanOTP = otp_code.toString().replace(/\s+/g, '').replace(/\D/g, '')
+
+    if (cleanOTP.length !== 6) {
+      return new Response(
+        JSON.stringify({ error: 'OTP code must be 6 digits' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Verify code with Twilio Verify
+    const checkUrl = `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY_SERVICE_SID}/VerificationCheck`
+    
+    const formData = new URLSearchParams()
+    formData.append('Code', cleanOTP)
+    formData.append('VerificationSid', verificationSid)
+
+    console.log('🔍 [verify-bank-account-approval-otp] Verifying OTP with Twilio Verify:', {
+      verificationSid: verificationSid,
+      codeLength: cleanOTP.length
+    })
+
+    const checkResponse = await fetch(checkUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    })
+
+    const checkData = await checkResponse.json()
+
+    console.log('📥 [verify-bank-account-approval-otp] Twilio Verify check response:', JSON.stringify({
+      ok: checkResponse.ok,
+      status: checkData.status,
+      error: checkData.error_message || checkData.message,
+      errorCode: checkData.code
+    }, null, 2))
+
+    if (!checkResponse.ok || checkData.status !== 'approved') {
       // Increment attempts counter
       const newAttempts = approval.attempts + 1
       const remainingAttempts = 5 - newAttempts
@@ -167,7 +221,7 @@ serve(async (req: Request) => {
 
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid OTP code',
+          error: checkData.message || 'Invalid OTP code',
           remaining_attempts: remainingAttempts > 0 ? remainingAttempts : 0,
           max_attempts_reached: remainingAttempts === 0
         }),

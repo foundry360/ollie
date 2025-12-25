@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/stores/themeStore';
@@ -62,35 +63,41 @@ export default function SplashScreen() {
   }, [router]);
 
   return (
-    <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
-      <View style={styles.content}>
-        <View style={[styles.logoContainer, isDark && styles.logoContainerDark]}>
-          <Image
-            source={require('@/assets/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
+    <LinearGradient
+      colors={['#1e3a5f', '#2d4a6f', '#111827']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradient}
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('@/assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.tagline}>
+              Connecting teens with neighbors
+            </Text>
+          </View>
+          <ActivityIndicator 
+            size="large" 
+            color="#FFFFFF" 
+            style={styles.loader}
           />
-          <Text style={[styles.tagline, isDark && styles.taglineDark]}>
-            Connecting teens with neighbors
-          </Text>
         </View>
-        <ActivityIndicator 
-          size="large" 
-          color="#73af17" 
-          style={styles.loader}
-        />
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#000000',
-  },
-  containerDark: {
-    backgroundColor: '#000000',
   },
   content: {
     flex: 1,
@@ -102,9 +109,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  logoContainerDark: {
-    // Same for dark mode
-  },
   logo: {
     width: 200,
     height: 200,
@@ -112,11 +116,8 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 18,
-    color: '#9CA3AF',
+    color: '#FFFFFF',
     textAlign: 'center',
-  },
-  taglineDark: {
-    color: '#9CA3AF',
   },
   loader: {
     marginTop: 32,

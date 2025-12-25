@@ -171,8 +171,12 @@ export function useDeleteTask() {
   return useMutation({
     mutationFn: (taskId: string) => deleteTask(taskId),
     onSuccess: () => {
+      // Invalidate all task-related queries
       queryClient.invalidateQueries({ queryKey: taskKeys.open() });
       queryClient.invalidateQueries({ queryKey: taskKeys.user() });
+      queryClient.invalidateQueries({ queryKey: ['gigApplications'] });
+      queryClient.invalidateQueries({ queryKey: ['savedGigs'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
   });
 }

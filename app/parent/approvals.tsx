@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   header: {
     padding: 16,
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   headerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
     borderBottomColor: '#374151',
   },
   headerTitle: {

@@ -87,7 +87,7 @@ export function BottomSheet({ visible, onClose, title, children }: BottomSheetPr
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(17, 24, 39, 0.5)',
     justifyContent: 'flex-end',
   },
   container: {

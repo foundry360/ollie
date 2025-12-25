@@ -20,6 +20,7 @@ import { RecentActivity } from '@/components/home/RecentActivity';
 import { NeighborActiveGigs } from '@/components/home/NeighborActiveGigs';
 import { NeighborUpcomingScheduledGigs } from '@/components/home/NeighborUpcomingScheduledGigs';
 import { NeighborRecentActivity } from '@/components/home/NeighborRecentActivity';
+import { FeaturedTeenlancers } from '@/components/home/FeaturedTeenlancers';
 import { TipsCarousel } from '@/components/home/TipsCarousel';
 import { Loading } from '@/components/ui/Loading';
 
@@ -101,12 +102,17 @@ export default function HomeScreen() {
             <Loading />
           ) : (
             <>
-              <NeighborHeader />
-              <NeighborActiveGigs />
-              <View style={[styles.divider, isDark && styles.dividerDark]} />
-              <NeighborUpcomingScheduledGigs />
-              <View style={[styles.divider, isDark && styles.dividerDark]} />
-              <NeighborRecentActivity />
+              <View style={[styles.topSection, isDark && styles.topSectionDark]}>
+                <NeighborHeader />
+                <FeaturedTeenlancers />
+              </View>
+              <View style={[styles.bottomSection, isDark && styles.bottomSectionDark]}>
+                <NeighborActiveGigs />
+                <View style={[styles.divider, isDark && styles.dividerDark]} />
+                <NeighborUpcomingScheduledGigs />
+                <View style={[styles.divider, isDark && styles.dividerDark]} />
+                <NeighborRecentActivity />
+              </View>
             </>
           )}
         </ScrollView>
@@ -145,15 +151,19 @@ export default function HomeScreen() {
           <Loading />
         ) : (
           <>
-            <HomeHeader />
-            <ActiveTaskCard />
-            <WeeklyEarnings />
-            <TasksNearYou />
-            <View style={[styles.divider, isDark && styles.dividerDark]} />
-            <RecentActivity />
-            <View style={[styles.divider, isDark && styles.dividerDark]} />
-            <TipsCarousel />
-            <UpcomingTasks />
+            <View style={[styles.topSection, isDark && styles.topSectionDark]}>
+              <HomeHeader />
+              <ActiveTaskCard />
+              <WeeklyEarnings />
+            </View>
+            <View style={[styles.bottomSection, isDark && styles.bottomSectionDark]}>
+              <TasksNearYou />
+              <View style={[styles.divider, isDark && styles.dividerDark]} />
+              <RecentActivity />
+              <View style={[styles.divider, isDark && styles.dividerDark]} />
+              <TipsCarousel />
+              <UpcomingTasks />
+            </View>
           </>
         )}
       </ScrollView>
@@ -169,13 +179,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 24,
   },
   errorContainer: {
@@ -199,7 +209,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   dividerDark: {
-    backgroundColor: '#1F2937',
+    backgroundColor: '#E5E7EB',
+  },
+  topSection: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 16,
+  },
+  topSectionDark: {
+    backgroundColor: '#111827',
+  },
+  bottomSection: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 16,
+  },
+  bottomSectionDark: {
+    backgroundColor: '#FFFFFF',
   },
 });
 

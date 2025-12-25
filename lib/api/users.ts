@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { User } from '@/types';
 import { getWeekRange, calculateDistance } from '@/lib/utils';
 import { getAverageRating } from './reviews';
+import * as Location from 'expo-location';
 
 export interface UpdateProfileData {
   full_name?: string;
@@ -57,6 +58,174 @@ export async function getPublicUserProfile(userId: string): Promise<User | null>
   }
   
   return data;
+}
+
+export interface FeaturedTeenlancer {
+  id: string;
+  full_name: string;
+  profile_photo_url?: string;
+  skills: string[];
+  rating: number;
+  reviewCount: number;
+}
+
+// Get featured teenlancers (teens with ratings)
+export async function getFeaturedTeenlancers(
+  limit: number = 10,
+  neighborLocation?: { latitude: number; longitude: number }
+): Promise<FeaturedTeenlancer[]> {
+  console.log('getFeaturedTeenlancers called with:', { limit, neighborLocation });
+  
+  // Get all teens with reviews and addresses (no verification required)
+  let query = supabase
+    .from('users')
+    .select('id, full_name, profile_photo_url, skills, address')
+    .eq('role', 'teen');
+  
+  // Only require addresses if location filtering is enabled
+  if (neighborLocation) {
+    query = query.not('address', 'is', null);
+  }
+  
+  query = query.limit(limit * 5); // Get more to account for filtering
+  
+  const { data: teens, error: teensError } = await query;
+
+  console.log('Teens query result:', { 
+    totalCount: teens?.length || 0,
+    error: teensError?.message,
+    teenIds: teens?.map(t => t.id)
+  });
+
+  if (teensError) {
+    console.error('Error fetching teens:', teensError);
+    throw teensError;
+  }
+  if (!teens || teens.length === 0) {
+    console.log('No teens found');
+    return [];
+  }
+
+  // Get reviews for all teens
+  const teenIds = teens.map(t => t.id);
+  const { data: reviews, error: reviewsError } = await supabase
+    .from('reviews')
+    .select('reviewee_id, rating')
+    .in('reviewee_id', teenIds);
+
+  console.log('Reviews query result:', { 
+    count: reviews?.length || 0, 
+    error: reviewsError?.message,
+    reviews: reviews?.map(r => ({ reviewee_id: r.reviewee_id, rating: r.rating }))
+  });
+
+  if (reviewsError) {
+    console.error('Error fetching reviews:', reviewsError);
+    throw reviewsError;
+  }
+
+  // Calculate average rating and review count for each teen
+  const teenRatings = new Map<string, { totalRating: number; count: number }>();
+  
+  reviews?.forEach(review => {
+    const current = teenRatings.get(review.reviewee_id) || { totalRating: 0, count: 0 };
+    teenRatings.set(review.reviewee_id, {
+      totalRating: current.totalRating + review.rating,
+      count: current.count + 1,
+    });
+  });
+
+  console.log('Teen ratings map:', Array.from(teenRatings.entries()).map(([id, data]) => ({ id, ...data })));
+  
+  // Map teens with their ratings and calculate distance
+  const featuredTeenlancers: (FeaturedTeenlancer & { distance?: number })[] = await Promise.all(
+    teens.map(async (teen) => {
+      const ratingData = teenRatings.get(teen.id);
+      console.log(`Processing teen ${teen.id} (${teen.full_name}):`, { 
+        hasRating: !!ratingData, 
+        ratingCount: ratingData?.count || 0,
+        address: teen.address 
+      });
+      
+      if (!ratingData || ratingData.count === 0) {
+        console.log(`Skipping teen ${teen.id} - no reviews`);
+        return null;
+      }
+      
+      // Calculate distance if neighbor location is provided
+      let distance: number | undefined;
+      if (neighborLocation && teen.address) {
+        try {
+          console.log(`Geocoding address for teen ${teen.id}: ${teen.address}`);
+          // Geocode the teen's address to get coordinates
+          const geocoded = await Location.geocodeAsync(teen.address);
+          console.log(`Geocoding result for teen ${teen.id}:`, geocoded);
+          if (geocoded && geocoded.length > 0) {
+            const teenLocation = geocoded[0];
+            distance = calculateDistance(
+              neighborLocation.latitude,
+              neighborLocation.longitude,
+              teenLocation.latitude,
+              teenLocation.longitude
+            );
+            console.log(`Distance calculated for teen ${teen.id}: ${distance.toFixed(1)} miles`);
+          } else {
+            console.warn(`No geocoding results for teen ${teen.id} address: ${teen.address}`);
+          }
+        } catch (error) {
+          console.error(`Error geocoding address for teen ${teen.id} (${teen.address}):`, error);
+          // If geocoding fails, skip this teen if location filtering is required
+          if (neighborLocation) {
+            console.warn(`Skipping teen ${teen.id} due to geocoding failure`);
+            return null;
+          }
+        }
+      } else if (neighborLocation && !teen.address) {
+        console.warn(`Teen ${teen.id} has no address but location filtering is enabled, skipping`);
+        return null;
+      }
+      
+      // Filter by 25 mile radius if location is provided
+      if (neighborLocation) {
+        if (distance === undefined) {
+          console.warn(`Teen ${teen.id} has no distance calculated, skipping`);
+          return null;
+        }
+        if (distance > 25) {
+          console.log(`Teen ${teen.id} is ${distance.toFixed(1)} miles away, outside 25 mile radius`);
+          return null;
+        }
+        console.log(`✓ Teen ${teen.id} is ${distance.toFixed(1)} miles away, within 25 mile radius`);
+      }
+      
+      return {
+        id: teen.id,
+        full_name: teen.full_name,
+        profile_photo_url: teen.profile_photo_url || undefined,
+        skills: teen.skills || [],
+        rating: Math.round((ratingData.totalRating / ratingData.count) * 10) / 10,
+        reviewCount: ratingData.count,
+        distance,
+      };
+    })
+  );
+
+  // Filter out nulls and sort
+  const filtered = featuredTeenlancers
+    .filter((teen): teen is FeaturedTeenlancer & { distance?: number } => teen !== null)
+    .sort((a, b) => {
+      // Sort by rating (descending), then by review count (descending)
+      if (b.rating !== a.rating) {
+        return b.rating - a.rating;
+      }
+      return b.reviewCount - a.reviewCount;
+    })
+    .slice(0, limit)
+    .map(({ distance, ...teen }) => teen); // Remove distance from final result
+
+  console.log(`Found ${filtered.length} featured teenlancers (limit: ${limit}, location: ${neighborLocation ? 'provided' : 'not provided'})`);
+  
+  return filtered;
 }
 
 // Get any user profile by ID (for messaging/chat - allows both teen and poster roles)

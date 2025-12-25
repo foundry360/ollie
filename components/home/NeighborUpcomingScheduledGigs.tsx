@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   titleDark: {
-    color: '#FFFFFF',
+    color: '#000000',
   },
   viewAllText: {
     fontSize: 14,
@@ -252,8 +252,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   cardDark: {
-    backgroundColor: 'transparent',
-    borderColor: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
   },
   titleRow: {
     flexDirection: 'row',
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   textDark: {
-    color: '#9CA3AF',
+    color: '#374151',
   },
   loadingText: {
     fontSize: 14,

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native';
-import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig } from '@/hooks/useTasks';
+import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig, useDeleteTask, taskKeys } from '@/hooks/useTasks';
 import { applyForGig } from '@/lib/api/tasks';
 import { useAuthStore } from '@/stores/authStore';
 import { TaskStatus } from '@/types';
@@ -35,6 +35,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const { data: task, isLoading } = useTask(taskId || '');
   const startTaskMutation = useStartTask();
   const completeTaskMutation = useCompleteTask();
+  const deleteTaskMutation = useDeleteTask();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedTeenId, setSelectedTeenId] = useState<string | null>(null);
@@ -131,6 +132,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const canStart = task && isTeen && task.status === 'accepted';
   const canComplete = task && isTeen && task.status === 'in_progress';
   const canEdit = task && isPoster && isNeighbor && ['open', 'cancelled'].includes(task.status);
+  const canDelete = task && isPoster && isNeighbor && ['open', 'accepted'].includes(task.status);
   const canSave = task && isOpen && isTeenlancer && !isPoster && !isTeen;
   const pendingApplications = applications.filter(app => app.status === 'pending');
   
@@ -232,6 +234,44 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
         },
       ],
       'plain-text'
+    );
+  };
+
+  const handleDelete = () => {
+    if (!task) return;
+    
+    Alert.alert(
+      'Delete Gig',
+      'Are you sure you want to delete this gig? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('Attempting to delete gig:', task.id);
+              await deleteTaskMutation.mutateAsync(task.id);
+              console.log('Gig deleted successfully, invalidating queries');
+              // Invalidate all task-related queries to refresh the UI
+              queryClient.invalidateQueries({ queryKey: ['tasks'] });
+              queryClient.invalidateQueries({ queryKey: ['gigApplications'] });
+              queryClient.invalidateQueries({ queryKey: ['savedGigs'] });
+              queryClient.invalidateQueries({ queryKey: taskKeys.open() });
+              queryClient.invalidateQueries({ queryKey: taskKeys.user() });
+              // Close the modal and show success message
+              onClose();
+              Alert.alert('Success', 'Gig deleted successfully.');
+            } catch (error: any) {
+              console.error('Error deleting gig:', error);
+              Alert.alert('Error', error.message || 'Failed to delete gig');
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -424,8 +464,10 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
           </View>
 
           {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <Loading />
+            <View style={[styles.loadingContainer, isDark && styles.loadingContainerDark]}>
+              <View style={styles.loadingWrapper}>
+                <Loading />
+              </View>
             </View>
           ) : !task ? (
             <View style={styles.errorContainer}>
@@ -482,14 +524,25 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                 <View style={styles.header}>
                   <View style={styles.titleRow}>
                     <Text style={[styles.title, titleStyle]}>{task.title}</Text>
-                    {canEdit && (
-                      <Pressable 
-                        style={styles.editButton}
-                        onPress={() => setShowEditModal(true)}
-                      >
-                        <Ionicons name="create-outline" size={18} color="#73af17" />
-                        <Text style={styles.editButtonText}>Edit</Text>
-                      </Pressable>
+                    {(canEdit || canDelete) && (
+                      <View style={styles.actionButtons}>
+                        {canEdit && (
+                          <Pressable 
+                            style={styles.editButton}
+                            onPress={() => setShowEditModal(true)}
+                          >
+                            <Ionicons name="create-outline" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                          </Pressable>
+                        )}
+                        {canDelete && (
+                          <Pressable 
+                            style={styles.deleteButton}
+                            onPress={handleDelete}
+                          >
+                            <Ionicons name="trash-outline" size={18} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                          </Pressable>
+                        )}
+                      </View>
                     )}
                   </View>
                   <View style={styles.payRow}>
@@ -528,12 +581,15 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                 <View style={[styles.section, sectionStyle]}>
                   <Text style={[titleStyle, styles.sectionTitle]}>Details</Text>
                   {task.estimated_hours && (
-                    <View style={styles.detailRow}>
-                      <Ionicons name="time" size={20} color="#73af17" />
-                      <Text style={[styles.detailText, textStyle]}>
-                        Estimated: {task.estimated_hours} hours
-                      </Text>
-                    </View>
+                    <>
+                      <View style={styles.detailRow}>
+                        <Ionicons name="time" size={20} color="#73af17" />
+                        <Text style={[styles.detailText, textStyle]}>
+                          Estimated: {task.estimated_hours} hours
+                        </Text>
+                      </View>
+                      <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+                    </>
                   )}
                   <View style={styles.detailRow}>
                     <Ionicons name="location" size={20} color="#73af17" />
@@ -551,6 +607,9 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                       })()}
                     </View>
                   </View>
+                  {(task.scheduled_date || (task.teen_id && isNeighbor) || (task.required_skills && task.required_skills.length > 0)) && (
+                    <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+                  )}
                   {task.scheduled_date && (
                     <View style={styles.detailRow}>
                       <Ionicons name="calendar" size={20} color="#73af17" />
@@ -567,71 +626,77 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                     </View>
                   )}
                   {task.teen_id && isNeighbor && (
-                    <View style={styles.detailRow}>
-                      <Pressable 
-                        style={styles.teenInfoContainer}
-                        onPress={() => setShowProfileModal(true)}
-                      >
-                        <View style={styles.teenAvatarContainer}>
-                          {teenProfile?.profile_photo_url ? (
-                            <Image
-                              source={{ uri: teenProfile.profile_photo_url }}
-                              style={styles.teenAvatar}
-                            />
-                          ) : (
-                            <View style={[styles.teenAvatarPlaceholder, isDark && styles.teenAvatarPlaceholderDark]}>
-                              <Ionicons name="person" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                            </View>
-                          )}
-                        </View>
-                        <View style={styles.teenInfo}>
-                          <Text style={[styles.teenName, textStyle]}>
-                            {teenProfile?.full_name || 'Loading...'}
-                          </Text>
-                          <View style={styles.teenRatingRow}>
-                            <View style={styles.teenRatingStars}>
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Ionicons
-                                  key={star}
-                                  name={star <= Math.round(teenRating) ? 'star' : 'star-outline'}
-                                  size={14}
-                                  color="#FBBF24"
-                                />
-                              ))}
-                            </View>
-                            <Text style={[styles.teenRatingText, labelStyle]}>
-                              {teenRating > 0 ? teenRating.toFixed(1) : '0.0'} ({teenReviewCount} {teenReviewCount === 1 ? 'review' : 'reviews'})
-                            </Text>
-                          </View>
-                          <Text style={[styles.teenLabel, labelStyle]}>Assigned Teenlancer</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                      </Pressable>
-                      {isNeighbor && (
-                        <Pressable
-                          style={[styles.addReviewButton, isDark && styles.addReviewButtonDark]}
-                          onPress={() => {
-                            setSelectedTeenForReview(task?.teen_id || null);
-                            setShowReviewModal(true);
-                          }}
+                    <>
+                      <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+                      <View style={styles.detailRow}>
+                        <Pressable 
+                          style={styles.teenInfoContainer}
+                          onPress={() => setShowProfileModal(true)}
                         >
-                          <Ionicons name="star-outline" size={16} color="#73af17" />
-                          <Text style={styles.addReviewButtonText}>Review</Text>
+                          <View style={styles.teenAvatarContainer}>
+                            {teenProfile?.profile_photo_url ? (
+                              <Image
+                                source={{ uri: teenProfile.profile_photo_url }}
+                                style={styles.teenAvatar}
+                              />
+                            ) : (
+                              <View style={[styles.teenAvatarPlaceholder, isDark && styles.teenAvatarPlaceholderDark]}>
+                                <Ionicons name="person" size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.teenInfo}>
+                            <Text style={[styles.teenName, textStyle]}>
+                              {teenProfile?.full_name || 'Loading...'}
+                            </Text>
+                            <View style={styles.teenRatingRow}>
+                              <View style={styles.teenRatingStars}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Ionicons
+                                    key={star}
+                                    name={star <= Math.round(teenRating) ? 'star' : 'star-outline'}
+                                    size={14}
+                                    color="#FBBF24"
+                                  />
+                                ))}
+                              </View>
+                              <Text style={[styles.teenRatingText, labelStyle]}>
+                                {teenRating > 0 ? teenRating.toFixed(1) : '0.0'} ({teenReviewCount} {teenReviewCount === 1 ? 'review' : 'reviews'})
+                              </Text>
+                            </View>
+                            <Text style={[styles.teenLabel, labelStyle]}>Assigned Teenlancer</Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
                         </Pressable>
-                      )}
-                    </View>
+                        {isNeighbor && (
+                          <Pressable
+                            style={[styles.addReviewButton, isDark && styles.addReviewButtonDark]}
+                            onPress={() => {
+                              setSelectedTeenForReview(task?.teen_id || null);
+                              setShowReviewModal(true);
+                            }}
+                          >
+                            <Ionicons name="star-outline" size={16} color="#73af17" />
+                            <Text style={styles.addReviewButtonText}>Review</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    </>
                   )}
                   {task.required_skills && task.required_skills.length > 0 && (
-                    <View style={styles.skillsContainer}>
-                      <Text style={[styles.label, labelStyle]}>Required Skills:</Text>
-                      <View style={styles.skills}>
+                    <>
+                      <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+                      <View style={styles.skillsContainer}>
+                        <Text style={[styles.label, labelStyle]}>Required Skills:</Text>
+                        <View style={styles.skills}>
                         {task.required_skills.map((skill, index) => (
                           <View key={index} style={[styles.skillTag, isDark && styles.skillTagDark]}>
                             <Text style={[styles.skillText, isDark && styles.skillTextDark]}>{skill}</Text>
                           </View>
                         ))}
+                        </View>
                       </View>
-                    </View>
+                    </>
                   )}
                 </View>
 
@@ -939,7 +1004,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(17, 24, 39, 0.5)',
     justifyContent: 'flex-end',
     maxHeight: Dimensions.get('window').height,
   },
@@ -955,7 +1020,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   modalDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   greenHeaderBackground: {
     position: 'absolute',
@@ -971,7 +1036,7 @@ const styles = StyleSheet.create({
   modalHeader: {
     paddingTop: 12,
     paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     position: 'relative',
     zIndex: 10,
@@ -1023,14 +1088,20 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   scrollContent: {
-    paddingTop: 24,
+    paddingTop: 8,
     paddingBottom: 24,
   },
   loadingContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: 200,
+    paddingVertical: 40,
+  },
+  loadingContainerDark: {
+    backgroundColor: '#111827',
+  },
+  loadingWrapper: {
+    backgroundColor: 'transparent',
   },
   errorContainer: {
     flex: 1,
@@ -1089,14 +1160,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 12,
   },
-  editButton: {
+  actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(115, 175, 23, 0.1)',
+    flexShrink: 0,
+  },
+  editButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 6,
+    flexShrink: 0,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 6,
     flexShrink: 0,
   },
   payRow: {
@@ -1119,11 +1198,6 @@ const styles = StyleSheet.create({
     gap: 6,
     flexShrink: 0,
     minWidth: 60,
-  },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#73af17',
   },
   statusDot: {
     width: 8,
@@ -1182,7 +1256,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  detailDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  detailDividerDark: {
+    backgroundColor: '#374151',
   },
   addressContainer: {
     flex: 1,
@@ -1345,7 +1428,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   containerLight: {
     backgroundColor: '#FFFFFF',
@@ -1638,6 +1721,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
 
 
 

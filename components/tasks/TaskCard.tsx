@@ -101,42 +101,31 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
     >
       {/* Left side: Image with info below */}
       <View style={[styles.leftSection, isDark && styles.leftSectionDark]}>
-        {task.photos && task.photos.length > 0 && task.photos[0] ? (
-          <Image 
-            source={{ uri: task.photos[0] }} 
-            style={styles.image}
-            resizeMode="cover"
-            onError={(e) => {
-              console.log('Image load error for task:', task.id, 'Photo URL:', task.photos?.[0], 'Error:', e.nativeEvent.error);
-            }}
-            onLoad={() => {
-              console.log('Image loaded successfully for task:', task.id, 'Photo URL:', task.photos?.[0]);
-            }}
-          />
-        ) : (
-          <View style={[styles.imagePlaceholder, isDark && styles.imagePlaceholderDark]}>
-            <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
-          </View>
-        )}
-        
-        {/* Time and Price below image */}
-        <View style={[styles.infoRow, isDark && styles.infoRowDark]}>
-          {task.estimated_hours && (
-            <View style={styles.metaItem}>
-              <Ionicons name="time" size={14} color="#73af17" />
-              <Text style={[styles.metaText, metaStyle]}>{task.estimated_hours}h</Text>
+        <View style={styles.imageContainer}>
+          {task.photos && task.photos.length > 0 && task.photos[0] ? (
+            <Image 
+              source={{ uri: task.photos[0] }} 
+              style={styles.image}
+              resizeMode="cover"
+              onError={(e) => {
+                console.log('Image load error for task:', task.id, 'Photo URL:', task.photos?.[0], 'Error:', e.nativeEvent.error);
+              }}
+              onLoad={() => {
+                console.log('Image loaded successfully for task:', task.id, 'Photo URL:', task.photos?.[0]);
+              }}
+            />
+          ) : (
+            <View style={[styles.imagePlaceholder, isDark && styles.imagePlaceholderDark]}>
+              <Ionicons name="aperture-outline" size={32} color={isDark ? '#D1D5DB' : '#D1D5DB'} />
             </View>
           )}
-          <View style={styles.metaItem}>
+        </View>
+        
+        {/* Price below image */}
+        <View style={[styles.infoRow, isDark && styles.infoRowDark]}>
+          <View style={[styles.metaItem, styles.centeredPrice]}>
             <Ionicons name="cash" size={14} color="#73af17" />
             <Text style={[styles.metaText, metaStyle]}>${task.pay.toFixed(2)}</Text>
-          </View>
-          {/* Status - dot and text only, no background */}
-          <View style={styles.statusRow}>
-            <View style={[styles.statusDotInline, { backgroundColor: getStatusColor(task.status) }]} />
-            <Text style={[styles.statusTextInline, { color: getStatusColor(task.status) }, metaStyle]}>
-              {getStatusLabel(task.status)}
-            </Text>
           </View>
         </View>
       </View>
@@ -187,32 +176,6 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
             </Text>
           </View>
         </View>
-        {(task.required_skills && task.required_skills.length > 0) || isOpen ? (
-          <View style={styles.skillsRow}>
-            {task.required_skills && task.required_skills.length > 0 && (
-              <View style={styles.skills}>
-                {task.required_skills.slice(0, 3).map((skill, index) => (
-                  <View key={index} style={[styles.skillTag, isDark && styles.skillTagDark]}>
-                    <Text style={[styles.skillText, isDark && styles.skillTextDark]}>{skill}</Text>
-                  </View>
-                ))}
-                {task.required_skills.length > 3 && (
-                  <Text style={[styles.moreSkills, metaStyle]}>
-                    +{task.required_skills.length - 3} more
-                  </Text>
-                )}
-              </View>
-            )}
-            {isOpen && (
-              <View style={styles.applicantRow}>
-                <Ionicons name="people" size={14} color="#73af17" />
-                <Text style={[styles.applicantText, metaStyle]}>
-                  Applicants ({applicationCount})
-                </Text>
-              </View>
-            )}
-          </View>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -243,17 +206,23 @@ const styles = StyleSheet.create({
   leftSectionDark: {
     backgroundColor: '#111827',
   },
+  imageContainer: {
+    padding: 8,
+    paddingBottom: 4,
+  },
   image: {
-    width: 100,
+    width: '100%',
     height: 80,
     backgroundColor: '#F3F4F6',
+    borderRadius: 8,
   },
   imagePlaceholder: {
-    width: 100,
+    width: '100%',
     height: 80,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 8,
   },
   imagePlaceholderDark: {
     backgroundColor: '#1F2937',
@@ -261,14 +230,15 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'column',
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingTop: 0,
+    paddingBottom: 6,
     gap: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoRowDark: {
-    borderTopColor: '#374151',
+    // No divider needed
   },
   content: {
     flex: 1,
@@ -347,6 +317,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     flexShrink: 1,
+  },
+  centeredPrice: {
+    justifyContent: 'center',
+    width: '100%',
   },
   metaText: {
     fontSize: 12,

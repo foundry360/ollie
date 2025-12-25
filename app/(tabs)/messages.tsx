@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   header: {
     paddingHorizontal: 16,
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   headerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   headerTitle: {
     fontSize: 20,

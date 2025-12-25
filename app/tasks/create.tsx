@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, Alert, Image, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -8,9 +8,11 @@ import { z } from 'zod';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useCreateTask } from '@/hooks/useTasks';
+import { getUserTasks } from '@/lib/api/tasks';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
 
 const createTaskSchema = z.object({
@@ -30,11 +32,13 @@ type CreateTaskFormData = z.infer<typeof createTaskSchema> & {
 export default function CreateTaskScreen() {
   const router = useRouter();
   const { colorScheme } = useThemeStore();
+  const { user } = useAuthStore();
   const isDark = colorScheme === 'dark';
   const createTaskMutation = useCreateTask();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [isLoadingPreviousGig, setIsLoadingPreviousGig] = useState(true);
 
   const { control, handleSubmit, formState: { errors }, setValue, watch } = useForm<CreateTaskFormData>({
     resolver: zodResolver(createTaskSchema),
@@ -47,6 +51,45 @@ export default function CreateTaskScreen() {
       required_skills: [],
     },
   });
+
+  // Pre-populate location from most recent gig if available
+  useEffect(() => {
+    const loadPreviousGigLocation = async () => {
+      if (!user) {
+        setIsLoadingPreviousGig(false);
+        return;
+      }
+
+      try {
+        // Get the most recent gig created by this user (as poster)
+        const previousGigs = await getUserTasks({ role: 'poster' });
+        
+        if (previousGigs && previousGigs.length > 0) {
+          const mostRecentGig = previousGigs[0]; // Already sorted by created_at descending
+          
+          // Check if the gig has location and address
+          if (mostRecentGig.location && mostRecentGig.address) {
+            const gigLocation = mostRecentGig.location as { latitude: number; longitude: number };
+            
+            // Pre-populate if location data is valid
+            if (gigLocation.latitude && gigLocation.longitude) {
+              setLocation(gigLocation);
+              setValue('location', gigLocation);
+              setValue('address', mostRecentGig.address);
+            }
+          }
+        }
+      } catch (error) {
+        // Silently fail - if we can't load previous gig, just use current location functionality
+        console.log('Could not load previous gig location:', error);
+      } finally {
+        setIsLoadingPreviousGig(false);
+      }
+    };
+
+    loadPreviousGigLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); // Only run once when component mounts or user changes
 
   const getCurrentLocation = async () => {
     setIsGettingLocation(true);
@@ -335,7 +378,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   scrollView: {
     flex: 1,
@@ -406,7 +449,7 @@ const styles = StyleSheet.create({
     minHeight: 100,
   },
   textAreaDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
     borderColor: '#4B5563',
   },
   textAreaInput: {

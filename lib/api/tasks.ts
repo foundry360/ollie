@@ -622,31 +622,98 @@ export async function cancelTask(taskId: string): Promise<Task> {
   return updatedTask;
 }
 
-// Delete a task (poster only, if not accepted)
+// Delete a task (poster only, if open or accepted)
 export async function deleteTask(taskId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data: task } = await supabase
+  // First, check if the task exists and get its details
+  const { data: task, error: fetchError } = await supabase
     .from('gigs')
     .select('poster_id, status')
     .eq('id', taskId)
     .single();
 
-  if (!task) throw new Error('Task not found');
+  if (fetchError) {
+    console.error('Error fetching task for deletion:', fetchError);
+    throw new Error(`Failed to fetch task: ${fetchError.message}`);
+  }
+
+  if (!task) {
+    throw new Error('Task not found');
+  }
+
   if (task.poster_id !== user.id) {
     throw new Error('Unauthorized to delete this task');
   }
-  if (task.status !== 'open') {
-    throw new Error('Cannot delete a task that has been accepted');
+
+  if (!['open', 'accepted'].includes(task.status)) {
+    throw new Error(`Cannot delete a task that is in progress, completed, or cancelled. Current status: ${task.status}`);
   }
 
-  const { error } = await supabase
-    .from('gigs')
-    .delete()
-    .eq('id', taskId);
+  // Attempt to delete the task using the database function (bypasses RLS)
+  const { data: deleteResult, error: functionError } = await supabase
+    .rpc('delete_gig', { p_gig_id: taskId });
+  
+  // If the function doesn't exist yet, fall back to direct delete
+  let error = functionError;
+  let data = null;
+  
+  if (functionError && functionError.code === '42883') {
+    // Function doesn't exist, use direct delete
+    console.warn('delete_gig function not found, using direct delete');
+    const deleteResponse = await supabase
+      .from('gigs')
+      .delete()
+      .eq('id', taskId)
+      .select('id');
+    error = deleteResponse.error;
+    data = deleteResponse.data;
+  } else if (deleteResult === true) {
+    // Function succeeded, create a mock data array to indicate success
+    data = [{ id: taskId }];
+  } else if (functionError) {
+    // Function returned an error
+    error = functionError;
+  }
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error deleting task:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    // The function throws descriptive errors, so pass them through
+    throw new Error(error.message || `Failed to delete task: ${error.code || 'Unknown error'}`);
+  }
+
+  // Verify deletion was successful
+  if (data && data.length > 0) {
+    console.log('Task deleted successfully:', taskId);
+  } else if (deleteResult === true) {
+    // Function returned true, deletion succeeded
+    console.log('Task deleted successfully via function:', taskId);
+  } else {
+    // Fallback: verify the task was actually deleted
+    console.warn('Delete result unclear, verifying deletion...');
+    const { data: stillExists, error: checkError } = await supabase
+      .from('gigs')
+      .select('id')
+      .eq('id', taskId)
+      .single();
+    
+    if (checkError && checkError.code === 'PGRST116') {
+      // PGRST116 is "not found" - that's good, means it was deleted
+      console.log('Task deleted successfully (verified by absence check)');
+    } else if (stillExists) {
+      console.error('Task still exists after delete attempt');
+      throw new Error('Deletion failed - task still exists');
+    } else {
+      console.log('Task deleted successfully (verified)');
+    }
+  }
 }
 
 // Get active task (in progress) for a teen

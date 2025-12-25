@@ -191,9 +191,13 @@ const styles = StyleSheet.create({
   drawerContainer: {
     flex: 1,
     backgroundColor: '#FAFAFA',
+    borderRightWidth: 1,
+    borderRightColor: '#E5E7EB',
   },
   drawerContainerDark: {
-    backgroundColor: '#111111',
+    backgroundColor: '#111827',
+    borderRightWidth: 1,
+    borderRightColor: '#374151',
   },
   drawerContent: {
     flex: 1,
@@ -296,10 +300,10 @@ const styles = StyleSheet.create({
     color: '#73af17',
   },
   overlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(17, 24, 39, 0.3)',
   },
   overlayDark: {
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(17, 24, 39, 0.6)',
   },
 });
 

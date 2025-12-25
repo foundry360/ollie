@@ -394,7 +394,7 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-          <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#000000' : '#ffffff' }}>
+          <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#111827' : '#ffffff' }}>
             <Slot />
           </View>
         </SafeAreaProvider>

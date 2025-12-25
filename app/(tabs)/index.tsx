@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   header: {
     paddingHorizontal: 16,
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   headerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   headerRow: {
     flexDirection: 'row',
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   },
   tabBarDark: {
     borderBottomColor: '#374151',
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   tab: {
     flex: 1,
@@ -427,12 +427,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   searchFieldWrapperDark: {
-    backgroundColor: '#000000',
-    borderBottomColor: '#374151',
+    backgroundColor: '#111827',
   },
   searchFieldContainer: {
     flexDirection: 'row',

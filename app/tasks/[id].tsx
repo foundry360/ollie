@@ -225,28 +225,34 @@ export default function TaskDetailScreen() {
           <View style={[styles.section, sectionStyle]}>
             <Text style={[styles.sectionTitle, titleStyle]}>Details</Text>
             {task.estimated_hours && (
-              <View style={styles.detailRow}>
-                <Ionicons name="time" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                <Text style={[styles.detailText, textStyle]}>
-                  Estimated: {task.estimated_hours} hours
-                </Text>
-              </View>
+              <>
+                <View style={styles.detailRow}>
+                  <Ionicons name="time" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                  <Text style={[styles.detailText, textStyle]}>
+                    Estimated: {task.estimated_hours} hours
+                  </Text>
+                </View>
+                <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+              </>
             )}
             <View style={styles.detailRow}>
               <Ionicons name="location" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
               <Text style={[styles.detailText, textStyle]}>{task.address}</Text>
             </View>
             {task.required_skills && task.required_skills.length > 0 && (
-              <View style={styles.skillsContainer}>
-                <Text style={[styles.label, labelStyle]}>Required Skills:</Text>
-                <View style={styles.skills}>
-                  {task.required_skills.map((skill, index) => (
-                    <View key={index} style={[styles.skillTag, isDark && styles.skillTagDark]}>
-                      <Text style={[styles.skillText, isDark && styles.skillTextDark]}>{skill}</Text>
-                    </View>
-                  ))}
+              <>
+                <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+                <View style={styles.skillsContainer}>
+                  <Text style={[styles.label, labelStyle]}>Required Skills:</Text>
+                  <View style={styles.skills}>
+                    {task.required_skills.map((skill, index) => (
+                      <View key={index} style={[styles.skillTag, isDark && styles.skillTagDark]}>
+                        <Text style={[styles.skillText, isDark && styles.skillTextDark]}>{skill}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              </>
             )}
           </View>
 
@@ -328,7 +334,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   scrollView: {
     flex: 1,
@@ -412,11 +418,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   detailText: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  detailDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  detailDividerDark: {
+    backgroundColor: '#374151',
   },
   label: {
     fontSize: 14,
@@ -428,7 +443,7 @@ const styles = StyleSheet.create({
     color: '#D1D5DB',
   },
   skillsContainer: {
-    marginTop: 12,
+    marginTop: 0,
   },
   skills: {
     flexDirection: 'row',

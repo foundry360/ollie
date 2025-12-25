@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   header: {
     paddingHorizontal: 16,
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   headerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
   },
   headerRow: {
     flexDirection: 'row',
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   filtersContainerDark: {
-    backgroundColor: '#000000',
+    backgroundColor: '#111827',
     borderBottomColor: '#374151',
   },
   filtersRow: {
