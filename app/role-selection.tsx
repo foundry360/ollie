@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable, Image, Dimensions } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeStore } from '@/stores/themeStore';
 import { Button } from '@/components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
@@ -60,11 +59,7 @@ export default function RoleSelectionScreen() {
         contentFit="cover"
         nativeControls={false}
       />
-      <LinearGradient
-        colors={['transparent', 'rgba(30, 58, 95, 0.4)', 'rgba(45, 74, 111, 0.85)', 'rgba(17, 24, 39, 1)', '#111827']}
-        locations={[0, 0.5, 0.7, 0.9, 1]}
-        style={styles.gradient}
-      />
+      <View style={styles.overlay} />
       <SafeAreaView style={styles.safeContent} edges={[]}>
         <View style={styles.content}>
           <View style={styles.spacerTop} />
@@ -187,7 +182,7 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT,
     zIndex: 0,
   },
-  gradient: {
+  overlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -195,6 +190,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+    backgroundColor: 'rgba(17, 24, 50, 0.92)',
     zIndex: 1,
   },
   safeContent: {

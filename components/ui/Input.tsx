@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   inputDark: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#111827',
     borderColor: '#4B5563',
     color: '#FFFFFF',
   },

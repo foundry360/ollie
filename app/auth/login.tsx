@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
   },
   loginFormContainerDark: {
     borderColor: '#4B5563',
-    backgroundColor: '#111111',
+    backgroundColor: '#111827',
   },
   loginInput: {
     fontSize: 14,

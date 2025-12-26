@@ -192,9 +192,9 @@ export default function TabLayout() {
         shadowOpacity: 0,
       };
     } else {
-      // Light mode: blue on all screens
+      // Light mode: white on all screens
       return {
-        backgroundColor: '#111827',
+        backgroundColor: '#FFFFFF',
         borderTopWidth: 0,
         borderWidth: 0,
         paddingTop: 8,
@@ -333,7 +333,7 @@ export default function TabLayout() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 2,
-                  borderColor: isDark ? '#000000' : '#FFFFFF',
+                  borderColor: '#73af17',
                   zIndex: 10,
                   elevation: 5, // Android shadow
                   shadowColor: '#000', // iOS shadow

@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTask, useAcceptTask, useStartTask, useCompleteTask, useCancelTask } from '@/hooks/useTasks';
@@ -20,6 +21,7 @@ export default function TaskDetailScreen() {
   const startTaskMutation = useStartTask();
   const completeTaskMutation = useCompleteTask();
   const cancelTaskMutation = useCancelTask();
+  const [imageLoading, setImageLoading] = useState(true);
 
   const isPoster = user?.id === task?.poster_id;
   const isTeen = user?.id === task?.teen_id;
@@ -198,7 +200,19 @@ export default function TaskDetailScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {task.photos && task.photos.length > 0 && (
           <View style={styles.imageContainer}>
-            <Image source={{ uri: task.photos[0] }} style={styles.image} />
+            {imageLoading && (
+              <View style={styles.imageLoader}>
+                <ActivityIndicator size="large" color="#73af17" />
+              </View>
+            )}
+            <Image 
+              source={{ uri: task.photos[0] }} 
+              style={styles.image}
+              resizeMode="cover"
+              onLoadStart={() => setImageLoading(true)}
+              onLoadEnd={() => setImageLoading(false)}
+              onError={() => setImageLoading(false)}
+            />
           </View>
         )}
 
@@ -342,11 +356,23 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     height: 250,
+    position: 'relative',
   },
   image: {
     width: '100%',
     height: '100%',
     backgroundColor: '#F3F4F6',
+  },
+  imageLoader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
   },
   content: {
     padding: 16,
