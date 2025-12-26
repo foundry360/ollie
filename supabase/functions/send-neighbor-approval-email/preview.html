@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Preview - Neighbor Approval</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f9fafb;
+      padding: 20px;
+      margin: 0;
+    }
+    .header-input {
+      max-width: 600px;
+      margin: 0 auto 20px;
+      padding: 15px;
+      background-color: #f3f4f6;
+      border-radius: 8px;
+    }
+    .header-input input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .header-input label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #374151;
+      font-size: 14px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .header-placeholder {
+      padding: 0;
+      text-align: center;
+      background-color: #111827;
+      color: #ffffff;
+    }
+    .header-placeholder img {
+      width: 100%;
+      max-width: 600px;
+      height: auto;
+      display: block;
+    }
+    .body {
+      padding: 40px 32px;
+    }
+    .footer {
+      padding: 24px 32px;
+      background-color: #111827;
+      color: #ffffff;
+      text-align: center;
+      font-size: 10px;
+    }
+    .footer a {
+      color: #ffffff;
+      text-decoration: none;
+    }
+    .button {
+      display: inline-block;
+      background-color: #73af17;
+      color: #ffffff;
+      padding: 14px 28px;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      margin: 20px 0;
+    }
+    p {
+      margin: 0 0 20px;
+      font-size: 16px;
+      line-height: 24px;
+      color: #374151;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-input">
+    <label for="headerUrl">Email Header Image URL:</label>
+    <input type="text" id="headerUrl" placeholder="https://your-domain.com/email-header.png" oninput="updateHeader()">
+    
+    <label for="connectedBodyUrl" style="margin-top: 15px;">Connected Body Image URL:</label>
+    <input type="text" id="connectedBodyUrl" placeholder="https://your-domain.com/connected-body.png" oninput="updateConnectedBody()">
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header-placeholder" id="header">
+      <p style="margin: 0; font-size: 24px; font-weight: 600; padding: 32px;">Ollie</p>
+    </div>
+    
+    <!-- Body -->
+    <div class="body">
+      <p>Hello <strong>John</strong>,</p>
+      
+      <p>Welcome to Ollie! We're excited to let you know that your neighbor application has been approved. You're now part of a community that connects trusted neighbors with local teens who are ready to help with everyday tasks.</p>
+      
+      <p>You can now log in to your account and start posting tasks—whether it's yard work, pet care, household help, or other simple jobs.</p>
+      
+      <div style="margin: 32px 0 0; text-align: center;" id="connectedBodyContainer">
+        <p style="color: #9ca3af; font-size: 14px; margin: 0;">Connected Body Image (add URL above)</p>
+      </div>
+      
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="https://olliejobs.com/login" class="button">Get Started</a>
+      </div>
+      
+      <p style="margin-top: 32px;">
+        Local teens in your area are ready to help, and you'll be supporting them as they build responsibility and earn money in a safe, community-based way.
+      </p>
+      
+      <p style="margin-top: 24px;">
+        Welcome to the community!<br>
+        <strong>The Ollie Team</strong>
+      </p>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+      <p style="margin: 0 0 8px; color: #ffffff; font-size: 12px; line-height: 18px;">
+        <a href="https://olliejobs.com">olliejobs.com</a> | <a href="mailto:support@olliejobs.com">support@olliejobs.com</a>
+      </p>
+      <p style="margin: 0; color: #ffffff; font-size: 10px; line-height: 16px;">
+        © <span id="year"></span> Ollie. All rights reserved.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    
+    function updateHeader() {
+      const headerUrl = document.getElementById('headerUrl').value.trim();
+      const header = document.getElementById('header');
+      
+      if (headerUrl) {
+        header.innerHTML = '<img src="' + headerUrl + '" alt="Ollie" onerror="this.parentElement.innerHTML=\'<p style=\\\'margin: 0; font-size: 24px; font-weight: 600; padding: 32px;\\\'>Ollie</p>\';">';
+      } else {
+        header.innerHTML = '<p style="margin: 0; font-size: 24px; font-weight: 600; padding: 32px;">Ollie</p>';
+      }
+    }
+    
+    function updateConnectedBody() {
+      const connectedBodyUrl = document.getElementById('connectedBodyUrl').value.trim();
+      const container = document.getElementById('connectedBodyContainer');
+      
+      if (connectedBodyUrl) {
+        container.innerHTML = '<img src="' + connectedBodyUrl + '" alt="Connected Community" style="width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto;">';
+      } else {
+        container.innerHTML = '<p style="color: #9ca3af; font-size: 14px; margin: 0;">Connected Body Image (add URL above)</p>';
+      }
+    }
+    
+    // Load from URL params if present
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('headerUrl')) {
+      document.getElementById('headerUrl').value = urlParams.get('headerUrl');
+      updateHeader();
+    }
+    if (urlParams.get('connectedBodyUrl')) {
+      document.getElementById('connectedBodyUrl').value = urlParams.get('connectedBodyUrl');
+      updateConnectedBody();
+    }
+  </script>
+</body>
+</html>

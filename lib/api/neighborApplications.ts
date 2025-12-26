@@ -568,6 +568,26 @@ export async function approveNeighborApplication(
     throw profileError;
   }
 
+  // Send approval email (don't fail approval if email fails)
+  try {
+    console.log('📧 [approveNeighborApplication] Attempting to send approval email to:', application.email);
+    const { data, error } = await supabase.functions.invoke('send-neighbor-approval-email', {
+      body: {
+        email: application.email,
+        fullName: application.full_name,
+      }
+    });
+    
+    if (error) {
+      console.error('❌ [approveNeighborApplication] Edge Function error:', error);
+    } else {
+      console.log('✅ [approveNeighborApplication] Email function response:', data);
+    }
+  } catch (emailError) {
+    // Log but don't throw - approval should succeed even if email fails
+    console.error('❌ [approveNeighborApplication] Failed to send approval email:', emailError);
+  }
+
   return {
     application: updatedApplication,
     profile: profile,

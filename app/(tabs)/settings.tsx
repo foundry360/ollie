@@ -36,10 +36,25 @@ export default function SettingsScreen() {
         .from('users')
         .select('*')
         .eq('id', authUser.id)
-        .single();
+        .maybeSingle();
+      
       if (error) throw error;
+      
+      // Handle case where profile doesn't exist yet
+      if (!data) {
+        console.log('User profile not found, user may need to complete profile setup');
+        setUserProfile(null);
+        return;
+      }
+      
       setUserProfile(data);
-    } catch (error) {
+    } catch (error: any) {
+      // Handle PGRST116 error (no rows found) gracefully
+      if (error?.code === 'PGRST116') {
+        console.log('User profile not found, user may need to complete profile setup');
+        setUserProfile(null);
+        return;
+      }
       console.error('Error loading user profile:', error);
     }
   };
@@ -180,6 +195,7 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
           </Pressable>
         </View>
+
 
         <View style={[styles.section, cardStyle]}>
           <Text style={[styles.sectionTitle, titleStyle]}>About</Text>
