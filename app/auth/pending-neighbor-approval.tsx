@@ -26,17 +26,13 @@ export default function PendingNeighborApprovalScreen() {
   useEffect(() => {
     if (applicationId) {
       checkStatus();
-      // Poll for status updates every 10 seconds
-      const interval = setInterval(() => {
-        checkStatus();
-      }, 10000);
-
-      return () => clearInterval(interval);
     }
   }, [applicationId]);
 
   const checkStatus = async () => {
     if (!applicationId) return;
+
+    setIsLoading(true);
 
     try {
       const app = await getNeighborApplicationStatus(applicationId);
@@ -91,9 +87,19 @@ export default function PendingNeighborApprovalScreen() {
         style={styles.keyboardAvoidingView}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => router.replace('/role-selection')}
+          >
+            <Ionicons name="arrow-back" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+            <Text style={[styles.backButtonText, isDark && styles.backButtonTextDark]}>Back</Text>
+          </Pressable>
+        </View>
+
         <ScrollView 
           style={styles.scrollView} 
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16, paddingBottom: 40 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: 16, paddingBottom: 40 }]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.logoContainer}>
@@ -108,7 +114,7 @@ export default function PendingNeighborApprovalScreen() {
             <Ionicons name="time-outline" size={64} color="#73af17" style={styles.icon} />
             <Text style={[styles.title, titleStyle]}>Application Under Review</Text>
             <Text style={[styles.subtitle, subtitleStyle]}>
-              Thank you for submitting your neighbor application. Our team is reviewing your information.
+              Thank you for submitting your application.
             </Text>
 
             {application && (
@@ -129,19 +135,10 @@ export default function PendingNeighborApprovalScreen() {
             )}
 
             <View style={styles.statusContainer}>
-              <ActivityIndicator size="small" color="#73af17" />
               <Text style={[styles.statusText, subtitleStyle]}>
-                We'll notify you once a decision has been made
+                We'll be in touch shortly...
               </Text>
             </View>
-
-            <Pressable
-              style={styles.refreshButton}
-              onPress={checkStatus}
-            >
-              <Ionicons name="refresh" size={20} color="#73af17" />
-              <Text style={styles.refreshButtonText}>Check Status</Text>
-            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -157,10 +154,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   containerDark: {
-    backgroundColor: '#111827',
+    backgroundColor: '#1F2937',
   },
   keyboardAvoidingView: {
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
   },
   scrollView: {
     flex: 1,
@@ -195,7 +199,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardDark: {
-    backgroundColor: '#73af1720',
+    backgroundColor: '#374151',
   },
   icon: {
     marginBottom: 16,
@@ -246,16 +250,17 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 14,
   },
-  refreshButton: {
+  backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    gap: 4,
+    backgroundColor: 'transparent',
   },
-  refreshButtonText: {
+  backButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#73af17',
+    color: '#000000',
+  },
+  backButtonTextDark: {
+    color: '#FFFFFF',
   },
 });

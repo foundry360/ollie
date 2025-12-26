@@ -534,8 +534,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   screenTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#111827',
   },
   titleDark: {

@@ -141,20 +141,68 @@ export default function CompleteNeighborProfileScreen() {
         console.log('Profile photo selected:', profilePhoto);
       }
 
+      // Get the address from application if not in store
+      const finalAddress = address || application?.address;
+      console.log('💾 [complete-profile] Saving address:', finalAddress);
+
       // Create or update user profile
       let profile;
       try {
-        profile = await createUserProfile(userId, profileData);
+        profile = await createUserProfile(userId, {
+          ...profileData,
+          address: finalAddress,
+        });
+        console.log('✅ [complete-profile] Profile created, address:', profile?.address);
       } catch (error: any) {
-        // If profile exists, update it
+        // If profile exists, update it with address and other data
         if (error.code !== '23505') { // Not a unique constraint error
           throw error;
         }
-        profile = await getUserProfile(userId);
+        // Profile exists, update it with address and other fields
+        console.log('⚠️ [complete-profile] Profile exists, updating with address:', finalAddress);
+        const { data: updatedProfile, error: updateError } = await supabase
+          .from('users')
+          .update({
+            address: finalAddress,
+            phone: profileData.phone,
+            date_of_birth: profileData.date_of_birth,
+            verified: true,
+            ...(data.bio && { bio: data.bio }),
+          })
+          .eq('id', userId)
+          .select()
+          .single();
+        
+        if (updateError) {
+          console.error('❌ [complete-profile] Error updating existing profile:', updateError);
+          throw updateError;
+        }
+        
+        profile = updatedProfile;
+        console.log('✅ [complete-profile] Profile updated, address:', profile?.address);
       }
 
       if (!profile) {
         throw new Error('Failed to create user profile');
+      }
+      
+      // Always ensure address is saved (in case RPC function doesn't support it yet)
+      if (finalAddress && (!profile.address || profile.address !== finalAddress)) {
+        console.log('🔄 [complete-profile] Ensuring address is saved:', finalAddress);
+        const { data: updatedProfile, error: updateError } = await supabase
+          .from('users')
+          .update({ address: finalAddress })
+          .eq('id', userId)
+          .select()
+          .single();
+        
+        if (updateError) {
+          console.error('❌ [complete-profile] Error updating address:', updateError);
+          // Don't throw - profile was created successfully, just log the error
+        } else if (updatedProfile) {
+          profile = updatedProfile;
+          console.log('✅ [complete-profile] Address confirmed saved:', profile.address);
+        }
       }
 
       // Set user and clear signup store
@@ -337,6 +385,9 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     overflow: 'hidden',
     borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  cardLight: {
     borderColor: '#E5E7EB',
   },
   cardDark: {

@@ -42,7 +42,7 @@ export function NeighborHeader() {
           onPress={handleActivePress}
           android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
         >
-          <Ionicons name="time" size={24} color="#111827" />
+          <Ionicons name="pulse" size={24} color="#73af17" />
           <Text 
             style={[styles.statValue, valueStyle]}
             numberOfLines={1}

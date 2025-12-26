@@ -130,8 +130,10 @@ export default function LoginScreen() {
       console.log('🔍 [login] Step 1: Checking for pending neighbor application');
       console.log('🔍 [login] User ID:', user.id, 'Email:', user.email);
       
+      // Declare pendingApp outside try block so it's accessible in catch blocks
+      let pendingApp: any = null;
       try {
-        let pendingApp = await getNeighborApplicationByUserId(user.id);
+        pendingApp = await getNeighborApplicationByUserId(user.id);
         
         // If not found by user_id, try finding by email (in case user_id mismatch from multiple signups)
         // Use RPC function to bypass RLS
@@ -153,26 +155,67 @@ export default function LoginScreen() {
         if (pendingApp) {
           console.log('✅ [login] Found application with status:', pendingApp.status);
           
+          // Check application completion status
+          const missingAddressOrDOB = !pendingApp.address || !pendingApp.date_of_birth;
+          const missingIDPhotos = !pendingApp.id_front_photo_url || 
+                                  !pendingApp.id_back_photo_url ||
+                                  (pendingApp.id_front_photo_url && pendingApp.id_front_photo_url.trim() === '') ||
+                                  (pendingApp.id_back_photo_url && pendingApp.id_back_photo_url.trim() === '');
+          
+          console.log('📋 [login] Application check:', {
+            hasAddress: !!pendingApp.address,
+            hasDOB: !!pendingApp.date_of_birth,
+            hasFrontPhoto: !!pendingApp.id_front_photo_url,
+            hasBackPhoto: !!pendingApp.id_back_photo_url,
+            frontPhotoLength: pendingApp.id_front_photo_url?.length || 0,
+            backPhotoLength: pendingApp.id_back_photo_url?.length || 0,
+            missingAddressOrDOB,
+            missingIDPhotos
+          });
+          
           if (pendingApp.status === 'pending') {
-            console.log('⏳ [login] Application is pending - redirecting');
-            setIsSubmitting(false);
-            shouldClearLoadingInFinally = false;
-            Alert.alert(
-              'Application Pending',
-              'Your neighbor application is still under review. Please wait for approval.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    router.replace({
-                      pathname: '/auth/pending-neighbor-approval',
-                      params: { applicationId: pendingApp.id }
-                    });
+            if (missingAddressOrDOB) {
+              // Missing address/DOB - redirect to application form
+              console.log('📝 [login] Application missing address/DOB - redirecting to application form');
+              setIsSubmitting(false);
+              shouldClearLoadingInFinally = false;
+              router.replace({
+                pathname: '/auth/neighbor-application',
+                params: { applicationId: pendingApp.id }
+              });
+              return;
+            } else if (missingIDPhotos) {
+              // Has address/DOB but missing ID photos - redirect to ID verification
+              console.log('📸 [login] Application missing ID photos - redirecting to ID verification');
+              setIsSubmitting(false);
+              shouldClearLoadingInFinally = false;
+              router.replace({
+                pathname: '/auth/verify-id',
+                params: { applicationId: pendingApp.id }
+              });
+              return;
+            } else {
+              // Application is complete and pending review
+              console.log('⏳ [login] Application is complete and pending - redirecting');
+              setIsSubmitting(false);
+              shouldClearLoadingInFinally = false;
+              Alert.alert(
+                'Application Pending',
+                'Your neighbor application is still under review. Please wait for approval.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      router.replace({
+                        pathname: '/auth/pending-neighbor-approval',
+                        params: { applicationId: pendingApp.id }
+                      });
+                    }
                   }
-                }
-              ]
-            );
-            return;
+                ]
+              );
+              return;
+            }
           } else if (pendingApp.status === 'rejected') {
             console.log('❌ [login] Application was rejected - redirecting');
             setIsSubmitting(false);
@@ -245,16 +288,95 @@ export default function LoginScreen() {
             });
 
             if (!profile) {
-              // If profile creation didn't return data, fetch it
-              profile = await getUserProfile(user.id);
+              // Profile creation returned null - this means profile exists with different user_id
+              // Use application data to create profile object
+              console.log('Profile creation returned null, using application data');
+              if (pendingApp) {
+                profile = {
+                  id: pendingApp.user_id,
+                  email: pendingApp.email,
+                  full_name: pendingApp.full_name,
+                  role: 'poster' as const,
+                  phone: pendingApp.phone || undefined,
+                  address: pendingApp.address || undefined,
+                  date_of_birth: pendingApp.date_of_birth || undefined,
+                  verified: false,
+                  created_at: pendingApp.created_at,
+                  updated_at: pendingApp.updated_at,
+                };
+                console.log('Created profile from application data');
+              } else {
+                // Try to fetch it one more time
+                try {
+                  profile = await getUserProfile(user.id);
+                } catch (getError: any) {
+                  // If we still can't get it, query application
+                  const { data: application } = await supabase.rpc('find_pending_application_by_email', {
+                    p_email: email
+                  });
+                  
+                  if (application && application.length > 0) {
+                    const appData = application[0];
+                    profile = {
+                      id: appData.user_id,
+                      email: appData.email,
+                      full_name: appData.full_name,
+                      role: 'poster' as const,
+                      phone: appData.phone || undefined,
+                      address: appData.address || undefined,
+                      date_of_birth: appData.date_of_birth || undefined,
+                      verified: false,
+                      created_at: appData.created_at,
+                      updated_at: appData.updated_at,
+                    };
+                  } else {
+                    throw new Error('Profile exists but cannot be accessed');
+                  }
+                }
+              }
+            } else if (profile.id !== user.id) {
+              // Profile exists but with different user_id (user signed up multiple times with same email)
+              // This is okay - use the existing profile
+              console.warn('Profile returned with different user_id:', { 
+                profileId: profile.id, 
+                loginUserId: user.id,
+                email: profile.email 
+              });
             }
           } catch (createError: any) {
-            console.error('Failed to create profile on login:', createError);
-            Alert.alert(
-              'Error',
-              'Failed to create your profile. Please try again or contact support.'
-            );
-            return;
+            // If it's a unique constraint error on email, profile already exists
+            // createUserProfile should return null, but if it throws, handle it here
+            if (createError.code === '23505' && (createError.message?.includes('email') || createError.details?.includes('email'))) {
+              console.log('Profile already exists with this email, using application data');
+              if (pendingApp) {
+                profile = {
+                  id: pendingApp.user_id,
+                  email: pendingApp.email,
+                  full_name: pendingApp.full_name,
+                  role: 'poster' as const,
+                  phone: pendingApp.phone || undefined,
+                  address: pendingApp.address || undefined,
+                  date_of_birth: pendingApp.date_of_birth || undefined,
+                  verified: false,
+                  created_at: pendingApp.created_at,
+                  updated_at: pendingApp.updated_at,
+                };
+              } else {
+                console.error('Failed to create profile on login:', createError);
+                Alert.alert(
+                  'Error',
+                  'Failed to create your profile. Please try again or contact support.'
+                );
+                return;
+              }
+            } else {
+              console.error('Failed to create profile on login:', createError);
+              Alert.alert(
+                'Error',
+                'Failed to create your profile. Please try again or contact support.'
+              );
+              return;
+            }
           }
         } else {
           throw profileError;

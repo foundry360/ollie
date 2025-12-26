@@ -260,13 +260,48 @@ export default function RootLayout() {
           getNeighborApplicationByUserId(user.id)
             .then((application) => {
               if (application) {
+                // Check application completion status
+                const missingAddressOrDOB = !application.address || !application.date_of_birth;
+                const missingIDPhotos = !application.id_front_photo_url || 
+                                        !application.id_back_photo_url ||
+                                        (application.id_front_photo_url && application.id_front_photo_url.trim() === '') ||
+                                        (application.id_back_photo_url && application.id_back_photo_url.trim() === '');
+                
+                console.log('📋 [_layout] Application check:', {
+                  hasAddress: !!application.address,
+                  hasDOB: !!application.date_of_birth,
+                  hasFrontPhoto: !!application.id_front_photo_url,
+                  hasBackPhoto: !!application.id_back_photo_url,
+                  missingAddressOrDOB,
+                  missingIDPhotos
+                });
+                
                 if (application.status === 'pending') {
-                  setTimeout(() => {
-                    router.replace({
-                      pathname: '/auth/pending-neighbor-approval',
-                      params: { applicationId: application.id }
-                    });
-                  }, 100);
+                  if (missingAddressOrDOB) {
+                    // Missing address/DOB - redirect to application form
+                    setTimeout(() => {
+                      router.replace({
+                        pathname: '/auth/neighbor-application',
+                        params: { applicationId: application.id }
+                      });
+                    }, 100);
+                  } else if (missingIDPhotos) {
+                    // Has address/DOB but missing ID photos - redirect to ID verification
+                    setTimeout(() => {
+                      router.replace({
+                        pathname: '/auth/verify-id',
+                        params: { applicationId: application.id }
+                      });
+                    }, 100);
+                  } else {
+                    // Application is complete and pending review
+                    setTimeout(() => {
+                      router.replace({
+                        pathname: '/auth/pending-neighbor-approval',
+                        params: { applicationId: application.id }
+                      });
+                    }, 100);
+                  }
                 } else if (application.status === 'rejected') {
                   setTimeout(() => {
                     router.replace({
@@ -315,11 +350,30 @@ export default function RootLayout() {
               try {
                 const application = await getNeighborApplicationByUserId(session.user.id);
                 if (application) {
+                  // Check application completion status
+                  const missingAddressOrDOB = !application.address || !application.date_of_birth;
+                  const missingIDPhotos = !application.id_front_photo_url || 
+                                          !application.id_back_photo_url ||
+                                          (application.id_front_photo_url && application.id_front_photo_url.trim() === '') ||
+                                          (application.id_back_photo_url && application.id_back_photo_url.trim() === '');
+                  
                   if (application.status === 'pending') {
-                    router.replace({
-                      pathname: '/auth/pending-neighbor-approval',
-                      params: { applicationId: application.id }
-                    });
+                    if (missingAddressOrDOB) {
+                      router.replace({
+                        pathname: '/auth/neighbor-application',
+                        params: { applicationId: application.id }
+                      });
+                    } else if (missingIDPhotos) {
+                      router.replace({
+                        pathname: '/auth/verify-id',
+                        params: { applicationId: application.id }
+                      });
+                    } else {
+                      router.replace({
+                        pathname: '/auth/pending-neighbor-approval',
+                        params: { applicationId: application.id }
+                      });
+                    }
                     setIsNavigating(false);
                     return;
                   } else if (application.status === 'rejected') {

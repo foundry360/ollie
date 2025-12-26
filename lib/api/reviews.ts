@@ -25,22 +25,46 @@ export interface UpdateReviewData {
 
 // Get reviews for a specific user (as reviewee) with reviewer information
 export async function getReviewsForUser(userId: string): Promise<Array<Review & { reviewer_name?: string; reviewer_photo?: string }>> {
-  const { data, error } = await supabase
+  // First, get reviews without the JOIN to avoid RLS issues
+  const { data: reviews, error } = await supabase
     .from('reviews')
-    .select(`
-      *,
-      reviewer:users!reviewer_id(id, full_name, profile_photo_url, role)
-    `)
+    .select('*')
     .eq('reviewee_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  
-  return (data || []).map((review: any) => ({
-    ...review,
-    reviewer_name: review.reviewer?.full_name,
-    reviewer_photo: review.reviewer?.profile_photo_url,
-  }));
+  if (!reviews || reviews.length === 0) return [];
+
+  // Then, try to get reviewer info for each review separately
+  // This way if one reviewer profile can't be read, others still work
+  const reviewsWithReviewerInfo = await Promise.all(
+    reviews.map(async (review) => {
+      try {
+        const { data: reviewer } = await supabase
+          .from('users')
+          .select('id, full_name, profile_photo_url, role')
+          .eq('id', review.reviewer_id)
+          .single();
+        
+        return {
+          ...review,
+          reviewer_name: reviewer?.full_name || 'Anonymous',
+          reviewer_photo: reviewer?.profile_photo_url,
+        };
+      } catch (error) {
+        // If we can't read the reviewer profile, still return the review
+        // but without reviewer info
+        console.warn(`Could not fetch reviewer profile for review ${review.id}:`, error);
+        return {
+          ...review,
+          reviewer_name: 'Anonymous',
+          reviewer_photo: undefined,
+        };
+      }
+    })
+  );
+
+  return reviewsWithReviewerInfo;
 }
 
 // Get reviews written by a specific user (as reviewer)

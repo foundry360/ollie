@@ -212,11 +212,11 @@ export default function NeighborApplicationScreen() {
         address: fullAddress,
         date_of_birth: dobString,
       });
-      setCurrentStep('pending');
+      setCurrentStep('id-verification');
 
-      // Redirect to pending approval screen
+      // Redirect to ID verification screen
       router.replace({
-        pathname: '/auth/pending-neighbor-approval',
+        pathname: '/auth/verify-id',
         params: { applicationId }
       });
     } catch (error: any) {
@@ -263,9 +263,36 @@ export default function NeighborApplicationScreen() {
             />
           </View>
 
-          <Text style={[styles.title, titleStyle]}>Complete Your Application</Text>
+          <View style={styles.stepTracker}>
+            <View style={styles.stepItem}>
+              <View style={[styles.stepNumber, isDark && styles.stepNumberDark]}>
+                <Text style={[styles.stepNumberText, isDark && styles.stepNumberTextDark]}>1</Text>
+              </View>
+              <Text style={[styles.stepLabel, isDark && styles.stepLabelDark]} numberOfLines={1}>Account Info</Text>
+            </View>
+            
+            <View style={[styles.stepConnector, isDark && styles.stepConnectorDark]} />
+            
+            <View style={styles.stepItem}>
+              <View style={[styles.stepNumber, styles.stepNumberActive]}>
+                <Text style={styles.stepNumberTextActive}>2</Text>
+              </View>
+              <Text style={[styles.stepLabel, isDark && styles.stepLabelDark]} numberOfLines={1}>Address Info</Text>
+            </View>
+            
+            <View style={[styles.stepConnector, isDark && styles.stepConnectorDark]} />
+            
+            <View style={styles.stepItem}>
+              <View style={[styles.stepNumber, isDark && styles.stepNumberDark]}>
+                <Text style={[styles.stepNumberText, isDark && styles.stepNumberTextDark]}>3</Text>
+              </View>
+              <Text style={[styles.stepLabel, isDark && styles.stepLabelDark]} numberOfLines={1}>Verify ID</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.title, titleStyle]}>Address & Age Verification</Text>
           <Text style={[styles.subtitle, subtitleStyle]}>
-            Please provide your address and date of birth to complete your neighbor application.
+            Please provide your address and date of birth to proceed with your neighbor application.
           </Text>
 
           <Controller
@@ -281,6 +308,7 @@ export default function NeighborApplicationScreen() {
                 required
                 autoCapitalize="words"
                 placeholder="123 Main St"
+                style={{ letterSpacing: 0 }}
               />
             )}
           />
@@ -378,16 +406,12 @@ export default function NeighborApplicationScreen() {
           </View>
 
           <Button
-            title="Submit Application"
+            title="Continue"
             onPress={handleSubmit(onSubmit)}
             loading={isSubmitting}
             disabled={isSubmitting}
             fullWidth
           />
-
-          <Text style={[styles.footerText, subtitleStyle]}>
-            Your application will be reviewed by our team. You'll be notified once a decision has been made.
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -444,7 +468,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   titleLight: {
     color: '#000000',
@@ -455,7 +479,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     lineHeight: 24,
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 32,
   },
   subtitleLight: {
@@ -540,5 +564,64 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 24,
     lineHeight: 20,
+  },
+  stepTracker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+    marginTop: 8,
+    paddingHorizontal: 16,
+  },
+  stepItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  stepNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  stepNumberActive: {
+    backgroundColor: '#73af17',
+  },
+  stepNumberDark: {
+    backgroundColor: '#4B5563',
+  },
+  stepNumberText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  stepNumberTextActive: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  stepNumberTextDark: {
+    color: '#9CA3AF',
+  },
+  stepLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
+    maxWidth: 60,
+  },
+  stepLabelDark: {
+    color: '#9CA3AF',
+  },
+  stepConnector: {
+    width: 24,
+    height: 2,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 8,
+    marginBottom: 24,
+  },
+  stepConnectorDark: {
+    backgroundColor: '#4B5563',
   },
 });

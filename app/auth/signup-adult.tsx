@@ -315,9 +315,33 @@ export default function SignupAdultScreen() {
             resizeMode="contain"
           />
         </View>
-        <Text style={[styles.subtitle, subtitleStyle]}>
-          Signup with Ollie for free
-        </Text>
+
+        <View style={styles.stepTracker}>
+          <View style={styles.stepItem}>
+            <View style={[styles.stepNumber, styles.stepNumberActive]}>
+              <Text style={styles.stepNumberTextActive}>1</Text>
+            </View>
+            <Text style={[styles.stepLabel, isDark && styles.stepLabelDark]} numberOfLines={1}>Account Info</Text>
+          </View>
+          
+          <View style={[styles.stepConnector, isDark && styles.stepConnectorDark]} />
+          
+          <View style={styles.stepItem}>
+            <View style={[styles.stepNumber, isDark && styles.stepNumberDark]}>
+              <Text style={[styles.stepNumberText, isDark && styles.stepNumberTextDark]}>2</Text>
+            </View>
+            <Text style={[styles.stepLabel, isDark && styles.stepLabelDark]} numberOfLines={1}>Address Info</Text>
+          </View>
+          
+          <View style={[styles.stepConnector, isDark && styles.stepConnectorDark]} />
+          
+          <View style={styles.stepItem}>
+            <View style={[styles.stepNumber, isDark && styles.stepNumberDark]}>
+              <Text style={[styles.stepNumberText, isDark && styles.stepNumberTextDark]}>3</Text>
+            </View>
+            <Text style={[styles.stepLabel, isDark && styles.stepLabelDark]} numberOfLines={1}>Verify ID</Text>
+          </View>
+        </View>
 
         <Controller
           control={control}
@@ -426,57 +450,6 @@ export default function SignupAdultScreen() {
           disabled={isSubmitting}
           fullWidth
         />
-
-        <View style={styles.loginLink}>
-          <Text
-            style={[styles.loginLinkText, linkTextStyle]}
-            onPress={() => router.push('/auth/login')}
-          >
-            Already have an account? Login
-          </Text>
-        </View>
-
-        <View style={[styles.divider, isDark && styles.dividerDark]}>
-          <View style={[styles.dividerLine, isDark && styles.dividerLineDark]} />
-          <Text style={[styles.dividerText, isDark && styles.dividerTextDark]}>OR</Text>
-          <View style={[styles.dividerLine, isDark && styles.dividerLineDark]} />
-        </View>
-
-        <View style={styles.socialButtons}>
-          <Pressable
-            style={[styles.socialButton, isDark && styles.socialButtonDark]}
-            onPress={async () => {
-              try {
-                await signInWithGoogle();
-                // OAuth will redirect, so we don't need to handle the response here
-              } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to sign in with Google');
-              }
-            }}
-          >
-            <Ionicons name="logo-google" size={20} color={isDark ? '#9CA3AF' : '#666666'} />
-            <Text style={[styles.socialButtonText, isDark && styles.socialButtonTextDark]}>
-              Google
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.socialButton, isDark && styles.socialButtonDark]}
-            onPress={async () => {
-              try {
-                await signInWithApple();
-                // OAuth will redirect, so we don't need to handle the response here
-              } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to sign in with Apple');
-              }
-            }}
-          >
-            <Ionicons name="logo-apple" size={20} color={isDark ? '#9CA3AF' : '#666666'} />
-            <Text style={[styles.socialButtonText, isDark && styles.socialButtonTextDark]}>
-              Apple
-            </Text>
-          </Pressable>
-        </View>
       </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -529,16 +502,64 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
   },
-  subtitle: {
-    fontSize: 16,
+  stepTracker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+    marginTop: 8,
+    paddingHorizontal: 16,
+  },
+  stepItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  stepNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
-    lineHeight: 24,
   },
-  subtitleLight: {
-    color: '#666666',
+  stepNumberActive: {
+    backgroundColor: '#73af17',
   },
-  subtitleDark: {
+  stepNumberDark: {
+    backgroundColor: '#4B5563',
+  },
+  stepNumberText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  stepNumberTextActive: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  stepNumberTextDark: {
     color: '#9CA3AF',
+  },
+  stepLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
+    maxWidth: 60,
+  },
+  stepLabelDark: {
+    color: '#9CA3AF',
+  },
+  stepConnector: {
+    width: 24,
+    height: 2,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 8,
+    marginBottom: 24,
+  },
+  stepConnectorDark: {
+    backgroundColor: '#4B5563',
   },
   loginLink: {
     paddingVertical: 8,

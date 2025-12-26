@@ -1,6 +1,7 @@
--- Function to find pending application by email
--- Used during login to check application status even with user_id mismatch
--- SECURITY DEFINER allows it to bypass RLS
+-- Update find_pending_application_by_email function to include ID photo URLs
+-- Drop and recreate to allow return type change
+
+DROP FUNCTION IF EXISTS find_pending_application_by_email(TEXT);
 
 CREATE OR REPLACE FUNCTION find_pending_application_by_email(
   p_email TEXT
@@ -58,5 +59,5 @@ $$;
 GRANT EXECUTE ON FUNCTION find_pending_application_by_email(TEXT) TO authenticated, anon;
 
 -- Add comment
-COMMENT ON FUNCTION find_pending_application_by_email IS 'Find pending neighbor application by email, bypassing RLS. Used during login to handle user_id mismatches from multiple signups.';
+COMMENT ON FUNCTION find_pending_application_by_email IS 'Find pending neighbor application by email, bypassing RLS. Used during login to handle user_id mismatches from multiple signups. Includes ID photo URLs.';
 

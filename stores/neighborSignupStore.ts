@@ -4,8 +4,9 @@ type NeighborSignupStep =
   | 'signup'           // Step 1: Enter name, email, password, phone
   | 'verify-phone'     // Step 2: Verify SMS code
   | 'application'      // Step 3: Enter address/DOB
-  | 'pending'          // Step 4: Wait for approval
-  | 'complete-profile'; // Step 5: Complete profile after approval
+  | 'id-verification'  // Step 4: Upload ID photos
+  | 'pending'          // Step 5: Wait for approval
+  | 'complete-profile'; // Step 6: Complete profile after approval
 
 interface NeighborSignupState {
   currentStep: NeighborSignupStep;

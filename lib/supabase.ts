@@ -142,9 +142,78 @@ export async function createUserProfile(userId: string, profileData: {
   date_of_birth?: string;
   parent_email?: string;
   phone?: string;
+  address?: string;
 }) {
-  // Use RPC function to bypass RLS during signup
-  // This ensures the profile can be created even if the session isn't fully established
+  // First, check if profile already exists (by id or email)
+  // This prevents duplicate key errors
+  const { data: existingById, error: checkByIdError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  
+  if (existingById) {
+    // Profile exists, update it
+    console.log('Profile exists by id, updating:', userId);
+    const { data: updatedProfile, error: updateError } = await supabase
+      .from('users')
+      .update({
+        email: profileData.email,
+        full_name: profileData.full_name,
+        role: profileData.role,
+        date_of_birth: profileData.date_of_birth ?? existingById.date_of_birth,
+        parent_email: profileData.parent_email ?? existingById.parent_email,
+        phone: profileData.phone ?? existingById.phone,
+        address: profileData.address ?? existingById.address,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+    
+    if (updateError) {
+      console.error('Failed to update existing profile:', updateError);
+      throw updateError;
+    }
+    
+    return updatedProfile;
+  }
+  
+  // Check by email as well
+  const { data: existingByEmail, error: checkByEmailError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('email', profileData.email)
+    .maybeSingle();
+  
+  if (existingByEmail) {
+    // Profile exists by email, update it
+    console.log('Profile exists by email, updating:', profileData.email);
+    const { data: updatedProfile, error: updateError } = await supabase
+      .from('users')
+      .update({
+        email: profileData.email,
+        full_name: profileData.full_name,
+        role: profileData.role,
+        date_of_birth: profileData.date_of_birth ?? existingByEmail.date_of_birth,
+        parent_email: profileData.parent_email ?? existingByEmail.parent_email,
+        phone: profileData.phone ?? existingByEmail.phone,
+        address: profileData.address ?? existingByEmail.address,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingByEmail.id)
+      .select()
+      .single();
+    
+    if (updateError) {
+      console.error('Failed to update existing profile by email:', updateError);
+      throw updateError;
+    }
+    
+    return updatedProfile;
+  }
+  
+  // Profile doesn't exist, create it using RPC function
   const { data, error } = await supabase.rpc('create_user_profile', {
     p_user_id: userId,
     p_email: profileData.email,
@@ -153,10 +222,18 @@ export async function createUserProfile(userId: string, profileData: {
     p_date_of_birth: profileData.date_of_birth || null,
     p_parent_email: profileData.parent_email || null,
     p_phone: profileData.phone || null,
+    p_address: profileData.address || null,
   });
   
   if (error) {
-    // Fallback to direct insert if function doesn't exist (for backwards compatibility)
+    // If RPC fails with unique constraint on email, profile already exists
+    // Return null - caller will handle it using application data
+    if (error.code === '23505' && (error.message?.includes('email') || error.details?.includes('email'))) {
+      console.log('Profile already exists with this email. Returning null - caller will use application data.');
+      return null;
+    }
+    
+    // If RPC fails with other error, fallback to direct insert
     console.warn('RPC function failed, trying direct insert:', error);
     const { data: insertData, error: insertError } = await supabase
       .from('users')
@@ -168,14 +245,24 @@ export async function createUserProfile(userId: string, profileData: {
         date_of_birth: profileData.date_of_birth,
         parent_email: profileData.parent_email,
         phone: profileData.phone,
+        address: profileData.address,
         verified: false
       })
       .select()
       .single();
+    
     if (insertError) {
+      // If direct insert fails with unique constraint on email, profile already exists
+      // Return null - caller will handle it using application data
+      if (insertError.code === '23505' && (insertError.message?.includes('email') || insertError.details?.includes('email'))) {
+        console.log('Profile already exists with this email. Returning null - caller will use application data.');
+        return null;
+      }
+      
       console.error('Failed to create user profile:', insertError);
       throw insertError;
     }
+    
     return insertData;
   }
   
@@ -400,28 +487,13 @@ export async function getPendingSignupByTokenAnyStatus(token: string) {
 }
 
 export async function approveTeenSignup(token: string) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:386',message:'approveTeenSignup called',data:{token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
   // Use database function that bypasses RLS (SECURITY DEFINER)
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:390',message:'Before RPC call',data:{hasToken:!!token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-  
   const { data, error } = await supabase.rpc('approve_teen_signup', {
     p_token: token
   });
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:395',message:'After RPC call',data:{hasError:!!error,errorMessage:error?.message,errorCode:error?.code,hasData:!!data,dataLength:data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
-
   if (error) {
     console.error('Error approving teen signup:', error);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:407',message:'RPC error, trying fallback',data:{errorMessage:error.message,errorCode:error.code,errorDetails:error.details,errorHint:error.hint},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     
     // If RPC function fails, fall back to direct update (for backwards compatibility)
     // Try fallback for most errors except clear auth/permission errors
@@ -431,9 +503,6 @@ export async function approveTeenSignup(token: string) {
     // Try fallback unless it's clearly an auth error
     if (!isAuthError) {
       console.warn('RPC function not found, using direct update fallback');
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:414',message:'Using direct update fallback',data:{token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
-      // #endregion
       
       // Get pending signup first
       const { data: signupData, error: fetchError } = await supabase
@@ -444,9 +513,6 @@ export async function approveTeenSignup(token: string) {
         .single();
       
       if (fetchError) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:425',message:'Fallback fetch error',data:{fetchError:fetchError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
-        // #endregion
         throw new Error('Pending signup not found or already processed');
       }
       
@@ -473,15 +539,8 @@ export async function approveTeenSignup(token: string) {
         .eq('id', signupData.id);
       
       if (updateError) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:446',message:'Fallback update error',data:{updateError:updateError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O'})}).catch(()=>{});
-        // #endregion
         throw updateError;
       }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:467',message:'Fallback update success, returning',data:{signupId:signupData.id,signupFullName:signupData.full_name,signupParentEmail:signupData.parent_email},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'U'})}).catch(()=>{});
-      // #endregion
       
       const returnValue = {
         pendingSignup: {
@@ -493,10 +552,6 @@ export async function approveTeenSignup(token: string) {
         }
       };
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:480',message:'Returning from fallback',data:{hasPendingSignup:!!returnValue.pendingSignup,returnStatus:returnValue.pendingSignup.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'V'})}).catch(()=>{});
-      // #endregion
-      
       return returnValue;
     }
     
@@ -504,17 +559,10 @@ export async function approveTeenSignup(token: string) {
   }
 
   if (!data || data.length === 0) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:405',message:'No data returned, throwing',data:{hasData:!!data,dataLength:data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     throw new Error('Failed to approve signup');
   }
 
   const result = data[0];
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/supabase.ts:412',message:'Success, returning result',data:{hasResult:!!result,resultId:result?.id,resultStatus:result?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-  // #endregion
   
   // Return the result directly - no need to query again
   return { 

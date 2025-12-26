@@ -8,6 +8,8 @@ export interface PendingNeighborApplication {
   phone: string;
   address: string | null;
   date_of_birth: string | null;
+  id_front_photo_url: string | null;
+  id_back_photo_url: string | null;
   status: 'pending' | 'approved' | 'rejected';
   phone_verified: boolean;
   phone_verified_at: string | null;

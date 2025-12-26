@@ -144,9 +144,23 @@ export default function AuthLayout() {
         }} 
       />
       <Stack.Screen 
+        name="verify-id" 
+        options={{ 
+          title: 'ID Verification',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
         name="pending-neighbor-approval" 
         options={{ 
           title: 'Pending Approval',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="neighbor-rejected" 
+        options={{ 
+          title: 'Application Rejected',
           headerShown: false,
         }} 
       />
