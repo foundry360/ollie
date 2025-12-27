@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert } from 'react-native';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheet } from '@/components/ui/BottomSheet';

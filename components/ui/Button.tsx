@@ -1,6 +1,7 @@
-import { Pressable, Text, ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Pressable, Text, StyleSheet, View } from 'react-native';
 import { clsx } from 'clsx';
 import { useThemeStore } from '@/stores/themeStore';
+import { ThreeDotsLoader } from './Loading';
 
 interface ButtonProps {
   title: string;
@@ -77,11 +78,14 @@ export function Button({ title, onPress, variant = 'primary', loading = false, d
       {({ pressed }) => (
         <View style={getButtonStyle(pressed)}>
           {loading ? (
-            <ActivityIndicator color={
-              variant === 'secondary' 
-                ? (isDark ? '#FFFFFF' : '#111827')
-                : '#fff'
-            } />
+            <ThreeDotsLoader 
+              color={
+                variant === 'secondary' 
+                  ? (isDark ? '#FFFFFF' : '#111827')
+                  : '#fff'
+              } 
+              size="small"
+            />
           ) : (
             <Text style={[
               styles.text,

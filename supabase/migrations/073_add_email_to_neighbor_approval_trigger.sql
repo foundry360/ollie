@@ -45,42 +45,57 @@ BEGIN
   IF NEW.status = 'approved' AND OLD.status != 'approved' THEN
     RAISE NOTICE '📧 [update_user_address_on_approval] Application % approved for user % (email: %)', NEW.id, NEW.user_id, NEW.email;
     
+    -- Verify that the user_id exists in auth.users before creating the profile
+    -- This prevents foreign key constraint errors
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = NEW.user_id) THEN
+      RAISE WARNING '❌ [update_user_address_on_approval] User % does not exist in auth.users. Cannot create profile.', NEW.user_id;
+      RAISE WARNING 'Application user_id: %, Email: %', NEW.user_id, NEW.email;
+      RETURN NEW; -- Don't create profile if auth user doesn't exist
+    END IF;
+    
     -- First, ensure the user profile exists (it might have been created during signup with only name/email)
     -- If it doesn't exist, create it. If it exists, update it with address and phone.
-    INSERT INTO public.users (
-      id,
-      email,
-      full_name,
-      role,
-      phone,
-      address,
-      date_of_birth,
-      verified,
-      updated_at
-    )
-    VALUES (
-      NEW.user_id,
-      NEW.email,
-      NEW.full_name,
-      'poster',
-      NEW.phone,
-      NEW.address,
-      NEW.date_of_birth,
-      true,
-      NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      -- Always update these fields from the application
-      email = EXCLUDED.email,
-      full_name = EXCLUDED.full_name,
-      phone = COALESCE(EXCLUDED.phone, users.phone),
-      address = COALESCE(EXCLUDED.address, users.address),
-      date_of_birth = COALESCE(EXCLUDED.date_of_birth, users.date_of_birth),
-      verified = true,
-      updated_at = NOW();
-    
-    -- Log for debugging
-    RAISE NOTICE 'Updated user % with address: %, phone: %', NEW.user_id, NEW.address, NEW.phone;
+    BEGIN
+      INSERT INTO public.users (
+        id,
+        email,
+        full_name,
+        role,
+        phone,
+        address,
+        date_of_birth,
+        verified,
+        updated_at
+      )
+      VALUES (
+        NEW.user_id,
+        NEW.email,
+        NEW.full_name,
+        'poster',
+        NEW.phone,
+        NEW.address,
+        NEW.date_of_birth,
+        true,
+        NOW()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        -- Always update these fields from the application
+        email = EXCLUDED.email,
+        full_name = EXCLUDED.full_name,
+        phone = COALESCE(EXCLUDED.phone, users.phone),
+        address = COALESCE(EXCLUDED.address, users.address),
+        date_of_birth = COALESCE(EXCLUDED.date_of_birth, users.date_of_birth),
+        verified = true,
+        updated_at = NOW();
+      
+      -- Log for debugging
+      RAISE NOTICE '✅ [update_user_address_on_approval] Updated user % with address: %, phone: %', NEW.user_id, NEW.address, NEW.phone;
+    EXCEPTION
+      WHEN OTHERS THEN
+        -- If profile creation fails, log the error but don't block approval
+        RAISE WARNING '❌ [update_user_address_on_approval] Failed to create/update profile for user %. Error: %', NEW.user_id, SQLERRM;
+        RAISE WARNING 'Error details: Code: %, Message: %', SQLSTATE, SQLERRM;
+    END;
     
     -- Send approval email via Edge Function
     BEGIN

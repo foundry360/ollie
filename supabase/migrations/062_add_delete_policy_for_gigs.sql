@@ -7,3 +7,5 @@ CREATE POLICY "Posters can delete own open or accepted gigs" ON public.gigs
 COMMENT ON POLICY "Posters can delete own open or accepted gigs" ON public.gigs IS 
   'Allows posters to delete their own gigs only when status is open or accepted. Prevents deletion of in-progress, completed, or cancelled gigs.';
 
+
+

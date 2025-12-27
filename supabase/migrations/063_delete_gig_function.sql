@@ -50,3 +50,5 @@ GRANT EXECUTE ON FUNCTION delete_gig(UUID) TO authenticated;
 
 COMMENT ON FUNCTION delete_gig(UUID) IS 'Deletes a gig if the user is the owner and the gig status is open or accepted. Bypasses RLS using SECURITY DEFINER.';
 
+
+

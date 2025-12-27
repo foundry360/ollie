@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { User } from '@/types';
 import { getWeekRange, calculateDistance } from '@/lib/utils';
 import { getAverageRating } from './reviews';
+import { getUserProfile } from '@/lib/supabase';
 import * as Location from 'expo-location';
 
 export interface UpdateProfileData {
@@ -759,5 +760,175 @@ export async function getTeenlancers(
   });
 
   return filtered;
+}
+
+// Favorite a teenlancer (for neighbors/posters)
+export async function favoriteTeenlancer(teenId: string): Promise<void> {
+  // Use the database function which handles profile creation automatically
+  const { error } = await supabase.rpc('favorite_teenlancer', {
+    p_teen_id: teenId,
+  });
+
+  if (error) {
+    // Already favorited - ignore (function uses ON CONFLICT DO NOTHING)
+    if (error.code === '23505') return;
+    throw error;
+  }
+}
+
+// Unfavorite a teenlancer
+export async function unfavoriteTeenlancer(teenId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { error } = await supabase
+    .from('favorite_teenlancers')
+    .delete()
+    .eq('poster_id', user.id)
+    .eq('teen_id', teenId);
+
+  if (error) {
+    console.error('Error unfavoriting teenlancer:', error);
+    throw error;
+  }
+}
+
+// Check if a teenlancer is favorited by the current user
+export async function isTeenlancerFavorited(teenId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data, error } = await supabase
+    .from('favorite_teenlancers')
+    .select('id')
+    .eq('poster_id', user.id)
+    .eq('teen_id', teenId)
+    .maybeSingle();
+
+  if (error) {
+    // If it's a permission or RLS error, return false (user can't access favorites)
+    if (error.code === '42501' || error.code === 'PGRST116' || error.message?.includes('permission denied') || error.message?.includes('row-level security')) {
+      return false;
+    }
+    console.error('Error checking if teenlancer is favorited:', error);
+    return false;
+  }
+
+  return !!data;
+}
+
+// Get favorited teenlancers for the current neighbor
+export async function getFavoritedTeenlancers(): Promise<TeenlancerProfile[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Get favorited teen IDs
+  const { data: favorites, error: favoritesError } = await supabase
+    .from('favorite_teenlancers')
+    .select('teen_id')
+    .eq('poster_id', user.id);
+
+  if (favoritesError) throw favoritesError;
+
+  if (!favorites || favorites.length === 0) {
+    return [];
+  }
+
+  const teenIds = favorites.map(f => f.teen_id);
+
+  // Get teen profiles
+  const { data: teens, error: teensError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('role', 'teen')
+    .in('id', teenIds);
+
+  if (teensError) throw teensError;
+
+  // Get ratings for each teen
+  const profilesWithRatings = await Promise.all(
+    (teens || []).map(async (teen) => {
+      try {
+        const rating = await getAverageRating(teen.id);
+        const reviewCount = rating.reviewCount;
+
+        return {
+          id: teen.id,
+          full_name: teen.full_name,
+          profile_photo_url: teen.profile_photo_url,
+          bio: teen.bio,
+          skills: teen.skills || [],
+          rating: rating.average,
+          reviewCount,
+          distance: undefined, // Favorited teenlancers don't need distance
+          address: teen.address,
+        };
+      } catch (error) {
+        console.error(`Error processing favorited teenlancer ${teen.id}:`, error);
+        return null;
+      }
+    })
+  );
+
+  return profilesWithRatings.filter((p) => p !== null) as TeenlancerProfile[];
+}
+
+// Get past teenlancers (those who completed gigs for the neighbor)
+export async function getPastTeenlancers(): Promise<TeenlancerProfile[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Get completed gigs for this neighbor
+  const { data: completedGigs, error: gigsError } = await supabase
+    .from('gigs')
+    .select('teen_id')
+    .eq('poster_id', user.id)
+    .eq('status', 'completed')
+    .not('teen_id', 'is', null);
+
+  if (gigsError) throw gigsError;
+
+  if (!completedGigs || completedGigs.length === 0) {
+    return [];
+  }
+
+  // Get unique teen IDs
+  const teenIds = [...new Set(completedGigs.map(g => g.teen_id).filter(Boolean))];
+
+  // Get teen profiles
+  const { data: teens, error: teensError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('role', 'teen')
+    .in('id', teenIds);
+
+  if (teensError) throw teensError;
+
+  // Get ratings for each teen
+  const profilesWithRatings = await Promise.all(
+    (teens || []).map(async (teen) => {
+      try {
+        const rating = await getAverageRating(teen.id);
+        const reviewCount = rating.reviewCount;
+
+        return {
+          id: teen.id,
+          full_name: teen.full_name,
+          profile_photo_url: teen.profile_photo_url,
+          bio: teen.bio,
+          skills: teen.skills || [],
+          rating: rating.average,
+          reviewCount,
+          distance: undefined, // Past teenlancers don't need distance
+          address: teen.address,
+        };
+      } catch (error) {
+        console.error(`Error processing past teenlancer ${teen.id}:`, error);
+        return null;
+      }
+    })
+  );
+
+  return profilesWithRatings.filter((p) => p !== null) as TeenlancerProfile[];
 }
 

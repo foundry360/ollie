@@ -1,9 +1,12 @@
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
+import { ThreeDotsLoader } from '@/components/ui/Loading';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { TeenlancerProfile } from '@/lib/api/users';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ProfileModal } from '@/components/profile/ProfileModal';
+import { useIsTeenlancerFavorited, useFavoriteTeenlancer, useUnfavoriteTeenlancer } from '@/hooks/useTeenlancers';
 
 interface TeenlancerCardProps {
   teenlancer: TeenlancerProfile;
@@ -12,14 +15,38 @@ interface TeenlancerCardProps {
 
 export function TeenlancerCard({ teenlancer, onPress }: TeenlancerCardProps) {
   const { colorScheme } = useThemeStore();
+  const { user } = useAuthStore();
   const isDark = colorScheme === 'dark';
+  const isNeighbor = user?.role === 'poster';
   const [showProfileModal, setShowProfileModal] = useState(false);
+  
+  // Favorite functionality (only for neighbors)
+  const { data: isFavorited = false, isLoading: isLoadingFavorite } = useIsTeenlancerFavorited(isNeighbor ? teenlancer.id : null);
+  const favoriteMutation = useFavoriteTeenlancer();
+  const unfavoriteMutation = useUnfavoriteTeenlancer();
 
   const handlePress = () => {
     if (onPress) {
       onPress(teenlancer.id);
     } else {
       setShowProfileModal(true);
+    }
+  };
+
+  const handleFavoritePress = () => {
+    if (favoriteMutation.isPending || unfavoriteMutation.isPending || isLoadingFavorite) return;
+    if (isFavorited) {
+      unfavoriteMutation.mutate(teenlancer.id, {
+        onError: (error) => {
+          console.error('Failed to unfavorite teenlancer:', error);
+        },
+      });
+    } else {
+      favoriteMutation.mutate(teenlancer.id, {
+        onError: (error) => {
+          console.error('Failed to favorite teenlancer:', error);
+        },
+      });
     }
   };
 
@@ -31,7 +58,7 @@ export function TeenlancerCard({ teenlancer, onPress }: TeenlancerCardProps) {
   // Render stars for rating
   const renderStars = () => {
     const stars = [];
-    const rating = Math.round(teenlancer.rating);
+    const rating = Math.round(teenlancer.rating ?? 0);
     for (let i = 1; i <= 5; i++) {
       stars.push(
         <Ionicons
@@ -66,15 +93,40 @@ export function TeenlancerCard({ teenlancer, onPress }: TeenlancerCardProps) {
             </View>
           )}
           <View style={styles.nameContainer}>
-            <Text style={[styles.name, titleStyle]} numberOfLines={1}>
-              {teenlancer.full_name}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text style={[styles.name, titleStyle]} numberOfLines={1}>
+                {teenlancer.full_name}
+              </Text>
+              {/* Heart icon for neighbors - same row as name, left-justified */}
+              {isNeighbor && (
+                <Pressable
+                  style={styles.heartButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleFavoritePress();
+                  }}
+                  onStartShouldSetResponder={() => true}
+                  disabled={favoriteMutation.isPending || unfavoriteMutation.isPending || isLoadingFavorite}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {favoriteMutation.isPending || unfavoriteMutation.isPending || isLoadingFavorite ? (
+                    <ThreeDotsLoader color="#F59E0B" size="small" />
+                  ) : (
+                    <Ionicons
+                      name={isFavorited ? "heart" : "heart-outline"}
+                      size={18}
+                      color="#F59E0B"
+                    />
+                  )}
+                </Pressable>
+              )}
+            </View>
             <View style={styles.ratingRow}>
               <View style={styles.starsContainer}>
                 {renderStars()}
               </View>
               <Text style={[styles.ratingText, textStyle]}>
-                {teenlancer.rating.toFixed(1)}
+                {(teenlancer.rating ?? 0).toFixed(1)}
               </Text>
               {teenlancer.reviewCount > 0 && (
                 <Text style={[styles.reviewCount, textStyle]}>
@@ -186,11 +238,20 @@ const styles = StyleSheet.create({
   nameContainer: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  heartButton: {
+    padding: 4,
+  },
   name: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
     color: '#000000',
+    flex: 1,
   },
   titleDark: {
     color: '#FFFFFF',

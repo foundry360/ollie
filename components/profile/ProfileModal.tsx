@@ -333,6 +333,8 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
               }}
               scrollEventThrottle={16}
             >
+              {/* Spacer for avatar */}
+              <View style={{ height: 20 }} />
               {/* Name */}
               <Text style={[styles.name, titleStyle]}>{profile.full_name}</Text>
 
@@ -754,7 +756,7 @@ const styles = StyleSheet.create({
   },
   scrollWrapper: {
     flex: 1,
-    paddingTop: 190,
+    paddingTop: 120,
     zIndex: 50,
   },
   scrollView: {
@@ -795,7 +797,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     position: 'absolute',
-    top: 90,
+    top: 70,
     alignSelf: 'center',
     zIndex: 200,
     elevation: 20,

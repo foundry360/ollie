@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { ThreeDotsLoader } from '@/components/ui/Loading';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
@@ -77,7 +78,7 @@ export function ActiveTaskCard() {
             style={[styles.completeButton, completeTaskMutation.isPending && styles.completeButtonDisabled]}
           >
             {completeTaskMutation.isPending ? (
-              <ActivityIndicator color="#3B82F6" />
+              <ThreeDotsLoader color="#3B82F6" size="small" />
             ) : (
               <Text style={styles.completeButtonText}>Mark Complete</Text>
             )}
@@ -174,6 +175,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+
+
 
 
 

@@ -147,6 +147,13 @@ export default function SignupAdultScreen() {
           phone: phoneWithPlus,
       });
         user = signUpResult.user;
+        // #region agent log
+        console.log('[DEBUG] signup-adult - Auth user created', { 
+          authUserId: user?.id, 
+          email: data.email 
+        });
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/signup-adult.tsx:149',message:'Auth user created',data:{authUserId:user?.id,email:data.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
+        // #endregion
       } catch (signUpError: any) {
         // Check if it's a duplicate email error from Supabase Auth
         if (signUpError.code === 'user_already_exists' ||
@@ -171,12 +178,28 @@ export default function SignupAdultScreen() {
       // Uses a database function that handles RLS properly during signup
       let application;
       try {
+        // #region agent log
+        console.log('[DEBUG] signup-adult - Creating application with userId', { 
+          authUserId: user.id, 
+          email: data.email 
+        });
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/signup-adult.tsx:174',message:'Creating application',data:{authUserId:user.id,email:data.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
+        // #endregion
         application = await createPendingNeighborApplication({
           userId: user.id,
           email: data.email,
           full_name: data.full_name,
           phone: phoneWithPlus,
         });
+        // #region agent log
+        console.log('[DEBUG] signup-adult - Application created', { 
+          authUserId: user.id, 
+          applicationUserId: application?.user_id,
+          idsMatch: user.id === application?.user_id,
+          applicationId: application?.id
+        });
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/signup-adult.tsx:183',message:'Application created',data:{authUserId:user.id,applicationUserId:application?.user_id,idsMatch:user.id===application?.user_id,applicationId:application?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
+        // #endregion
       } catch (appError: any) {
         // If creating the application fails, sign out to prevent orphaned session
         console.error('❌ Failed to create application, signing out:', appError);

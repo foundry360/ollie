@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import { ThreeDotsLoader } from '@/components/ui/Loading';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -56,7 +57,7 @@ export function ReviewsModal({ visible, userId, onClose }: ReviewsModalProps) {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={true}>
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#73af17" />
+            <ThreeDotsLoader size="large" color="#73af17" />
             <Text style={[styles.loadingText, textStyle]}>Loading reviews...</Text>
           </View>
         ) : error ? (

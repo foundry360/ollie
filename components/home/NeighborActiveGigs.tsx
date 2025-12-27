@@ -6,6 +6,7 @@ import { Task } from '@/types';
 import { formatTimeAgo } from '@/lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 import { GigDetailModal } from '@/components/tasks/GigDetailModal';
+import { CreateGigModal } from '@/components/tasks/CreateGigModal';
 import { useState, useMemo } from 'react';
 import { usePendingApplicationsForNeighbor } from '@/hooks/useGigApplications';
 
@@ -15,6 +16,7 @@ export function NeighborActiveGigs() {
   const isDark = colorScheme === 'dark';
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Get active gigs (open, accepted, in_progress)
   const { data: activeGigs = [], isLoading } = useUserTasks({
@@ -83,8 +85,46 @@ export function NeighborActiveGigs() {
     );
   }
 
+  const handleCreateGig = () => {
+    setShowCreateModal(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+  };
+
   if (filteredGigs.length === 0) {
-    return null;
+    const containerStyle = isDark ? styles.containerDark : styles.containerLight;
+    const titleStyle = isDark ? styles.titleDark : undefined;
+    const cardStyle = isDark ? styles.emptyCardDark : styles.emptyCard;
+    
+    return (
+      <>
+        <View style={[styles.container, containerStyle]}>
+          <View style={styles.header}>
+            <Text style={[styles.sectionTitle, titleStyle]}>Active Gigs</Text>
+          </View>
+          <Pressable
+            style={[styles.emptyCard, cardStyle]}
+            onPress={handleCreateGig}
+            android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
+          >
+            <View style={styles.emptyCardContent}>
+              <View style={[styles.plusIconContainer, isDark && styles.plusIconContainerDark]}>
+                <Ionicons name="add" size={32} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.emptyCardText, isDark && styles.emptyCardTextDark]}>
+                Ready to get started?
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+        <CreateGigModal
+          visible={showCreateModal}
+          onClose={handleCloseCreateModal}
+        />
+      </>
+    );
   }
 
   const containerStyle = isDark ? styles.containerDark : styles.containerLight;
@@ -160,6 +200,10 @@ export function NeighborActiveGigs() {
         visible={showDetailModal}
         taskId={selectedTaskId}
         onClose={handleCloseModal}
+      />
+      <CreateGigModal
+        visible={showCreateModal}
+        onClose={handleCloseCreateModal}
       />
     </>
   );
@@ -343,6 +387,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 8,
     paddingHorizontal: 16,
+  },
+  emptyCard: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    minHeight: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyCardDark: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  emptyCardContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  plusIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#73af17',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+  },
+  plusIconContainerDark: {
+    backgroundColor: '#73af17',
+  },
+  emptyCardText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  emptyCardTextDark: {
+    color: '#6B7280',
   },
 });
 

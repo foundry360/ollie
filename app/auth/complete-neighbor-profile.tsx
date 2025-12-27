@@ -108,10 +108,40 @@ export default function CompleteNeighborProfileScreen() {
   });
 
   const onSubmit = async (data: ProfileFormData) => {
-    if (!userId) {
+    // Verify current auth user
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    
+    // Use application.user_id if available, otherwise fall back to store userId or auth user ID
+    // This ensures we use the correct ID that matches what the trigger created
+    const targetUserId = application?.user_id || userId || authUser?.id;
+    
+    if (!targetUserId) {
       Alert.alert('Error', 'User ID is missing. Please start over.');
       router.replace('/auth/signup-adult');
       return;
+    }
+    
+    // #region agent log
+    console.log('[DEBUG] complete-neighbor-profile - User ID verification', {
+      authUserId: authUser?.id,
+      storeUserId: userId,
+      applicationUserId: application?.user_id,
+      targetUserId,
+      authMatchesApplication: authUser?.id === application?.user_id,
+      authMatchesStore: authUser?.id === userId,
+      authMatchesTarget: authUser?.id === targetUserId
+    });
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/complete-neighbor-profile.tsx:111',message:'User ID verification',data:{authUserId:authUser?.id,storeUserId:userId,applicationUserId:application?.user_id,targetUserId,authMatchesApplication:authUser?.id===application?.user_id,authMatchesStore:authUser?.id===userId,authMatchesTarget:authUser?.id===targetUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O'})}).catch(()=>{});
+    // #endregion
+    
+    // Warn if there's a mismatch (but continue anyway - the trigger may have created the profile)
+    if (authUser?.id && targetUserId !== authUser.id) {
+      console.warn('⚠️ [complete-profile] User ID mismatch detected:', {
+        authUserId: authUser.id,
+        targetUserId,
+        applicationUserId: application?.user_id,
+        storeUserId: userId
+      });
     }
 
     setIsSubmitting(true);
@@ -145,13 +175,34 @@ export default function CompleteNeighborProfileScreen() {
       const finalAddress = address || application?.address;
       console.log('💾 [complete-profile] Saving address:', finalAddress);
 
+      // #region agent log
+      console.log('[DEBUG] complete-neighbor-profile - BEFORE createUserProfile', {
+        storeUserId: userId,
+        applicationUserId: application?.user_id,
+        targetUserId,
+        applicationId: application?.id,
+        idsMatch: userId === application?.user_id,
+        usingApplicationId: !!application?.user_id
+      });
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/complete-neighbor-profile.tsx:151',message:'BEFORE createUserProfile',data:{storeUserId:userId,applicationUserId:application?.user_id,targetUserId,applicationId:application?.id,idsMatch:userId===application?.user_id,usingApplicationId:!!application?.user_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+      // #endregion
+      
       // Create or update user profile
+      // Use application.user_id to match what the trigger created
       let profile;
       try {
-        profile = await createUserProfile(userId, {
+        profile = await createUserProfile(targetUserId, {
           ...profileData,
           address: finalAddress,
         });
+        // #region agent log
+        console.log('[DEBUG] complete-neighbor-profile - Profile created', {
+          profileId: profile?.id,
+          storeUserId: userId,
+          idsMatch: profile?.id === userId
+        });
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/complete-neighbor-profile.tsx:158',message:'Profile created',data:{profileId:profile?.id,storeUserId:userId,idsMatch:profile?.id===userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+        // #endregion
         console.log('✅ [complete-profile] Profile created, address:', profile?.address);
       } catch (error: any) {
         // If profile exists, update it with address and other data
@@ -169,7 +220,7 @@ export default function CompleteNeighborProfileScreen() {
             verified: true,
             ...(data.bio && { bio: data.bio }),
           })
-          .eq('id', userId)
+          .eq('id', targetUserId)
           .select()
           .single();
         
@@ -192,7 +243,7 @@ export default function CompleteNeighborProfileScreen() {
         const { data: updatedProfile, error: updateError } = await supabase
           .from('users')
           .update({ address: finalAddress })
-          .eq('id', userId)
+          .eq('id', targetUserId)
           .select()
           .single();
         

@@ -84,3 +84,5 @@ GRANT EXECUTE ON FUNCTION verify_bank_approval_otp(UUID, TEXT) TO authenticated;
 
 COMMENT ON FUNCTION verify_bank_approval_otp IS 'Validates bank account approval OTP request. Returns verification SID for Twilio Verify API call.';
 
+
+

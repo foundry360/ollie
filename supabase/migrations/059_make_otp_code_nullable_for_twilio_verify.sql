@@ -8,3 +8,5 @@ ALTER COLUMN otp_code DROP NOT NULL;
 -- Update comment to reflect new usage
 COMMENT ON COLUMN public.bank_account_approvals.otp_code IS 'Twilio Verify verification SID (starts with VE...) or legacy 6-digit OTP code';
 
+
+

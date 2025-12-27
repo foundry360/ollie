@@ -9,3 +9,5 @@ ADD COLUMN IF NOT EXISTS id_back_photo_url TEXT;
 COMMENT ON COLUMN public.pending_neighbor_applications.id_front_photo_url IS 'Signed URL to front ID photo in id-verifications bucket (private)';
 COMMENT ON COLUMN public.pending_neighbor_applications.id_back_photo_url IS 'Signed URL to back ID photo in id-verifications bucket (private)';
 
+
+

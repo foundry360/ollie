@@ -119,7 +119,7 @@ export function TeenlancerFilters({ filters, onFiltersChange }: TeenlancerFilter
             <View style={[styles.modalHeader, isDark && styles.modalHeaderDark]}>
               <Text style={[styles.modalTitle, titleStyle]}>Filter Teenlancers</Text>
               <Pressable onPress={() => setShowModal(false)}>
-                <Ionicons name="close" size={24} color={isDark ? '#FFFFFF' : '#111827'} />
+                <Ionicons name="close" size={24} color="#FFFFFF" />
               </Pressable>
             </View>
 
@@ -291,6 +291,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
+    overflow: 'hidden',
   },
   modalLight: {
     backgroundColor: '#FFFFFF',
@@ -307,16 +308,18 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    backgroundColor: '#73af17',
   },
   modalHeaderDark: {
     borderBottomColor: '#1F2937',
+    backgroundColor: '#73af17',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
   },
   titleLight: {
-    color: '#111827',
+    color: '#FFFFFF',
   },
   titleDark: {
     color: '#FFFFFF',
@@ -343,15 +346,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
   },
   ratingChipSelected: {
     backgroundColor: '#73af17',
     borderColor: '#73af17',
   },
   ratingChipDark: {
-    backgroundColor: '#111827',
-    borderColor: '#1F2937',
+    backgroundColor: 'transparent',
+    borderColor: '#4B5563',
   },
   ratingChipSelectedDark: {
     backgroundColor: '#73af17',
@@ -388,15 +391,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
   },
   radiusChipSelected: {
     backgroundColor: '#73af17',
     borderColor: '#73af17',
   },
   radiusChipDark: {
-    backgroundColor: '#111827',
-    borderColor: '#1F2937',
+    backgroundColor: 'transparent',
+    borderColor: '#4B5563',
   },
   radiusChipSelectedDark: {
     backgroundColor: '#73af17',
@@ -424,15 +427,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
   },
   skillChipSelected: {
     backgroundColor: '#73af17',
     borderColor: '#73af17',
   },
   skillChipDark: {
-    backgroundColor: '#111827',
-    borderColor: '#1F2937',
+    backgroundColor: 'transparent',
+    borderColor: '#4B5563',
   },
   skillChipSelectedDark: {
     backgroundColor: '#73af17',

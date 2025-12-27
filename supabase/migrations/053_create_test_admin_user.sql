@@ -68,3 +68,5 @@ GRANT EXECUTE ON FUNCTION make_user_admin TO authenticated;
 -- SELECT make_user_admin('admin@ollie.test');
 
 
+
+

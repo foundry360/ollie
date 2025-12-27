@@ -64,6 +64,11 @@ export async function createPendingNeighborApplication(data: {
   full_name: string;
   phone: string;
 }): Promise<PendingNeighborApplication> {
+  // #region agent log
+  console.log('[DEBUG] createPendingNeighborApplication ENTRY', { userId: data.userId, email: data.email });
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/neighborApplications.ts:61',message:'createPendingNeighborApplication ENTRY',data:{userId:data.userId,email:data.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+  // #endregion
+  
   // Try using the database function first (more reliable during signup)
   const { data: application, error: functionError } = await supabase.rpc(
     'create_pending_neighbor_application',
@@ -75,7 +80,26 @@ export async function createPendingNeighborApplication(data: {
     }
   );
 
+  // #region agent log
+  console.log('[DEBUG] createPendingNeighborApplication RPC result', { 
+    hasApplication: !!application, 
+    applicationUserId: application?.user_id, 
+    applicationId: application?.id,
+    hasError: !!functionError,
+    errorCode: functionError?.code 
+  });
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/neighborApplications.ts:78',message:'createPendingNeighborApplication RPC result',data:{hasApplication:!!application,applicationUserId:application?.user_id,applicationId:application?.id,hasError:!!functionError,errorCode:functionError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+  // #endregion
+
   if (!functionError && application) {
+    // #region agent log
+    console.log('[DEBUG] createPendingNeighborApplication SUCCESS', { 
+      applicationUserId: application.user_id, 
+      inputUserId: data.userId,
+      match: application.user_id === data.userId 
+    });
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/neighborApplications.ts:85',message:'createPendingNeighborApplication SUCCESS',data:{applicationUserId:application.user_id,inputUserId:data.userId,match:application.user_id===data.userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+    // #endregion
     return application;
   }
 
@@ -520,7 +544,16 @@ export async function approveNeighborApplication(
     throw new Error(`Application is already ${application.status}`);
   }
 
-  // Update application status
+  // #region agent log
+  console.log('[DEBUG] approveNeighborApplication - Approving application', {
+    applicationUserId: application.user_id,
+    applicationEmail: application.email,
+    applicationId: application.id
+  });
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/neighborApplications.ts:543',message:'Approving application',data:{applicationUserId:application.user_id,applicationEmail:application.email,applicationId:application.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'S'})}).catch(()=>{});
+  // #endregion
+  
+  // Simply update the status - the trigger will handle finding the auth user and creating the profile
   const { data: updatedApplication, error: updateError } = await supabase
     .from('pending_neighbor_applications')
     .update({
@@ -541,31 +574,41 @@ export async function approveNeighborApplication(
     throw new Error('Failed to update application status');
   }
 
-  // Create full user profile
-  const { data: profile, error: profileError } = await supabase
+  // #region agent log
+  console.log('[DEBUG] approveNeighborApplication - Application approved, trigger should have created profile', {
+    applicationUserId: updatedApplication.user_id,
+    applicationEmail: updatedApplication.email
+  });
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/neighborApplications.ts:565',message:'Application approved',data:{applicationUserId:updatedApplication.user_id,applicationEmail:updatedApplication.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'S'})}).catch(()=>{});
+  // #endregion
+
+  // Fetch the profile that should have been created by the trigger
+  // Wait a moment for the trigger to complete
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  const { data: profile, error: fetchError } = await supabase
     .from('users')
-    .upsert({
-      id: application.user_id,
-      email: application.email,
-      full_name: application.full_name,
-      phone: application.phone,
-      address: application.address,
-      date_of_birth: application.date_of_birth,
-      role: 'poster',
-      verified: true,
-      application_status: 'active',
-    })
-    .select()
+    .select('*')
+    .eq('email', updatedApplication.email)
     .single();
 
-  if (profileError) {
-    console.error('Error creating user profile:', profileError);
-    // Rollback application status
-    await supabase
-      .from('pending_neighbor_applications')
-      .update({ status: 'pending', reviewed_by: null, reviewed_at: null })
-      .eq('id', applicationId);
-    throw profileError;
+  // #region agent log
+  console.log('[DEBUG] approveNeighborApplication - Profile fetch result', {
+    hasProfile: !!profile,
+    profileId: profile?.id,
+    profileEmail: profile?.email,
+    applicationUserId: updatedApplication.user_id,
+    hasError: !!fetchError,
+    errorCode: fetchError?.code,
+    profileMatchesApplicationUserId: profile?.id === updatedApplication.user_id
+  });
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/neighborApplications.ts:580',message:'Profile fetch result',data:{hasProfile:!!profile,profileId:profile?.id,profileEmail:profile?.email,applicationUserId:updatedApplication.user_id,hasError:!!fetchError,errorCode:fetchError?.code,profileMatchesApplicationUserId:profile?.id===updatedApplication.user_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'S'})}).catch(()=>{});
+  // #endregion
+
+  if (fetchError || !profile) {
+    console.error('Error fetching user profile:', fetchError);
+    // Don't throw - the trigger might still be processing
+    console.warn('Profile not found immediately after approval. It may be created by the trigger shortly.');
   }
 
   // Send approval email (don't fail approval if email fails)

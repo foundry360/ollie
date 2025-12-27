@@ -61,3 +61,5 @@ GRANT EXECUTE ON FUNCTION find_pending_application_by_email(TEXT) TO authenticat
 -- Add comment
 COMMENT ON FUNCTION find_pending_application_by_email IS 'Find pending neighbor application by email, bypassing RLS. Used during login to handle user_id mismatches from multiple signups. Includes ID photo URLs.';
 
+
+

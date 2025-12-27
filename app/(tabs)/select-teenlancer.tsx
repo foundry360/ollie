@@ -6,8 +6,9 @@ import { TeenlancerCard } from '@/components/teenlancers/TeenlancerCard';
 import { TeenlancerFilters } from '@/components/teenlancers/TeenlancerFilters';
 import { Loading } from '@/components/ui/Loading';
 import { getTeenlancers, TeenlancerFilters as TeenlancerFiltersType, TeenlancerProfile } from '@/lib/api/users';
+import { useFavoritedTeenlancers, usePastTeenlancers } from '@/hooks/useTeenlancers';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 
@@ -20,6 +21,7 @@ export default function SelectTeenlancerScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'rating' | 'distance'>('rating');
+  const [activeTab, setActiveTab] = useState<'find' | 'past'>('find');
 
   // Get available sort options based on active filters
   const getAvailableSortOptions = (): Array<'rating' | 'distance'> => {
@@ -83,19 +85,57 @@ export default function SelectTeenlancerScreen() {
   }, []);
 
 
+  // Get teenlancers based on active tab
   const {
-    data: teenlancers = [],
-    isLoading,
-    isRefetching,
-    refetch,
+    data: findTeenlancers = [],
+    isLoading: isLoadingFind,
+    isRefetching: isRefetchingFind,
+    refetch: refetchFind,
   } = useQuery({
     queryKey: ['teenlancers', filters, userLocation, currentSortBy],
     queryFn: () => getTeenlancers(filters, userLocation || undefined, currentSortBy),
     staleTime: 30000, // 30 seconds
+    enabled: activeTab === 'find',
   });
 
+  // Get favorited and past teenlancers
+  const {
+    data: favoritedTeenlancers = [],
+    isLoading: isLoadingFavorited,
+    isRefetching: isRefetchingFavorited,
+    refetch: refetchFavorited,
+  } = useFavoritedTeenlancers();
+
+  const {
+    data: pastTeenlancers = [],
+    isLoading: isLoadingPast,
+    isRefetching: isRefetchingPast,
+    refetch: refetchPast,
+  } = usePastTeenlancers();
+
+  // Combine favorited and past teenlancers, removing duplicates
+  const myTeenlancers = useMemo(() => {
+    const combined = [...favoritedTeenlancers, ...pastTeenlancers];
+    const uniqueMap = new Map<string, TeenlancerProfile>();
+    combined.forEach(teen => {
+      if (!uniqueMap.has(teen.id)) {
+        uniqueMap.set(teen.id, teen);
+      }
+    });
+    return Array.from(uniqueMap.values());
+  }, [favoritedTeenlancers, pastTeenlancers]);
+
+  const isLoading = activeTab === 'find' ? isLoadingFind : (isLoadingFavorited || isLoadingPast);
+  const isRefetching = activeTab === 'find' ? isRefetchingFind : (isRefetchingFavorited || isRefetchingPast);
+  const teenlancers = activeTab === 'find' ? findTeenlancers : myTeenlancers;
+
   const handleRefresh = () => {
-    refetch();
+    if (activeTab === 'find') {
+      refetchFind();
+    } else {
+      refetchFavorited();
+      refetchPast();
+    }
   };
 
   const containerStyle = isDark ? styles.containerDark : styles.containerLight;
@@ -128,15 +168,40 @@ export default function SelectTeenlancerScreen() {
     <SafeAreaView style={[styles.container, containerStyle]} edges={['bottom', 'left', 'right']}>
       <View style={[styles.header, headerStyle]}>
         <View style={styles.headerRow}>
-          <Text style={[styles.heading, titleStyle]}>Find a Teenlancer</Text>
-          <View style={styles.headerActions}>
-            <TeenlancerFilters filters={filters} onFiltersChange={setFilters} />
-          </View>
+          {activeTab === 'find' ? (
+            <View style={styles.headerActions}>
+              <TeenlancerFilters filters={filters} onFiltersChange={setFilters} />
+            </View>
+          ) : (
+            <View style={styles.headerActionsPlaceholder} />
+          )}
+          <Text style={[styles.heading, titleStyle]}>Teenlancers</Text>
+          <View style={styles.headerActionsPlaceholder} />
+        </View>
+        
+        {/* Tab Buttons */}
+        <View style={styles.tabsContainer}>
+          <Pressable
+            style={[styles.tabButton, activeTab === 'find' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('find')}
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'find' && styles.tabButtonTextActive, isDark && styles.tabButtonTextDark]}>
+              Find Teenlancers
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.tabButton, activeTab === 'past' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('past')}
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'past' && styles.tabButtonTextActive, isDark && styles.tabButtonTextDark]}>
+              My Teenlancers
+            </Text>
+          </Pressable>
         </View>
       </View>
 
-      {/* Active Filters and Sort */}
-      {((filters.minRating || (filters.skills && filters.skills.length > 0) || filters.radius) || getAvailableSortOptions().length > 0) && (
+      {/* Active Filters and Sort - only show for Find Teenlancers tab */}
+      {activeTab === 'find' && ((filters.minRating || (filters.skills && filters.skills.length > 0) || filters.radius) || getAvailableSortOptions().length > 0) && (
         <View style={[styles.filtersContainer, isDark && styles.filtersContainerDark]}>
           <View style={styles.filtersRow}>
             <ScrollView
@@ -243,14 +308,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    width: 48, // Match the width of the placeholder to center the heading
+  },
+  headerActionsPlaceholder: {
+    width: 48, // Match the width of headerActions to center the heading
   },
   heading: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
+    textAlign: 'center',
+    flex: 1,
   },
   titleDark: {
     color: '#FFFFFF',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 8,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: '#73af17',
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  tabButtonTextActive: {
+    color: '#73af17',
+    fontWeight: '600',
+  },
+  tabButtonTextDark: {
+    color: '#9CA3AF',
   },
   listContent: {
     padding: 16,

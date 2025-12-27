@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, Modal, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, Modal, Dimensions } from 'react-native';
+import { ThreeDotsLoader } from '@/components/ui/Loading';
 import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig, useDeleteTask, taskKeys } from '@/hooks/useTasks';
 import { applyForGig } from '@/lib/api/tasks';
 import { useAuthStore } from '@/stores/authStore';
@@ -842,7 +843,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                             disabled={saveGigMutation.isPending || unsaveGigMutation.isPending}
                           >
                             {saveGigMutation.isPending || unsaveGigMutation.isPending ? (
-                              <ActivityIndicator size="small" color="#73af17" />
+                              <ThreeDotsLoader size="small" color="#73af17" />
                             ) : (
                               <>
                                 <Ionicons 

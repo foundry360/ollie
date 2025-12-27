@@ -9,3 +9,5 @@ ADD COLUMN IF NOT EXISTS parent_phone TEXT;
 CREATE INDEX IF NOT EXISTS idx_pending_teen_signups_parent_phone 
 ON public.pending_teen_signups(parent_phone);
 
+
+

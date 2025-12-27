@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Pressable, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
+import { ThreeDotsLoader } from '@/components/ui/Loading';
 import { useRouter } from 'expo-router';
 import { Task, TaskStatus } from '@/types';
 import { useThemeStore } from '@/stores/themeStore';
@@ -150,7 +151,7 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
               disabled={saveGigMutation.isPending || unsaveGigMutation.isPending}
             >
               {saveGigMutation.isPending || unsaveGigMutation.isPending ? (
-                <ActivityIndicator size="small" color="#F97316" />
+                <ThreeDotsLoader color="#F97316" size="small" />
               ) : (
                 <Ionicons 
                   name={isSaved ? "heart" : "heart-outline"} 
