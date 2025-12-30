@@ -10,3 +10,5 @@ COMMENT ON COLUMN public.bank_account_approvals.otp_code IS 'Twilio Verify verif
 
 
 
+
+

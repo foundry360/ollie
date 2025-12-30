@@ -137,9 +137,18 @@ export function NeighborActiveGigs() {
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
           <Text style={[styles.sectionTitle, titleStyle]}>Active Gigs</Text>
-          <Pressable onPress={() => router.push('/(tabs)/tasks')}>
-            <Text style={styles.viewAllText}>View All</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable 
+              onPress={handleCreateGig}
+              style={styles.addButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="add-circle" size={24} color="#73af17" />
+            </Pressable>
+            <Pressable onPress={() => router.push('/(tabs)/tasks')}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </Pressable>
+          </View>
         </View>
         <View style={styles.gigsList}>
           {filteredGigs.map((item) => (
@@ -235,6 +244,14 @@ const styles = StyleSheet.create({
   },
   titleDark: {
     color: '#000000',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  addButton: {
+    padding: 4,
   },
   viewAllText: {
     fontSize: 14,
@@ -353,7 +370,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   assignedText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#F97316',
     fontWeight: '500',
   },

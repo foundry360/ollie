@@ -19,11 +19,12 @@ export default function AgeGateScreen() {
 
   const handleContinue = () => {
     const age = calculateAge(date);
-    if (age < 13) {
-      Alert.alert('Age Requirement', 'You must be at least 13 years old to use Ollie.');
+    if (age < 14) {
+      Alert.alert('Age Requirement', 'You must be at least 14 years old to use Ollie.');
       return;
     }
-    const path = age < 18 ? '/auth/signup-teen' : '/auth/signup-adult';
+    // Route 14-19 year olds to teen signup, 20+ to adult signup
+    const path = age <= 19 ? '/auth/signup-teen' : '/auth/signup-adult';
     router.push({ pathname: path as any, params: { birthdate: date.toISOString() } });
   };
 

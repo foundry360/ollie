@@ -23,30 +23,64 @@ export function TasksNearYou() {
   useEffect(() => {
     // Get user's current location
     const getUserLocation = async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/TasksNearYou.tsx:25',message:'getUserLocation called',data:{userHasAddress:!!user?.address},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/TasksNearYou.tsx:30',message:'Location permission status',data:{status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         if (status === 'granted') {
           const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/TasksNearYou.tsx:35',message:'Device location obtained',data:{latitude:location.coords.latitude,longitude:location.coords.longitude},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           setUserLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           });
           setLocationError(null);
         } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/TasksNearYou.tsx:43',message:'Location permission denied',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           setLocationError('Location permission denied');
         }
       } catch (error: any) {
         console.error('Error getting location:', error);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/TasksNearYou.tsx:48',message:'Location error',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         setLocationError(error.message || 'Failed to get location');
       }
     };
 
     getUserLocation();
-  }, []);
+  }, [user]);
 
   const { data: tasks = [], isLoading, error: tasksError } = useTasksNearUser(userLocation, 10);
+  
+  // #region agent log
+  // All hooks must be at the top before any conditional returns
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/TasksNearYou.tsx:64',message:'TasksNearYou state check',data:{userLocation,locationError,tasksCount:tasks.length,isLoading,hasUserLocation:!!userLocation,hasProfileAddress:!!user?.address},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  }, [userLocation, locationError, tasks.length, isLoading, user?.address]);
+  
+  useEffect(() => {
+    if (!userLocation || locationError) {
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/TasksNearYou.tsx:70',message:'Location check - showing message',data:{userLocation:!!userLocation,locationError,userAddress:user?.address},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    }
+  }, [userLocation, locationError, user?.address]);
+  
+  useEffect(() => {
+    if (tasks.length > 0) {
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/TasksNearYou.tsx:76',message:'Rendering tasks',data:{tasksCount:tasks.length,userLocation:!!userLocation,locationError,userAddress:user?.address},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    }
+  }, [tasks.length, userLocation, locationError, user?.address]);
+  // #endregion
 
   // Get application counts for open gigs
   const openGigIds = useMemo(() => 
@@ -74,7 +108,7 @@ export function TasksNearYou() {
   const cardStyle = isDark ? styles.cardDark : styles.cardLight;
   const textStyle = isDark ? styles.textDark : styles.textLight;
 
-  if (isLoading || !userLocation) {
+  if (isLoading) {
     return (
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
@@ -87,7 +121,11 @@ export function TasksNearYou() {
     );
   }
 
-  if (locationError) {
+  // Show message if location is not available - check BOTH device location AND profile address
+  // User must have an address in their profile to see nearby gigs
+  const hasProfileAddress = !!user?.address;
+  
+  if (!userLocation || locationError || !hasProfileAddress) {
     return (
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
@@ -99,9 +137,11 @@ export function TasksNearYou() {
             size={48}
             color={isDark ? '#6B7280' : '#9CA3AF'}
           />
-          <Text style={[styles.emptyText, textStyle]}>Location unavailable</Text>
+          <Text style={[styles.emptyText, textStyle]}>Update your location</Text>
           <Text style={[styles.emptySubtext, textStyle]}>
-            {locationError}
+            {!hasProfileAddress 
+              ? 'Add your address in your profile to see gigs near you'
+              : 'Enable location services to see gigs near you'}
           </Text>
         </View>
       </View>
@@ -123,6 +163,32 @@ export function TasksNearYou() {
           <Text style={[styles.emptyText, textStyle]}>Error loading gigs</Text>
           <Text style={[styles.emptySubtext, textStyle]}>
             Please try again later
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Don't show tasks if location is not available (double check to prevent cached data from showing)
+  // This ensures we never show tasks when location is unavailable, even if React Query has cached data
+  // Also check profile address - user must have address in profile (reuse hasProfileAddress from above)
+  if (!userLocation || locationError || !hasProfileAddress) {
+    return (
+      <View style={[styles.container, containerStyle]}>
+        <View style={styles.header}>
+          <Text style={[styles.sectionTitle, titleStyle]}>Gigs Near You</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Ionicons
+            name="location-outline"
+            size={48}
+            color={isDark ? '#6B7280' : '#9CA3AF'}
+          />
+          <Text style={[styles.emptyText, textStyle]}>Update your location</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
+            {!hasProfileAddress 
+              ? 'Add your address in your profile to see gigs near you'
+              : 'Enable location services to see gigs near you'}
           </Text>
         </View>
       </View>

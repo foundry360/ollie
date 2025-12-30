@@ -109,6 +109,7 @@ export interface CreateTaskData {
   scheduled_date?: string; // ISO date string (YYYY-MM-DD)
   scheduled_start_time?: string; // 24-hour format (HH:MM)
   scheduled_end_time?: string; // 24-hour format (HH:MM)
+  teen_id?: string; // Optional: if provided, gig is assigned to this teenlancer
 }
 
 export interface UpdateTaskData {
@@ -124,6 +125,7 @@ export interface UpdateTaskData {
   scheduled_date?: string; // ISO date string (YYYY-MM-DD)
   scheduled_start_time?: string; // 24-hour format (HH:MM)
   scheduled_end_time?: string; // 24-hour format (HH:MM)
+  teen_id?: string | null; // Optional: if provided, gig is assigned to this teenlancer; if null, unassigns
 }
 
 // Create a new task
@@ -818,7 +820,12 @@ export async function getTasksNearUser(
       }
     })
     .filter((task): task is TaskWithDistance => task !== null && task.distance <= 25) // Within 25 miles
-    .sort((a, b) => a.distance - b.distance)
+    .sort((a, b) => {
+      // Sort by most recent first (created_at descending)
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateB - dateA;
+    })
     .slice(0, limit);
 
   return tasksWithDistance;

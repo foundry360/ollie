@@ -95,13 +95,28 @@ export default function RequestApprovalScreen() {
   const onSubmit = async (data: RequestFormData) => {
     const age = calculateAgeLocal(data.date_of_birth);
     
-    if (age < 13) {
-      Alert.alert('Age Requirement', 'You must be at least 13 years old to use Ollie.');
+    if (age < 14) {
+      Alert.alert('Age Requirement', 'You must be at least 14 years old to use Ollie.');
       return;
     }
-    if (age >= 18) {
-      Alert.alert('Age Limit', 'Teens must be under 18. Please use the adult signup.');
+    if (age >= 20) {
+      Alert.alert('Age Limit', 'Teens must be under 20. Please use the adult signup.');
       router.replace('/role-selection');
+      return;
+    }
+
+    // For 18-19 year olds: redirect to direct signup (no parent approval needed)
+    if (age >= 18) {
+      // Store birthdate for signup-teen screen
+      await AsyncStorage.setItem('teen_birthdate', data.date_of_birth.toISOString());
+      // Redirect to signup-teen where they can create account directly
+      router.replace({
+        pathname: '/auth/signup-teen',
+        params: {
+          birthdate: data.date_of_birth.toISOString(),
+          age: age.toString()
+        }
+      });
       return;
     }
 

@@ -58,3 +58,5 @@ GRANT EXECUTE ON FUNCTION public.favorite_teenlancer(UUID) TO authenticated;
 -- Add comment
 COMMENT ON FUNCTION public.favorite_teenlancer IS 'Favorites a teenlancer for the current user. Automatically creates the poster profile if it does not exist.';
 
+
+

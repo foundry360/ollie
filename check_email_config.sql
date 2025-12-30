@@ -21,3 +21,5 @@ FROM public.pending_neighbor_applications
 ORDER BY updated_at DESC
 LIMIT 5;
 
+
+

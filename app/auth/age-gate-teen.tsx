@@ -86,12 +86,12 @@ export default function AgeGateTeenScreen() {
     const birthDate = new Date(yearNum, monthNum - 1, dayNum);
     const age = calculateAgeLocal(birthDate);
     
-    if (age < 13) {
-      Alert.alert('Age Requirement', 'You must be at least 13 years old to use Ollie.');
+    if (age < 14) {
+      Alert.alert('Age Requirement', 'You must be at least 14 years old to use Ollie.');
       return;
     }
-    if (age >= 18) {
-      Alert.alert('Age Limit', 'Teens must be under 18. Please use the adult signup.');
+    if (age >= 20) {
+      Alert.alert('Age Limit', 'Teens must be under 20. Please use the adult signup.');
       router.replace('/role-selection');
       return;
     }
@@ -99,7 +99,19 @@ export default function AgeGateTeenScreen() {
     // Store birthdate in AsyncStorage for later use (e.g., check status)
     await AsyncStorage.setItem('teen_birthdate', birthDate.toISOString());
     
-    // Navigate to request approval screen with birthdate
+    // For 18-19 year olds: go directly to signup (no parent approval needed)
+    if (age >= 18) {
+      router.push({
+        pathname: '/auth/signup-teen',
+        params: { 
+          birthdate: birthDate.toISOString(),
+          age: age.toString()
+        }
+      });
+      return;
+    }
+    
+    // For under 18: navigate to request approval screen with birthdate
     router.push({
       pathname: '/auth/request-approval',
       params: { 

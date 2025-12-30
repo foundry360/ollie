@@ -26,9 +26,18 @@ export function TeenlancerCard({ teenlancer, onPress }: TeenlancerCardProps) {
   const unfavoriteMutation = useUnfavoriteTeenlancer();
 
   const handlePress = () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeenlancerCard.tsx:28',message:'TeenlancerCard handlePress called',data:{teenlancerId:teenlancer.id,hasOnPressProp:!!onPress},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     if (onPress) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeenlancerCard.tsx:30',message:'TeenlancerCard calling onPress prop',data:{teenlancerId:teenlancer.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       onPress(teenlancer.id);
     } else {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeenlancerCard.tsx:32',message:'TeenlancerCard opening profile modal',data:{teenlancerId:teenlancer.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       setShowProfileModal(true);
     }
   };

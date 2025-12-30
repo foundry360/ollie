@@ -38,3 +38,5 @@ ADD COLUMN IF NOT EXISTS availability JSONB DEFAULT '{
 
 
 
+
+

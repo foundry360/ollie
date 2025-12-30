@@ -20,9 +20,11 @@ interface ProfileModalProps {
   visible: boolean;
   userId: string | null;
   onClose: () => void;
+  onSelect?: (userId: string) => void;
+  showSelectButton?: boolean;
 }
 
-export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
+export function ProfileModal({ visible, userId, onClose, onSelect, showSelectButton = false }: ProfileModalProps) {
   const { colorScheme } = useThemeStore();
   const { user: currentUser } = useAuthStore();
   const router = useRouter();
@@ -299,9 +301,22 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
               <Text style={[styles.modalTitle, titleStyle, isNeighbor && styles.modalTitleOnGreen]}>
                 Teenlancer Profile
               </Text>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={isNeighbor ? '#FFFFFF' : (isDark ? '#FFFFFF' : '#111827')} />
-              </Pressable>
+              <View style={styles.headerButtons}>
+                {showSelectButton && onSelect && userId && (
+                  <Pressable 
+                    onPress={() => {
+                      onSelect(userId);
+                      onClose();
+                    }}
+                    style={styles.selectButton}
+                  >
+                    <Text style={styles.selectButtonText}>Select</Text>
+                  </Pressable>
+                )}
+                <Pressable onPress={onClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color={isNeighbor ? '#FFFFFF' : (isDark ? '#FFFFFF' : '#111827')} />
+                </Pressable>
+              </View>
             </View>
           </View>
 
@@ -334,7 +349,7 @@ export function ProfileModal({ visible, userId, onClose }: ProfileModalProps) {
               scrollEventThrottle={16}
             >
               {/* Spacer for avatar */}
-              <View style={{ height: 20 }} />
+              <View style={{ height: 90 }} />
               {/* Name */}
               <Text style={[styles.name, titleStyle]}>{profile.full_name}</Text>
 
@@ -753,6 +768,25 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 4,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  selectButton: {
+    backgroundColor: '#73af17',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 80,
+    borderWidth: 1,
+    borderColor: '#5A8F12',
+  },
+  selectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   scrollWrapper: {
     flex: 1,

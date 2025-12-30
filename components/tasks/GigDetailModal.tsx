@@ -565,7 +565,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                       </Text>
                     </View>
                   </View>
-                  {isOpen && (
+                  {isOpen && !task.teen_id && (
                     <View style={styles.applicantsRow}>
                       <Text style={[styles.applicantsText, textStyle]}>
                         Applicants ({applicantCount})
@@ -732,7 +732,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                   </Pressable>
                 </View>
 
-                {isNeighbor && isOpen && (
+                {isNeighbor && isOpen && !task.teen_id && (
                   <View style={[styles.section, sectionStyle]}>
                     <Text style={[titleStyle, styles.sectionTitle]}>Applicants ({applicantCount})</Text>
                     {pendingApplications.length > 0 ? (

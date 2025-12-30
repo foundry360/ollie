@@ -52,3 +52,5 @@ COMMENT ON FUNCTION delete_gig(UUID) IS 'Deletes a gig if the user is the owner 
 
 
 
+
+

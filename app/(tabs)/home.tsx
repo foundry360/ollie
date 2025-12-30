@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useTeenStats } from '@/hooks/useTeenStats';
@@ -86,6 +87,7 @@ export default function HomeScreen() {
   if (isNeighbor) {
     return (
       <SafeAreaView style={[styles.container, containerStyle]} edges={['bottom', 'left', 'right']}>
+        <StatusBar style="light" />
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}

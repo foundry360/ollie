@@ -1,7 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 import { HeaderLogo } from '@/components/ui/HeaderLogo';
-import { Pressable, Text } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export function HeaderBackButton() {
@@ -10,20 +10,39 @@ export function HeaderBackButton() {
   const isDark = colorScheme === 'dark';
   
   return (
-    <Pressable
-      onPress={() => router.back()}
-      android_ripple={null}
+    <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
+        marginBottom: 16,
+        marginTop: 0,
+        alignSelf: 'flex-start',
         gap: 4,
-        marginLeft: 16,
         backgroundColor: 'transparent',
+        borderWidth: 0,
+        borderColor: 'transparent',
+        borderRadius: 0,
+        padding: 0,
+        margin: 0,
       }}
     >
-      <Ionicons name="arrow-back" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
-      <Text style={{ fontSize: 16, color: isDark ? '#FFFFFF' : '#000000' }}>Back</Text>
-    </Pressable>
+      <Pressable
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          backgroundColor: 'transparent',
+          borderWidth: 0,
+          borderColor: 'transparent',
+          borderRadius: 0,
+        }}
+        onPress={() => router.back()}
+        android_ripple={null}
+      >
+        <Ionicons name="arrow-back" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
+        <Text style={{ fontSize: 16, color: isDark ? '#FFFFFF' : '#000000' }}>Back</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -62,7 +81,6 @@ export default function AuthLayout() {
       <Stack.Screen 
         name="age-gate-teen" 
         options={{ 
-          title: 'Age Verification',
           headerShown: false,
         }} 
       />
@@ -168,6 +186,12 @@ export default function AuthLayout() {
         name="complete-neighbor-profile" 
         options={{ 
           title: 'Complete Profile',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="signup-teen" 
+        options={{ 
           headerShown: false,
         }} 
       />

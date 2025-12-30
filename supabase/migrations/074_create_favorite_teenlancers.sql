@@ -32,3 +32,5 @@ CREATE POLICY "Posters can unfavorite teenlancers" ON public.favorite_teenlancer
 -- Add comment for documentation
 COMMENT ON TABLE public.favorite_teenlancers IS 'Allows neighbors (posters) to favorite teenlancers they want to work with again';
 
+
+

@@ -11,3 +11,5 @@ COMMENT ON COLUMN public.pending_neighbor_applications.id_back_photo_url IS 'Sig
 
 
 
+
+

@@ -1,28 +1,50 @@
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Pressable, Image, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '@/stores/authStore';
 import { useSignupStore } from '@/stores/signupStore';
-import { createPendingTeenSignup, sendParentApprovalEmail, signInWithGoogle, signInWithApple } from '@/lib/supabase';
+import { createPendingTeenSignup, sendParentApprovalEmail, signInWithGoogle, signInWithApple, signUp, createUserProfile, getUserProfile } from '@/lib/supabase';
 import { UserRole } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 
-const signupSchema = z.object({
+// Base schema without parent_email requirement
+const baseSignupSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   full_name: z.string().min(2, 'Name must be at least 2 characters'),
   date_of_birth: z.date({
     required_error: 'Date of birth is required',
   }),
-  parent_email: z.string().email('Please enter a valid parent email address'),
+  parent_email: z.string().email('Please enter a valid parent email address').optional().or(z.literal('')),
 });
+
+// Schema with conditional parent_email requirement
+const signupSchema = baseSignupSchema.refine(
+  (data) => {
+    const today = new Date();
+    const birthDate = data.date_of_birth;
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    
+    // If under 18, parent_email is required
+    if (age < 18) {
+      return !!data.parent_email && data.parent_email.trim() !== '';
+    }
+    return true;
+  },
+  {
+    message: 'Parent email is required for users under 18',
+    path: ['parent_email'],
+  }
+);
 
 type SignupFormData = z.infer<typeof signupSchema>;
 
@@ -30,6 +52,7 @@ type OnboardingStep = 'age' | 'details';
 
 export default function SignupTeenScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ birthdate?: string; age?: string }>();
   const { setUser, setLoading } = useAuthStore();
   const { currentStep, setCurrentStep } = useSignupStore();
   const { colorScheme } = useThemeStore();
@@ -38,6 +61,34 @@ export default function SignupTeenScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [birthdate, setBirthdate] = useState(['', '', '', '', '', '', '', '']); // MM/DD/YYYY
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  
+  // If birthdate is passed as param (from request-approval), pre-populate it
+  useEffect(() => {
+    if (params.birthdate) {
+      try {
+        const birthDate = new Date(params.birthdate);
+        const month = String(birthDate.getMonth() + 1).padStart(2, '0');
+        const day = String(birthDate.getDate()).padStart(2, '0');
+        const year = String(birthDate.getFullYear());
+        
+        const birthdateArray = [
+          month[0], month[1],
+          day[0], day[1],
+          year[0], year[1], year[2], year[3]
+        ];
+        setBirthdate(birthdateArray);
+        setValue('date_of_birth', birthDate, { shouldValidate: false });
+        
+        // If age is 18-19, skip to details step
+        const age = params.age ? parseInt(params.age) : calculateAgeLocal(birthDate);
+        if (age >= 18 && age < 20) {
+          setCurrentStep('details');
+        }
+      } catch (error) {
+        console.error('Error parsing birthdate param:', error);
+      }
+    }
+  }, [params.birthdate, params.age]);
   
   // Reset step when component unmounts (user navigates away)
   useEffect(() => {
@@ -62,6 +113,14 @@ export default function SignupTeenScreen() {
     };
   }, []);
 
+  const calculateAgeLocal = (birthdate: Date): number => {
+    const today = new Date();
+    let age = today.getFullYear() - birthdate.getFullYear();
+    const m = today.getMonth() - birthdate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthdate.getDate())) age--;
+    return age;
+  };
+
   const { control, handleSubmit, formState: { errors }, setValue, watch } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
@@ -73,14 +132,9 @@ export default function SignupTeenScreen() {
     },
   });
 
-
-  const calculateAgeLocal = (birthdate: Date): number => {
-    const today = new Date();
-    let age = today.getFullYear() - birthdate.getFullYear();
-    const m = today.getMonth() - birthdate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthdate.getDate())) age--;
-    return age;
-  };
+  // Watch date_of_birth to determine if parent email is required
+  const watchedDateOfBirth = watch('date_of_birth');
+  const requiresParentEmail = watchedDateOfBirth ? calculateAgeLocal(watchedDateOfBirth) < 18 : true;
 
   const handleBirthdateChange = (index: number, value: string) => {
     // Only allow digits
@@ -139,12 +193,12 @@ export default function SignupTeenScreen() {
     
     console.log('Age calculated:', age, 'Birthdate:', birthDate);
     
-    if (age < 13) {
-      Alert.alert('Age Requirement', 'You must be at least 13 years old to use Ollie.');
+    if (age < 14) {
+      Alert.alert('Age Requirement', 'You must be at least 14 years old to use Ollie.');
       return;
     }
-    if (age >= 18) {
-      Alert.alert('Age Limit', 'Teens must be under 18. Please use the adult signup.');
+    if (age >= 20) {
+      Alert.alert('Age Limit', 'Teens must be under 20. Please use the adult signup.');
       router.replace('/role-selection');
       return;
     }
@@ -161,13 +215,23 @@ export default function SignupTeenScreen() {
 
   const onSubmit = async (data: SignupFormData) => {
     const age = calculateAgeLocal(data.date_of_birth);
-    if (age < 13) {
-      Alert.alert('Age Requirement', 'You must be at least 13 years old to use Ollie.');
+    if (age < 14) {
+      Alert.alert('Age Requirement', 'You must be at least 14 years old to use Ollie.');
       return;
     }
-    if (age >= 18) {
-      Alert.alert('Age Limit', 'Teens must be under 18. Please use the adult signup.');
+    if (age >= 20) {
+      Alert.alert('Age Limit', 'Teens must be under 20. Please use the adult signup.');
       router.replace('/role-selection');
+      return;
+    }
+
+    // Check if parent approval is required (under 18)
+    const requiresParentApproval = age < 18;
+    
+    console.log('[signup-teen] Age check:', { age, requiresParentApproval });
+    
+    if (requiresParentApproval && !data.parent_email) {
+      Alert.alert('Parent Email Required', 'Users under 18 must provide a parent email address.');
       return;
     }
 
@@ -175,19 +239,61 @@ export default function SignupTeenScreen() {
     setLoading(true);
 
     try {
+      // For 18-19 year olds: create account directly (no parent approval needed)
+      if (!requiresParentApproval) {
+        console.log('[signup-teen] Creating account directly for 18-19 year old');
+        // Create auth account
+        const signUpResult = await signUp(data.email, data.password, {
+          full_name: data.full_name,
+          role: 'teen'
+        });
+
+        if (!signUpResult?.user) {
+          throw new Error('Failed to create user account');
+        }
+
+        // Create user profile
+        const profile = await createUserProfile(signUpResult.user.id, {
+          email: data.email,
+          full_name: data.full_name,
+          role: 'teen',
+          date_of_birth: data.date_of_birth.toISOString().split('T')[0],
+        });
+
+        if (!profile) {
+          // If profile creation returned null, try to fetch it
+          console.log('[signup-teen] Profile creation returned null, fetching profile');
+          const fetchedProfile = await getUserProfile(signUpResult.user.id);
+          if (!fetchedProfile) {
+            throw new Error('Failed to create user profile');
+          }
+          setUser(fetchedProfile);
+        } else {
+          // Set user in auth store
+          setUser(profile);
+        }
+
+        // Navigate directly without Alert to avoid blocking
+        setIsSubmitting(false);
+        setLoading(false);
+        router.replace('/(tabs)/home');
+        return;
+      }
+
+      // For under 18: require parent approval (existing flow)
       // Create pending signup (doesn't create account yet)
       // Note: parent_phone should be collected on Request Approval page
       // For this direct signup flow, parent_phone is optional
       const pendingSignup = await createPendingTeenSignup({
         full_name: data.full_name,
         date_of_birth: data.date_of_birth.toISOString().split('T')[0],
-        parent_email: data.parent_email,
+        parent_email: data.parent_email!,
         // parent_phone not collected in this flow - should use Request Approval page instead
       });
 
       // Send approval email to parent
       await sendParentApprovalEmail(
-        data.parent_email,
+        data.parent_email!,
         pendingSignup.approval_token,
         {
           teenName: data.full_name,
@@ -197,7 +303,7 @@ export default function SignupTeenScreen() {
       );
 
       // Redirect to pending approval screen
-      router.replace(`/auth/pending-approval?email=${encodeURIComponent(data.email)}&parentEmail=${encodeURIComponent(data.parent_email)}`);
+      router.replace(`/auth/pending-approval?email=${encodeURIComponent(data.email)}&parentEmail=${encodeURIComponent(data.parent_email!)}`);
     } catch (error: any) {
       console.error('Signup error:', error);
       Alert.alert(
@@ -282,12 +388,25 @@ export default function SignupTeenScreen() {
 
   // Signup Details Step
   console.log('Rendering details step');
+  
+  // Check if user is 18-19 years old (no parent approval needed)
+  const is18Or19 = watchedDateOfBirth ? (() => {
+    const age = calculateAgeLocal(watchedDateOfBirth);
+    return age >= 18 && age < 20;
+  })() : false;
+  
   return (
       <SafeAreaView style={[styles.container, containerStyle]} edges={['bottom', 'left', 'right']} key="details-form">
       <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}>
         <Pressable
           style={styles.backButton}
-          onPress={() => setCurrentStep('age')}
+          onPress={() => {
+            if (is18Or19) {
+              router.back();
+            } else {
+              setCurrentStep('age');
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={24} color={isDark ? '#FFFFFF' : '#000000'} />
           <Text style={[styles.backButtonText, isDark && styles.backButtonTextDark]}>Back</Text>
@@ -356,24 +475,26 @@ export default function SignupTeenScreen() {
           )}
         />
 
-        <Controller
-          control={control}
-          name="parent_email"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <Input
-              label="Parent Email"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.parent_email?.message}
-              required
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              placeholder="parent@example.com"
-            />
-          )}
-        />
+        {requiresParentEmail && (
+          <Controller
+            control={control}
+            name="parent_email"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <Input
+                label="Parent Email"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.parent_email?.message}
+                required
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                placeholder="parent@example.com"
+              />
+            )}
+          />
+        )}
 
         <Button
           title="Create Account"
@@ -392,47 +513,52 @@ export default function SignupTeenScreen() {
           </Text>
         </View>
 
-        <View style={[styles.divider, isDark && styles.dividerDark]}>
-          <View style={[styles.dividerLine, isDark && styles.dividerLineDark]} />
-          <Text style={[styles.dividerText, isDark && styles.dividerTextDark]}>OR</Text>
-          <View style={[styles.dividerLine, isDark && styles.dividerLineDark]} />
-        </View>
+        {/* Social auth buttons hidden for now */}
+        {false && (
+          <>
+            <View style={[styles.divider, isDark && styles.dividerDark]}>
+              <View style={[styles.dividerLine, isDark && styles.dividerLineDark]} />
+              <Text style={[styles.dividerText, isDark && styles.dividerTextDark]}>OR</Text>
+              <View style={[styles.dividerLine, isDark && styles.dividerLineDark]} />
+            </View>
 
-        <View style={styles.socialButtons}>
-          <Pressable
-            style={[styles.socialButton, isDark && styles.socialButtonDark]}
-            onPress={async () => {
-              try {
-                await signInWithGoogle();
-                // OAuth will redirect, so we don't need to handle the response here
-              } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to sign in with Google');
-              }
-            }}
-          >
-            <Ionicons name="logo-google" size={20} color={isDark ? '#9CA3AF' : '#666666'} />
-            <Text style={[styles.socialButtonText, isDark && styles.socialButtonTextDark]}>
-              Google
-            </Text>
-          </Pressable>
+            <View style={styles.socialButtons}>
+              <Pressable
+                style={[styles.socialButton, isDark && styles.socialButtonDark]}
+                onPress={async () => {
+                  try {
+                    await signInWithGoogle();
+                    // OAuth will redirect, so we don't need to handle the response here
+                  } catch (error: any) {
+                    Alert.alert('Error', error.message || 'Failed to sign in with Google');
+                  }
+                }}
+              >
+                <Ionicons name="logo-google" size={20} color={isDark ? '#9CA3AF' : '#666666'} />
+                <Text style={[styles.socialButtonText, isDark && styles.socialButtonTextDark]}>
+                  Google
+                </Text>
+              </Pressable>
 
-          <Pressable
-            style={[styles.socialButton, isDark && styles.socialButtonDark]}
-            onPress={async () => {
-              try {
-                await signInWithApple();
-                // OAuth will redirect, so we don't need to handle the response here
-              } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to sign in with Apple');
-              }
-            }}
-          >
-            <Ionicons name="logo-apple" size={20} color={isDark ? '#9CA3AF' : '#666666'} />
-            <Text style={[styles.socialButtonText, isDark && styles.socialButtonTextDark]}>
-              Apple
-            </Text>
-          </Pressable>
-        </View>
+              <Pressable
+                style={[styles.socialButton, isDark && styles.socialButtonDark]}
+                onPress={async () => {
+                  try {
+                    await signInWithApple();
+                    // OAuth will redirect, so we don't need to handle the response here
+                  } catch (error: any) {
+                    Alert.alert('Error', error.message || 'Failed to sign in with Apple');
+                  }
+                }}
+              >
+                <Ionicons name="logo-apple" size={20} color={isDark ? '#9CA3AF' : '#666666'} />
+                <Text style={[styles.socialButtonText, isDark && styles.socialButtonTextDark]}>
+                  Apple
+                </Text>
+              </Pressable>
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

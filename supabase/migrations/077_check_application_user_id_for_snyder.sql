@@ -35,3 +35,5 @@ FROM public.users pu
 LEFT JOIN auth.users au ON pu.email = au.email
 WHERE pu.email = 'snyderlacrosse@gmail.com' OR au.email = 'snyderlacrosse@gmail.com';
 
+
+
