@@ -28,7 +28,7 @@ export default function TasksLayout() {
           paddingBottom: 24,
         },
         headerShadowVisible: false,
-        headerTintColor: isDark ? '#FFFFFF' : '#000000',
+        headerTintColor: '#FFFFFF',
         headerBackTitleVisible: false,
       }}
     >

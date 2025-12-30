@@ -204,17 +204,17 @@ export interface BankAccountApprovalStatus {
   expires_at?: string;
   attempts?: number;
   verified_at?: string;
-  parent_phone_masked?: string;
+  parent_email_masked?: string;
 }
 
 /**
- * Request parent approval for bank account setup
- * Sends an OTP code to the parent's phone number using Supabase auth (same as neighbor signup)
+ * Request parent to set up bank account
+ * Sends an email to the parent with a secure link to enter bank account details
  */
-export async function requestBankAccountApproval(): Promise<{
+export async function requestBankAccountSetup(): Promise<{
   success: boolean;
   expires_at: string;
-  parent_phone_masked?: string;
+  parent_email_masked?: string;
 }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('User not authenticated');
@@ -225,7 +225,7 @@ export async function requestBankAccountApproval(): Promise<{
 
   const { data: teenUser, error: teenError } = await supabase
     .from('users')
-    .select('id, parent_id, role')
+    .select('id, parent_id, role, full_name')
     .eq('id', user.id)
     .single();
 
@@ -234,49 +234,52 @@ export async function requestBankAccountApproval(): Promise<{
   }
 
   if (teenUser.role !== 'teen') {
-    throw new Error('Only teens can request bank account approval');
+    throw new Error('Only teens can request bank account setup');
   }
 
   if (!teenUser.parent_id) {
     throw new Error('No parent associated with this account');
   }
 
-  // Get parent's phone number using database function (bypasses RLS)
-  // Migration 032 removed parent-child queries from RLS to avoid recursion
-  // So we use a SECURITY DEFINER function to safely get the parent's phone
-  const { data: parentPhoneResult, error: parentPhoneError } = await supabase
-    .rpc('get_parent_phone_for_bank_approval');
+  // Get parent's information (email, phone, full_name) using database function
+  const { data: parentInfoResult, error: parentInfoError } = await supabase
+    .rpc('get_parent_info_for_bank_setup');
 
-  if (parentPhoneError) {
-    console.error('Error fetching parent phone:', parentPhoneError);
-    throw new Error(`Failed to fetch parent phone: ${parentPhoneError.message}`);
+  if (parentInfoError) {
+    console.error('Error fetching parent info:', parentInfoError);
+    throw new Error(`Failed to fetch parent information: ${parentInfoError.message}`);
   }
 
-  // The function returns a single TEXT value (the phone number)
-  const parentPhone = parentPhoneResult?.trim() || '';
-  if (!parentPhone) {
-    throw new Error('Parent phone number not found. Please ensure the parent account exists and has a phone number.');
+  // The function returns a single row with email, phone, full_name
+  if (!parentInfoResult || parentInfoResult.length === 0 || !parentInfoResult[0]?.email) {
+    throw new Error('Parent email not found. Please ensure the parent account exists and has an email address.');
   }
 
-  // Normalize phone number (ensure E.164 format)
-  const normalizedPhone = parentPhone.trim().replace(/\s+/g, '');
-  const finalParentPhone = normalizedPhone.startsWith('+') ? normalizedPhone : `+${normalizedPhone}`;
+  const parentEmail = parentInfoResult[0].email;
+  const parentPhone = parentInfoResult[0].phone || null;
 
-  // Set expiration to 15 minutes from now
+  // Generate secure token for email link
+  const { randomUUID } = await import('expo-crypto');
+  const setupToken = randomUUID();
+  
+  // Set expiration to 7 days from now (email links last longer than OTP)
   const expiresAt = new Date();
-  expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+  expiresAt.setDate(expiresAt.getDate() + 7);
+  const tokenExpiresAt = expiresAt.toISOString();
 
-  // Create or update approval record
+  // Create or update approval record with token
   const { data: approval, error: approvalError } = await supabase
     .from('bank_account_approvals')
     .upsert({
       teen_id: teenUser.id,
-      parent_phone: finalParentPhone,
-      otp_code: null, // Will be set after OTP is sent (if needed for tracking)
+      parent_phone: parentPhone, // Keep for reference, but not required
+      setup_token: setupToken,
+      token_expires_at: tokenExpiresAt,
       status: 'pending',
-      expires_at: expiresAt.toISOString(),
+      expires_at: tokenExpiresAt, // Use same expiration for consistency
       attempts: 0,
       verified_at: null,
+      otp_code: null, // Not used in email flow
     }, {
       onConflict: 'teen_id',
       ignoreDuplicates: false,
@@ -289,20 +292,53 @@ export async function requestBankAccountApproval(): Promise<{
     throw new Error('Failed to create approval record');
   }
 
-  // Send OTP using Supabase auth (same as neighbor signup)
-  // This uses Twilio Verify automatically through Supabase's phone provider
-  const { sendPhoneOTP } = await import('@/lib/supabase');
+  // Send email via Edge Function
+  const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || 'https://olliejobs.com';
   
   try {
-    await sendPhoneOTP(finalParentPhone);
+    const { data: emailResult, error: emailError } = await supabase.functions.invoke(
+      'send-bank-account-setup-email',
+      {
+        body: {
+          parent_email: parentEmail,
+          teen_name: teenUser.full_name,
+          setup_token: setupToken,
+          web_app_url: webAppUrl,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }
+    );
+
+    if (emailError) {
+      console.error('Error sending email:', emailError);
+      // Update approval status to reflect failure
+      await supabase
+        .from('bank_account_approvals')
+        .update({ status: 'expired' })
+        .eq('id', approval.id);
+      throw new Error('Failed to send setup email');
+    }
+
+    if (!emailResult?.success) {
+      // Update approval status to reflect failure
+      await supabase
+        .from('bank_account_approvals')
+        .update({ status: 'expired' })
+        .eq('id', approval.id);
+      throw new Error(emailResult?.error || 'Failed to send setup email');
+    }
     
-    // Mask phone number for display
-    const maskedPhone = finalParentPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1***$2****');
+    // Mask email for display
+    const maskedEmail = parentEmail.replace(/(.{2})(.*)(@.*)/, (match, start, middle, domain) => {
+      return `${start}***${domain}`;
+    });
     
     return {
       success: true,
-      expires_at: expiresAt.toISOString(),
-      parent_phone_masked: maskedPhone,
+      expires_at: tokenExpiresAt,
+      parent_email_masked: maskedEmail,
     };
   } catch (error: any) {
     // Update approval status to reflect failure
@@ -316,200 +352,7 @@ export async function requestBankAccountApproval(): Promise<{
 }
 
 /**
- * Verify the OTP code for bank account approval
- * Uses Supabase auth.verifyOtp (same as neighbor signup)
- * @param otpCode - The 6-digit OTP code received by the parent
- */
-export async function verifyBankAccountApprovalOTP(otpCode: string): Promise<{
-  approved: boolean;
-  verified_at: string;
-}> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('User not authenticated');
-
-  // Get teen user profile to find parent
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not found');
-
-  const { data: teenUser, error: teenError } = await supabase
-    .from('users')
-    .select('id, parent_id, role')
-    .eq('id', user.id)
-    .single();
-
-  if (teenError || !teenUser) {
-    throw new Error('User profile not found');
-  }
-
-  if (teenUser.role !== 'teen') {
-    throw new Error('Only teens can verify bank account approval OTP');
-  }
-
-  // Get pending approval
-  const { data: approval, error: approvalError } = await supabase
-    .from('bank_account_approvals')
-    .select('*')
-    .eq('teen_id', teenUser.id)
-    .single();
-
-  if (approvalError || !approval) {
-    throw new Error('No approval request found. Please request a new OTP code.');
-  }
-
-  // Check if already approved
-  if (approval.status === 'approved') {
-    return {
-      approved: true,
-      verified_at: approval.verified_at || new Date().toISOString(),
-    };
-  }
-
-  // Check if expired
-  const expiresAt = new Date(approval.expires_at);
-  if (expiresAt <= new Date()) {
-    await supabase
-      .from('bank_account_approvals')
-      .update({ status: 'expired' })
-      .eq('id', approval.id);
-    throw new Error('OTP code has expired. Please request a new code.');
-  }
-
-  // Check max attempts
-  if (approval.attempts >= 5) {
-    await supabase
-      .from('bank_account_approvals')
-      .update({ status: 'expired' })
-      .eq('id', approval.id);
-    throw new Error('Maximum verification attempts reached. Please request a new OTP code.');
-  }
-
-  // Verify OTP using Supabase auth, but restore session immediately to prevent redirect
-  // Since we're using sendPhoneOTP (Supabase auth), we need to verify with verifyPhoneOTP
-  // However, this might create a session for the parent's phone, so we restore the teen's session after
-  const { verifyPhoneOTP } = await import('@/lib/supabase');
-
-  // Save current session and user ID before verification
-  const { data: { session: currentSession } } = await supabase.auth.getSession();
-  if (!currentSession) throw new Error('User not authenticated');
-  
-  const { data: { user: currentUser } } = await supabase.auth.getUser();
-  const currentUserId = currentUser?.id;
-
-  // Set flag to suppress navigation during OTP verification
-  const { useAuthStore } = await import('@/stores/authStore');
-  useAuthStore.getState().setSuppressingNavigation(true);
-
-  try {
-    // Verify the code - this uses Twilio Verify through Supabase
-    // It might create a session for the parent's phone, so we'll restore the teen's session after
-    await verifyPhoneOTP(approval.parent_phone, otpCode);
-    
-    // Check if session changed (user ID might have changed)
-    const { data: { user: userAfterVerify } } = await supabase.auth.getUser();
-    const userIdAfterVerify = userAfterVerify?.id;
-    
-    // If the user ID changed, we need to restore the original session immediately
-    if (userIdAfterVerify !== currentUserId) {
-      console.log('Session changed after OTP verification, restoring original session...');
-      
-      // Immediately restore the original session to prevent navigation
-      const { error: restoreError } = await supabase.auth.setSession({
-        access_token: currentSession.access_token,
-        refresh_token: currentSession.refresh_token,
-      });
-      
-      if (restoreError) {
-        console.error('Failed to restore session after OTP verification:', restoreError);
-        // Try to sign out and sign back in with the original session
-        await supabase.auth.signOut();
-        const { error: restoreError2 } = await supabase.auth.setSession({
-          access_token: currentSession.access_token,
-          refresh_token: currentSession.refresh_token,
-        });
-        
-        if (restoreError2) {
-          console.error('Failed to restore session on second attempt:', restoreError2);
-          throw new Error('Session restoration failed. Please try again.');
-        }
-      }
-      
-      // Verify we're back to the original user
-      const { data: { user: userAfterRestore } } = await supabase.auth.getUser();
-      if (userAfterRestore?.id !== currentUserId) {
-        console.error('Session restoration failed - user ID mismatch');
-        throw new Error('Session restoration failed. Please try again.');
-      }
-      
-      // Refresh user profile in auth store immediately to prevent navigation issues
-      // The onAuthStateChange listener might have updated it with the wrong user
-      if (currentUserId) {
-        try {
-          const { getUserProfile } = await import('@/lib/supabase');
-          const refreshedProfile = await getUserProfile(currentUserId);
-          // Immediately update auth store to prevent navigation redirects
-          // Update store BEFORE clearing suppression flag
-          useAuthStore.getState().setUser(refreshedProfile);
-          
-          // Small delay to ensure store update is processed
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (profileError) {
-          console.warn('Failed to refresh user profile after session restoration:', profileError);
-          // Continue anyway - the session is restored
-        }
-      }
-      
-      // Clear navigation suppression flag AFTER auth store is updated
-      useAuthStore.getState().setSuppressingNavigation(false);
-    }
-    
-    // OTP is valid! Update approval status
-    const verifiedAt = new Date().toISOString();
-    const { error: updateError } = await supabase
-      .from('bank_account_approvals')
-      .update({
-        status: 'approved',
-        verified_at: verifiedAt,
-        attempts: approval.attempts + 1,
-      })
-      .eq('id', approval.id);
-
-    if (updateError) {
-      console.error('Error updating approval:', updateError);
-      throw new Error('Failed to update approval status');
-    }
-
-    return {
-      approved: true,
-      verified_at: verifiedAt,
-    };
-  } catch (error: any) {
-    // Always clear navigation suppression flag on error
-    const { useAuthStore } = await import('@/stores/authStore');
-    useAuthStore.getState().setSuppressingNavigation(false);
-    
-    // Increment attempts
-    const newAttempts = approval.attempts + 1;
-    await supabase
-      .from('bank_account_approvals')
-      .update({
-        attempts: newAttempts,
-        status: newAttempts >= 5 ? 'expired' : approval.status,
-      })
-      .eq('id', approval.id);
-
-    // Re-throw with helpful message
-    if (error.message?.toLowerCase().includes('expired')) {
-      throw new Error('This verification code has expired. Please request a new one.');
-    }
-    if (error.message?.toLowerCase().includes('invalid')) {
-      throw new Error('Invalid verification code. Please check and try again.');
-    }
-    throw error;
-  }
-}
-
-/**
- * Get the current bank account approval status for the teen
+ * Get the current bank account approval/setup status for the teen
  */
 export async function getBankAccountApprovalStatus(): Promise<BankAccountApprovalStatus> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -519,45 +362,56 @@ export async function getBankAccountApprovalStatus(): Promise<BankAccountApprova
   if (!user) throw new Error('User not authenticated');
 
   // Query the bank_account_approvals table
-  const { data, error } = await supabase
+  // Get parent email from users table via parent_id
+  const { data: approvalData, error: approvalError } = await supabase
     .from('bank_account_approvals')
-    .select('status, expires_at, attempts, verified_at, parent_phone')
+    .select('status, expires_at, attempts, verified_at, token_expires_at')
     .eq('teen_id', user.id)
     .single();
 
-  if (error) {
+  if (approvalError) {
     // If no record found, return 'none' status
-    if (error.code === 'PGRST116') {
+    if (approvalError.code === 'PGRST116') {
       return { status: 'none' };
     }
-    throw error;
+    throw approvalError;
   }
 
-  // Check if expired
-  if (data.status === 'pending' && data.expires_at) {
-    const expiresAt = new Date(data.expires_at);
+  // Get parent email for masking (using RPC function to bypass RLS)
+  let parentEmailMasked: string | undefined;
+  try {
+    const { data: parentInfo } = await supabase.rpc('get_parent_info_for_bank_setup');
+    if (parentInfo && parentInfo.length > 0 && parentInfo[0]?.email) {
+      const email = parentInfo[0].email;
+      parentEmailMasked = email.replace(/(.{2})(.*)(@.*)/, (match, start, middle, domain) => {
+        return `${start}***${domain}`;
+      });
+    }
+  } catch (error) {
+    console.warn('Could not fetch parent email for masking:', error);
+  }
+
+  // Check if expired (use token_expires_at if available, otherwise expires_at)
+  const expirationDate = approvalData.token_expires_at || approvalData.expires_at;
+  if (approvalData.status === 'pending' && expirationDate) {
+    const expiresAt = new Date(expirationDate);
     const now = new Date();
     if (expiresAt <= now) {
       return {
         status: 'expired',
-        expires_at: data.expires_at,
-        attempts: data.attempts,
+        expires_at: expirationDate,
+        attempts: approvalData.attempts,
+        parent_email_masked: parentEmailMasked,
       };
     }
   }
 
-  // Mask parent phone for privacy
-  let parentPhoneMasked: string | undefined;
-  if (data.parent_phone) {
-    parentPhoneMasked = data.parent_phone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1***$2****');
-  }
-
   return {
-    status: data.status as 'pending' | 'approved' | 'expired',
-    expires_at: data.expires_at,
-    attempts: data.attempts,
-    verified_at: data.verified_at,
-    parent_phone_masked: parentPhoneMasked,
+    status: approvalData.status as 'pending' | 'approved' | 'expired',
+    expires_at: expirationDate,
+    attempts: approvalData.attempts,
+    verified_at: approvalData.verified_at,
+    parent_email_masked: parentEmailMasked,
   };
 }
 

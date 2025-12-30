@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Alert, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
@@ -7,8 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { 
-  requestBankAccountApproval, 
-  verifyBankAccountApprovalOTP, 
+  requestBankAccountSetup, 
   getBankAccountApprovalStatus,
   getBankAccount,
   deleteBankAccount,
@@ -27,10 +26,7 @@ export default function PaymentSetupScreen() {
   const [approvalStatus, setApprovalStatus] = useState<BankAccountApprovalStatus | null>(null);
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
-  const [requestingOTP, setRequestingOTP] = useState(false);
-  const [verifyingOTP, setVerifyingOTP] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpError, setOtpError] = useState('');
+  const [requestingSetup, setRequestingSetup] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   // Load approval status and bank account on mount
@@ -45,99 +41,53 @@ export default function PaymentSetupScreen() {
 
   const loadData = async () => {
     setLoading(true);
-    try {
-      const needsParentApproval = user?.parent_id != null;
-      
-      // Load approval status if needed
-      if (needsParentApproval) {
+    
+    // Load approval status first (for teens)
+    if (user?.role === 'teen') {
+      try {
         const status = await getBankAccountApprovalStatus();
         setApprovalStatus(status);
+      } catch (error: any) {
+        console.error('Error loading approval status:', error);
+        // If no approval record exists, that's fine - status will be 'none'
+        setApprovalStatus({ status: 'none' });
       }
-      
-      // Always try to load bank account
+    }
+    
+    // Load bank account (this can fail independently)
+    try {
       const account = await getBankAccount();
       setBankAccount(account);
     } catch (error: any) {
-      console.error('Error loading data:', error);
+      console.error('Error loading bank account:', error);
       // If no bank account exists, that's fine
       setBankAccount(null);
-      if (user?.parent_id != null) {
-        setApprovalStatus({ status: 'none' });
-      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Check if teen needs parent approval (has parent_id)
-  const needsParentApproval = user?.parent_id != null;
+  // All teens need parent approval for bank account setup (new flow requires parent to enter bank account info)
+  const needsParentApproval = user?.role === 'teen';
   const approvalRequired = needsParentApproval && approvalStatus?.status !== 'approved';
 
 
-  const handleRequestApproval = async () => {
-    setRequestingOTP(true);
-    setOtpError('');
+  const handleRequestSetup = async () => {
+    setRequestingSetup(true);
     try {
-      const result = await requestBankAccountApproval();
+      const result = await requestBankAccountSetup();
       Alert.alert(
-        'OTP Sent',
-        `A verification code has been sent to your parent's phone ${result.parent_phone_masked || ''}. Please ask your parent for the code and enter it below.`,
+        'Email Sent',
+        `We've sent an email to your parent (${result.parent_email_masked || 'your parent'}) with a secure link to set up your bank account. Once they complete the setup, you'll be able to receive payments.`,
         [{ text: 'OK' }]
       );
       // Reload status to reflect pending state
       await loadData();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send OTP code');
+      Alert.alert('Error', error.message || 'Failed to send setup email');
     } finally {
-      setRequestingOTP(false);
+      setRequestingSetup(false);
     }
-  };
-
-  const handleVerifyOTP = async () => {
-    if (!otpCode.trim() || otpCode.length !== 6) {
-      setOtpError('Please enter a valid 6-digit code');
-      return;
-    }
-
-    setVerifyingOTP(true);
-    setOtpError('');
-    try {
-      await verifyBankAccountApprovalOTP(otpCode);
-      
-      // Refresh user profile to ensure auth store has correct user after session restoration
-      try {
-        const { getUserProfile, supabase: supabaseClient } = await import('@/lib/supabase');
-        const { useAuthStore } = await import('@/stores/authStore');
-        const { data: { user: currentAuthUser } } = await supabaseClient.auth.getUser();
-        if (currentAuthUser) {
-          const refreshedProfile = await getUserProfile(currentAuthUser.id);
-          useAuthStore.getState().setUser(refreshedProfile);
-        }
-      } catch (profileError) {
-        console.warn('Failed to refresh user profile:', profileError);
-      }
-      
-      // Refresh data immediately (before alert) to update UI
-      await loadData();
-      
-      Alert.alert(
-        'Approved!',
-        'Your bank account setup has been approved. You can now add your bank account.',
-        [{ text: 'OK', onPress: () => {
-          setOtpCode('');
-        }}]
-      );
-    } catch (error: any) {
-      setOtpError(error.message || 'Invalid OTP code. Please try again.');
-      // Reload status to get updated attempts count
-      await loadData();
-    } finally {
-      setVerifyingOTP(false);
-    }
-  };
-
-  const handleAddBankAccount = () => {
-    router.push('/payments/bank-account-setup');
   };
 
   const handleDeleteBankAccount = async () => {
@@ -246,99 +196,51 @@ export default function PaymentSetupScreen() {
             {approvalStatus?.status === 'approved' ? (
               <>
                 <Text style={[styles.description, textStyle]}>
-                  Your parent has approved bank account setup. You can now add your bank account details.
+                  Your parent has received the setup link. Once they complete the bank account setup, you'll see it here.
                 </Text>
-                <Button
-                  title="Add Bank Account"
-                  onPress={handleAddBankAccount}
-                  fullWidth
-                />
               </>
             ) : approvalStatus?.status === 'pending' ? (
               <>
                 <Text style={[styles.description, textStyle]}>
-                  A verification code has been sent to your parent's phone {approvalStatus.parent_phone_masked || ''}. 
-                  Please ask your parent for the code and enter it below.
+                  We've sent an email to your parent ({approvalStatus.parent_email_masked || 'your parent'}) with a secure link to set up your bank account. Once they complete the setup, you'll be able to receive payments.
                 </Text>
                 
                 {approvalStatus.expires_at && (
                   <View style={[styles.infoBox, isDark ? styles.infoBoxDark : styles.infoBoxLight]}>
                     <Ionicons name="time-outline" size={16} color="#F59E0B" />
                     <Text style={[styles.infoBoxText, textStyle]}>
-                      Code expires: {new Date(approvalStatus.expires_at).toLocaleTimeString()}
+                      Link expires: {new Date(approvalStatus.expires_at).toLocaleDateString()} at {new Date(approvalStatus.expires_at).toLocaleTimeString()}
                     </Text>
                   </View>
                 )}
 
-                {approvalStatus.attempts !== undefined && approvalStatus.attempts > 0 && (
-                  <View style={[styles.infoBox, isDark ? styles.infoBoxDark : styles.infoBoxLight]}>
-                    <Ionicons name="alert-circle-outline" size={16} color="#F59E0B" />
-                    <Text style={[styles.infoBoxText, textStyle]}>
-                      Attempts remaining: {5 - approvalStatus.attempts}
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.otpContainer}>
-                  <Text style={[styles.otpLabel, textStyle]}>Enter OTP Code</Text>
-                  <TextInput
-                    style={[
-                      styles.otpInput,
-                      isDark ? styles.otpInputDark : styles.otpInputLight,
-                      otpError && styles.otpInputError
-                    ]}
-                    value={otpCode}
-                    onChangeText={(text) => {
-                      // Only allow digits, max 6 characters
-                      const cleaned = text.replace(/\D/g, '').slice(0, 6);
-                      setOtpCode(cleaned);
-                      setOtpError('');
-                    }}
-                    placeholder="123456"
-                    placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    autoComplete="sms-otp"
-                  />
-                  {otpError ? (
-                    <Text style={styles.errorText}>{otpError}</Text>
-                  ) : null}
-                  <Button
-                    title="Verify OTP"
-                    onPress={handleVerifyOTP}
-                    loading={verifyingOTP}
-                    disabled={otpCode.length !== 6 || verifyingOTP}
-                    fullWidth
-                  />
-                </View>
-
-                <Pressable onPress={handleRequestApproval} disabled={requestingOTP} style={styles.resendButton}>
+                <Pressable onPress={handleRequestSetup} disabled={requestingSetup} style={styles.resendButton}>
                   <Text style={[styles.resendText, textStyle]}>
-                    {requestingOTP ? 'Sending...' : "Didn't receive code? Resend"}
+                    {requestingSetup ? 'Sending...' : "Didn't receive email? Resend"}
                   </Text>
                 </Pressable>
               </>
             ) : approvalStatus?.status === 'expired' ? (
               <>
                 <Text style={[styles.description, textStyle]}>
-                  The verification code has expired. Please request a new code.
+                  The setup link has expired. Please request a new one.
                 </Text>
                 <Button
-                  title="Request New Code"
-                  onPress={handleRequestApproval}
-                  loading={requestingOTP}
+                  title="Request New Link"
+                  onPress={handleRequestSetup}
+                  loading={requestingSetup}
                   fullWidth
                 />
               </>
             ) : (
               <>
                 <Text style={[styles.description, textStyle]}>
-                  You need your parent's approval to set up a bank account. We'll send a verification code to your parent's phone.
+                  You need your parent to set up your bank account. We'll send them an email with a secure link to enter the bank account details.
                 </Text>
                 <Button
-                  title="Request Parent Approval"
-                  onPress={handleRequestApproval}
-                  loading={requestingOTP}
+                  title="Request Bank Account Setup"
+                  onPress={handleRequestSetup}
+                  loading={requestingSetup}
                   fullWidth
                 />
               </>
@@ -346,9 +248,8 @@ export default function PaymentSetupScreen() {
           </View>
         )}
 
-        {/* Bank Account Info Section - Show when bank account exists, or when no approval needed */}
-        {/* Bank Account Info Section - Only show when bank account exists, or when no approval needed */}
-        {(bankAccount || !needsParentApproval) && (
+        {/* Bank Account Info Section - Only show when bank account exists */}
+        {bankAccount && (
           <View style={[styles.section, cardStyle]}>
             <View style={styles.statusHeader}>
               <Ionicons 
@@ -361,10 +262,9 @@ export default function PaymentSetupScreen() {
               </Text>
             </View>
 
-            {bankAccount ? (
-              <>
-                {/* Display existing bank account info */}
-                <View style={styles.accountInfo}>
+            <>
+              {/* Display existing bank account info */}
+              <View style={styles.accountInfo}>
                   <View style={[styles.accountInfoRow, isDark && styles.accountInfoRowDark]}>
                     <Text style={[styles.accountInfoLabel, textStyle]}>Account Type:</Text>
                     <Text style={[styles.accountInfoValue, isDark ? styles.accountInfoValueDark : styles.accountInfoValueLight]}>
@@ -465,50 +365,21 @@ export default function PaymentSetupScreen() {
                     <View style={[styles.infoBox, { backgroundColor: '#FEE2E2' }, isDark && { backgroundColor: '#7F1D1D' }]}>
                       <Ionicons name="alert-circle" size={20} color="#EF4444" />
                       <Text style={[styles.infoBoxText, { color: '#991B1B' }, isDark && { color: '#FCA5A5' }]}>
-                        Verification failed. Please add a new bank account.
+                        Verification failed. Please delete this account and request a new setup link for your parent.
                       </Text>
                     </View>
-                    <Button
-                      title="Add New Bank Account"
-                      onPress={handleAddBankAccount}
-                      fullWidth
-                    />
+                    <View style={{ marginTop: 12 }}>
+                      <Button
+                        title="Delete Bank Account"
+                        onPress={handleDeleteBankAccount}
+                        loading={deleting}
+                        fullWidth
+                        variant="danger"
+                      />
+                    </View>
                   </>
                 )}
               </>
-            ) : (
-              <>
-                {/* No bank account - show setup instructions */}
-                <Text style={[styles.description, textStyle]}>
-                  Add your bank account details to receive payments directly.
-                </Text>
-
-                <View style={styles.infoItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#73af17" />
-                  <Text style={[styles.infoText, textStyle]}>
-                    Add your bank account details
-                  </Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#73af17" />
-                  <Text style={[styles.infoText, textStyle]}>
-                    Payments will be automatically transferred to your account
-                  </Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#73af17" />
-                  <Text style={[styles.infoText, textStyle]}>
-                    Funds arrive within 2-3 business days
-                  </Text>
-                </View>
-
-                <Button
-                  title="Add Bank Account"
-                  onPress={handleAddBankAccount}
-                  fullWidth
-                />
-              </>
-            )}
           </View>
         )}
       </ScrollView>
@@ -597,44 +468,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginLeft: 12,
     flex: 1,
-  },
-  otpContainer: {
-    marginTop: 20,
-  },
-  otpLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  otpInput: {
-    fontSize: 24,
-    fontWeight: '600',
-    textAlign: 'center',
-    letterSpacing: 8,
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  otpInputLight: {
-    backgroundColor: '#F3F4F6',
-    color: '#111827',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  otpInputDark: {
-    backgroundColor: '#374151',
-    color: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#4B5563',
-  },
-  otpInputError: {
-    borderColor: '#DC2626',
-  },
-  errorText: {
-    color: '#DC2626',
-    fontSize: 14,
-    marginBottom: 12,
-    textAlign: 'center',
   },
   resendButton: {
     marginTop: 16,
