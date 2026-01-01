@@ -59,6 +59,44 @@ serve(async (req) => {
       )
     }
 
+    // Fetch billing details from Stripe for each payment method
+    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY')
+    if (stripeSecretKey && paymentMethods && paymentMethods.length > 0) {
+      const paymentMethodsWithBilling = await Promise.all(
+        paymentMethods.map(async (pm: any) => {
+          try {
+            const pmResponse = await fetch(`https://api.stripe.com/v1/payment_methods/${pm.stripe_payment_method_id}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${stripeSecretKey}`,
+              },
+            })
+
+            if (pmResponse.ok) {
+              const stripePm = await pmResponse.json()
+              return {
+                ...pm,
+                billing_name: stripePm.billing_details?.name || null,
+                billing_phone: stripePm.billing_details?.phone || null,
+                billing_address_line1: stripePm.billing_details?.address?.line1 || null,
+                billing_city: stripePm.billing_details?.address?.city || null,
+                billing_state: stripePm.billing_details?.address?.state || null,
+                billing_postal_code: stripePm.billing_details?.address?.postal_code || null,
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching billing details for ${pm.stripe_payment_method_id}:`, error)
+          }
+          return pm
+        })
+      )
+
+      return new Response(
+        JSON.stringify({ payment_methods: paymentMethodsWithBilling || [] }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     return new Response(
       JSON.stringify({ payment_methods: paymentMethods || [] }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

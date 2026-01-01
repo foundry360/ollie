@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { getPaymentMethods, setDefaultPaymentMethod, removePaymentMethod } from '@/lib/api/payments';
 import { Loading } from '@/components/ui/Loading';
+import { AddPaymentMethodModal } from '@/components/payments/AddPaymentMethodModal';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { PaymentMethod } from '@/types';
 
 export default function PaymentMethodsScreen() {
@@ -14,6 +16,7 @@ export default function PaymentMethodsScreen() {
   const isDark = colorScheme === 'dark';
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     loadPaymentMethods();
@@ -67,6 +70,33 @@ export default function PaymentMethodsScreen() {
     );
   };
 
+  const handlePaymentMethodAdded = async () => {
+    // Small delay to ensure the backend has processed the new payment method
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await loadPaymentMethods();
+  };
+
+  const getCardBrandImage = (brand?: string) => {
+    const brandLower = brand?.toLowerCase();
+    if (brandLower === 'visa') {
+      return require('@/assets/visa.png');
+    } else if (brandLower === 'mastercard') {
+      return require('@/assets/mastercard.png');
+    } else if (brandLower === 'amex' || brandLower === 'american_express') {
+      return require('@/assets/amex.png');
+    } else if (brandLower === 'discover') {
+      return require('@/assets/discover.png');
+    }
+    return null;
+  };
+
+  const getDefaultCard = () => {
+    if (!paymentMethods || paymentMethods.length === 0) return null;
+    
+    // Simply return the first payment method that has card_last4 (it's a card)
+    return paymentMethods.find(m => m.card_last4) || null;
+  };
+
   const getCardIcon = (brand?: string) => {
     switch (brand?.toLowerCase()) {
       case 'visa':
@@ -105,14 +135,63 @@ export default function PaymentMethodsScreen() {
     );
   }
 
+  // Get the card to display
+  const defaultCard = useMemo(() => getDefaultCard(), [paymentMethods]);
+  const cardBrandImage = defaultCard ? getCardBrandImage(defaultCard.card_brand) : null;
+
   return (
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['bottom', 'left', 'right']}>
+      {/* TEST: Outside ScrollView */}
+      <View style={{ height: 100, backgroundColor: '#FF0000', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>RED TEST OUTSIDE SCROLLVIEW</Text>
+      </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* TEST: Inside ScrollView */}
+        <View style={{ height: 100, backgroundColor: '#00FF00', marginBottom: 20, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: 'black', fontSize: 20, fontWeight: 'bold' }}>GREEN TEST INSIDE SCROLLVIEW</Text>
+        </View>
+
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={isDark ? '#FFFFFF' : '#111827'} />
           </Pressable>
           <Text style={[styles.screenTitle, titleStyle]}>Payment Methods</Text>
+        </View>
+
+        {/* Card Visualization */}
+        <View style={styles.cardContainer}>
+          <LinearGradient
+            colors={isDark ? ['#1F2937', '#374151', '#4B5563'] : ['#6366F1', '#8B5CF6', '#A78BFA']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.cardGradient}
+          >
+            <View style={styles.cardContent}>
+              <View style={styles.cardTopRow}>
+                <View style={styles.cardTopLeft}>
+                  {paymentMethods[0] && getCardBrandImage(paymentMethods[0].card_brand) && (
+                    <Image 
+                      source={getCardBrandImage(paymentMethods[0].card_brand)!} 
+                      style={styles.cardBrandLogoTop} 
+                      resizeMode="contain" 
+                    />
+                  )}
+                  <Text style={styles.cardLast4}>
+                    {paymentMethods[0]?.card_last4 || '1414'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.cardBottomRow}>
+                {paymentMethods[0] && getCardBrandImage(paymentMethods[0].card_brand) && (
+                  <Image 
+                    source={getCardBrandImage(paymentMethods[0].card_brand)!} 
+                    style={styles.cardBrandLogoBottom} 
+                    resizeMode="contain" 
+                  />
+                )}
+              </View>
+            </View>
+          </LinearGradient>
         </View>
 
         {paymentMethods.length === 0 ? (
@@ -124,9 +203,7 @@ export default function PaymentMethodsScreen() {
             </Text>
             <Pressable
               style={styles.addButton}
-              onPress={() => {
-                Alert.alert('Coming Soon', 'Payment method addition will be available soon. This will integrate with Stripe Elements or Payment Sheet.');
-              }}
+              onPress={() => setShowAddModal(true)}
             >
               <Ionicons name="add" size={20} color="#FFFFFF" style={styles.addButtonIcon} />
               <Text style={styles.addButtonText}>Add Payment Method</Text>
@@ -134,6 +211,44 @@ export default function PaymentMethodsScreen() {
           </View>
         ) : (
           <>
+            {/* Card Visualization - INSIDE the list section where we know it renders */}
+            {paymentMethods.length > 0 && paymentMethods[0]?.card_last4 && (
+              <View style={styles.cardContainer}>
+                <LinearGradient
+                  colors={isDark ? ['#1F2937', '#374151', '#4B5563'] : ['#6366F1', '#8B5CF6', '#A78BFA']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.cardGradient}
+                >
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardTopRow}>
+                      <View style={styles.cardTopLeft}>
+                        {getCardBrandImage(paymentMethods[0].card_brand) && (
+                          <Image 
+                            source={getCardBrandImage(paymentMethods[0].card_brand)!} 
+                            style={styles.cardBrandLogoTop} 
+                            resizeMode="contain" 
+                          />
+                        )}
+                        <Text style={styles.cardLast4}>
+                          {paymentMethods[0].card_last4}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.cardBottomRow}>
+                      {getCardBrandImage(paymentMethods[0].card_brand) && (
+                        <Image 
+                          source={getCardBrandImage(paymentMethods[0].card_brand)!} 
+                          style={styles.cardBrandLogoBottom} 
+                          resizeMode="contain" 
+                        />
+                      )}
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+            )}
+            
             {paymentMethods.map((method) => (
               <View key={method.id} style={[styles.section, cardStyle]}>
                 <View style={styles.methodHeader}>
@@ -201,9 +316,7 @@ export default function PaymentMethodsScreen() {
 
             <Pressable
               style={[styles.section, cardStyle, styles.addSection]}
-              onPress={() => {
-                Alert.alert('Coming Soon', 'Payment method addition will be available soon. This will integrate with Stripe Elements or Payment Sheet.');
-              }}
+              onPress={() => setShowAddModal(true)}
             >
               <Ionicons name="add-circle-outline" size={24} color="#73af17" />
               <Text style={[styles.addText, labelStyle]}>Add Payment Method</Text>
@@ -211,6 +324,18 @@ export default function PaymentMethodsScreen() {
           </>
         )}
       </ScrollView>
+
+      <AddPaymentMethodModal
+        visible={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+          // Refresh after modal closes to ensure new card appears
+          setTimeout(() => {
+            loadPaymentMethods();
+          }, 300);
+        }}
+        onSuccess={handlePaymentMethodAdded}
+      />
     </SafeAreaView>
   );
 }
@@ -228,6 +353,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingTop: 0,
   },
   header: {
     flexDirection: 'row',
@@ -364,6 +490,66 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  cardContainer: {
+    marginBottom: 24,
+    marginTop: 0,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    width: '100%',
+    height: 200,
+    backgroundColor: '#FF0000', // Temporary: to verify it renders
+  },
+  cardGradient: {
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    height: 200,
+    justifyContent: 'space-between',
+  },
+  cardContent: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'space-between',
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardTopLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cardBrandLogoTop: {
+    width: 50,
+    height: 30,
+  },
+  cardLast4: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    marginTop: 'auto',
+    paddingTop: 20,
+  },
+  cardBrandLogoBottom: {
+    width: 60,
+    height: 40,
   },
 });
 

@@ -9,6 +9,10 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('=== add-payment-method function called ===')
+  console.log('Method:', req.method)
+  console.log('URL:', req.url)
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { 
@@ -18,6 +22,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Processing add-payment-method request')
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
@@ -28,7 +33,8 @@ serve(async (req) => {
     }
 
     // Get request body
-    const { payment_method_id, is_default } = await req.json()
+    const requestBody = await req.json()
+    const { payment_method_id, is_default } = requestBody
 
     if (!payment_method_id) {
       return new Response(
@@ -88,17 +94,83 @@ serve(async (req) => {
 
     // Get or create Stripe customer
     let customerId = null
-    const { data: existingPm } = await supabase
+    
+    // First, try to find existing customer in database
+    console.log('Looking up customer for user:', user.id)
+    const { data: existingPms } = await supabase
       .from('payment_methods')
       .select('stripe_customer_id')
       .eq('user_id', user.id)
+      .not('stripe_customer_id', 'is', null)
       .limit(1)
-      .single()
 
-    if (existingPm?.stripe_customer_id) {
-      customerId = existingPm.stripe_customer_id
-    } else {
-      // Create customer
+    if (existingPms && existingPms.length > 0 && existingPms[0]?.stripe_customer_id) {
+      const dbCustomerId = existingPms[0].stripe_customer_id
+      console.log('Found customer ID in database:', dbCustomerId)
+      
+      // Verify customer exists in Stripe
+      try {
+        const verifyResponse = await fetch(`https://api.stripe.com/v1/customers/${dbCustomerId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+          },
+        })
+        
+        if (verifyResponse.ok) {
+          customerId = dbCustomerId
+          console.log('Verified customer exists in Stripe:', customerId)
+        } else {
+          const verifyResult = await verifyResponse.json().catch(() => ({}))
+          console.warn('Customer from database not found in Stripe:', verifyResult)
+          customerId = null // Will search or create new one
+        }
+      } catch (verifyError) {
+        console.error('Error verifying customer in Stripe:', verifyError)
+        customerId = null
+      }
+    }
+    
+    // If no valid customer found, search Stripe by email
+    if (!customerId) {
+      const userEmail = profile?.email || user.email
+      console.log('Searching Stripe for customer by email:', userEmail)
+      
+      if (userEmail) {
+        try {
+          const searchResponse = await fetch(`https://api.stripe.com/v1/customers?email=${encodeURIComponent(userEmail)}&limit=10`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${stripeSecretKey}`,
+            },
+          })
+          
+          if (searchResponse.ok) {
+            const searchResult = await searchResponse.json().catch(() => ({ data: [] }))
+            if (searchResult.data && Array.isArray(searchResult.data) && searchResult.data.length > 0) {
+              // Prefer customer with matching user_id in metadata
+              const foundCustomer = searchResult.data.find((c: any) => 
+                c.metadata && c.metadata.user_id === user.id
+              ) || searchResult.data[0]
+              
+              if (foundCustomer && foundCustomer.id) {
+                customerId = foundCustomer.id
+                console.log('Found existing customer in Stripe by email:', customerId)
+              }
+            }
+          } else {
+            const searchError = await searchResponse.json().catch(() => ({}))
+            console.warn('Error searching Stripe for customer:', searchError)
+          }
+        } catch (searchError) {
+          console.error('Exception while searching for customer in Stripe:', searchError)
+        }
+      }
+    }
+    
+    // If still no customer, create a new one
+    if (!customerId) {
+      console.log('Creating new Stripe customer')
       const customerParams = new URLSearchParams()
       customerParams.append('email', profile?.email || user.email || '')
       customerParams.append('metadata[user_id]', user.id)
@@ -112,15 +184,24 @@ serve(async (req) => {
         body: customerParams,
       })
 
-      const customer = await customerResponse.json()
-      if (customerResponse.ok) {
+      const customer = await customerResponse.json().catch(() => ({}))
+      if (customerResponse.ok && customer.id) {
         customerId = customer.id
+        console.log('Created new Stripe customer:', customerId)
+      } else {
+        console.error('Failed to create Stripe customer:', customer)
+        return new Response(
+          JSON.stringify({ error: 'Failed to create Stripe customer', details: customer }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
     }
+    
+    console.log('Final customer ID:', customerId)
 
     // Attach payment method to customer
     if (customerId) {
-      await fetch(`https://api.stripe.com/v1/payment_methods/${payment_method_id}/attach`, {
+      const attachResponse = await fetch(`https://api.stripe.com/v1/payment_methods/${payment_method_id}/attach`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${stripeSecretKey}`,
@@ -130,6 +211,21 @@ serve(async (req) => {
           customer: customerId,
         }),
       })
+
+      const attachResult = await attachResponse.json()
+      if (!attachResponse.ok) {
+        console.error('Failed to attach payment method to customer:', attachResult)
+        return new Response(
+          JSON.stringify({ error: 'Failed to attach payment method to Stripe customer', details: attachResult }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      console.log('Successfully attached payment method to customer:', payment_method_id, customerId)
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'No Stripe customer ID available' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Check if this is the first payment method for this user
@@ -172,15 +268,18 @@ serve(async (req) => {
     }
 
     // Check if payment method already exists
-    const { data: existing } = await supabase
+    const { data: existingPmList } = await supabase
       .from('payment_methods')
       .select('id')
       .eq('stripe_payment_method_id', payment_method_id)
-      .single()
+      .limit(1)
+    
+    const existing = existingPmList && existingPmList.length > 0 ? existingPmList[0] : null
 
     let savedPm
     if (existing) {
       // Update existing
+      console.log('Updating existing payment method:', existing.id, 'with data:', pmData)
       const { data, error } = await supabase
         .from('payment_methods')
         .update(pmData)
@@ -188,22 +287,48 @@ serve(async (req) => {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error updating payment method:', error)
+        throw error
+      }
+      if (!data) {
+        console.error('Update returned no data')
+        throw new Error('Update returned no data')
+      }
       savedPm = data
+      console.log('Successfully updated payment method:', savedPm)
     } else {
       // Insert new
+      console.log('Inserting new payment method with data:', JSON.stringify(pmData))
       const { data, error } = await supabase
         .from('payment_methods')
         .insert(pmData)
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error inserting payment method:', error)
+        throw error
+      }
+      if (!data) {
+        console.error('Insert returned no data')
+        throw new Error('Insert returned no data')
+      }
       savedPm = data
+      console.log('Successfully inserted payment method:', savedPm)
     }
 
+    // Verify the payment method was saved
+    if (!savedPm || !savedPm.id) {
+      console.error('Payment method was not saved correctly:', savedPm)
+      throw new Error('Payment method was not saved correctly')
+    }
+
+    console.log('Returning response with payment_method:', savedPm.id)
+    const responseBody = { payment_method: savedPm }
+    console.log('Response body:', JSON.stringify(responseBody, null, 2))
     return new Response(
-      JSON.stringify({ payment_method: savedPm }),
+      JSON.stringify(responseBody),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 

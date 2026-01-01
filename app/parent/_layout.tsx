@@ -44,6 +44,12 @@ export default function ParentLayout() {
           title: 'Approvals',
         }} 
       />
+      <Stack.Screen 
+        name="bank-setup" 
+        options={{ 
+          headerShown: false,
+        }} 
+      />
     </Stack>
   );
 }

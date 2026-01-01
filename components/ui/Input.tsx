@@ -1,15 +1,16 @@
-import { View, Text, TextInput, TextInputProps, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TextInputProps, StyleSheet, Platform } from 'react-native';
 import { useThemeStore } from '@/stores/themeStore';
 
 interface InputProps extends TextInputProps {
   label: string;
   error?: string;
   required?: boolean;
+  forceLightTheme?: boolean;
 }
 
-export function Input({ label, error, required = false, style, ...props }: InputProps) {
+export function Input({ label, error, required = false, style, forceLightTheme = false, ...props }: InputProps) {
   const { colorScheme } = useThemeStore();
-  const isDark = colorScheme === 'dark';
+  const isDark = forceLightTheme ? false : (Platform.OS === 'web' ? false : colorScheme === 'dark');
 
   return (
     <View style={styles.container}>
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#B8BDC5',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,

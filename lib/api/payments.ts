@@ -33,8 +33,9 @@ export async function createSetupIntent(): Promise<{
   customer_id?: string;
 }> {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('User not authenticated');
-
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
   const { data, error } = await supabase.functions.invoke('create-setup-intent', {
     body: {},
     headers: {
@@ -42,11 +43,12 @@ export async function createSetupIntent(): Promise<{
     },
   });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
   if (!data?.client_secret) {
     throw new Error('Invalid response: missing client_secret');
   }
-  
   return {
     client_secret: data.client_secret,
     customer_id: data.customer_id,
@@ -76,11 +78,37 @@ export async function addPaymentMethod(
     },
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error from add-payment-method function:', error);
+    throw error;
+  }
+  
+  // Check if the response contains an error
+  if (data?.error) {
+    console.error('Error in response data:', data.error);
+    throw new Error(data.error || 'Failed to add payment method');
+  }
+  
+  // The edge function should return { payment_method: ... }
+  // If we get payment_methods (plural), something is wrong - don't silently handle it
+  if (data?.payment_methods) {
+    console.error('ERROR: Received payment_methods (plural) instead of payment_method (singular). This indicates the wrong function was called or the response was transformed incorrectly.');
+    console.error('Full response data:', JSON.stringify(data, null, 2));
+    throw new Error('Invalid response format: received payment_methods instead of payment_method. The payment method was not saved.');
+  }
+  
   if (!data?.payment_method) {
-    throw new Error('Failed to add payment method');
+    console.error('No payment_method in response:', JSON.stringify(data, null, 2));
+    throw new Error('Failed to add payment method: No payment method returned');
   }
 
+  // Verify the payment method has required fields
+  if (!data.payment_method.id || !data.payment_method.stripe_payment_method_id) {
+    console.error('Payment method missing required fields:', data.payment_method);
+    throw new Error('Failed to add payment method: Invalid payment method data returned');
+  }
+
+  console.log('Successfully added payment method:', data.payment_method.id);
   return data.payment_method;
 }
 
@@ -110,18 +138,26 @@ export async function setDefaultPaymentMethod(paymentMethodId: string): Promise<
 
 /**
  * Remove a payment method
+ * Deletes from both Stripe and the database
  */
 export async function removePaymentMethod(paymentMethodId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('User not authenticated');
 
-  const { error } = await supabase
-    .from('payment_methods')
-    .delete()
-    .eq('user_id', user.id)
-    .eq('stripe_payment_method_id', paymentMethodId);
+  // Explicitly pass Authorization header - functions.invoke() doesn't always include it automatically in React Native
+  const { data, error } = await supabase.functions.invoke('remove-payment-method', {
+    body: {
+      payment_method_id: paymentMethodId,
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  });
 
   if (error) throw error;
+  if (!data?.success) {
+    throw new Error('Failed to remove payment method');
+  }
 }
 
 /**

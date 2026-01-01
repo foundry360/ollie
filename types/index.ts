@@ -99,6 +99,12 @@ export interface PaymentMethod {
   card_exp_year?: number;
   bank_name?: string;
   bank_last4?: string;
+  billing_name?: string | null;
+  billing_phone?: string | null;
+  billing_address_line1?: string | null;
+  billing_city?: string | null;
+  billing_state?: string | null;
+  billing_postal_code?: string | null;
   created_at: string;
   updated_at: string;
 }

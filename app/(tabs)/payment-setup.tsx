@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Alert, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Pressable, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
@@ -6,16 +6,46 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/authStore';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { 
   requestBankAccountSetup, 
   getBankAccountApprovalStatus,
   getBankAccount,
   deleteBankAccount,
+  verifyBankAccount,
+  resendMicroDeposits,
   type BankAccountApprovalStatus,
   type BankAccount
 } from '@/lib/api/payments';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Loading } from '@/components/ui/Loading';
+
+const verificationSchema = z.object({
+  amount1: z.string()
+    .regex(/^\d+\.?\d{0,2}$/, 'Enter a valid amount (e.g., 0.32)')
+    .refine((val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num > 0 && num < 1;
+    }, 'Amount must be between $0.01 and $0.99'),
+  amount2: z.string()
+    .regex(/^\d+\.?\d{0,2}$/, 'Enter a valid amount (e.g., 0.45)')
+    .refine((val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num > 0 && num < 1;
+    }, 'Amount must be between $0.01 and $0.99'),
+}).refine((data) => {
+  const amount1 = parseFloat(data.amount1);
+  const amount2 = parseFloat(data.amount2);
+  return amount1 !== amount2;
+}, {
+  message: 'Amounts must be different',
+  path: ['amount2'],
+});
+
+type VerificationFormData = z.infer<typeof verificationSchema>;
 
 export default function PaymentSetupScreen() {
   const router = useRouter();
@@ -28,6 +58,16 @@ export default function PaymentSetupScreen() {
   const [loading, setLoading] = useState(true);
   const [requestingSetup, setRequestingSetup] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+
+  const { control, handleSubmit, formState: { errors }, reset } = useForm<VerificationFormData>({
+    resolver: zodResolver(verificationSchema),
+    defaultValues: {
+      amount1: '',
+      amount2: '',
+    },
+  });
 
   // Load approval status and bank account on mount
   useEffect(() => {
@@ -88,6 +128,68 @@ export default function PaymentSetupScreen() {
     } finally {
       setRequestingSetup(false);
     }
+  };
+
+  const handleVerifyAccount = async (data: VerificationFormData) => {
+    setIsVerifying(true);
+    try {
+      await verifyBankAccount(data.amount1, data.amount2);
+      Alert.alert(
+        'Account Verified!',
+        'Your bank account has been verified successfully. You can now receive payments.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              reset();
+              loadData();
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Verification Failed', error.message || 'The amounts you entered do not match. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResendDeposits = async () => {
+    Alert.alert(
+      'Resend Verification Deposits',
+      'This will remove your current bank account. You\'ll need to add it again with the same details to receive new verification deposits. Continue?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Continue',
+          onPress: async () => {
+            setIsResending(true);
+            try {
+              const result = await resendMicroDeposits();
+              Alert.alert(
+                'Account Removed',
+                result.message,
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      loadData();
+                    },
+                  },
+                ]
+              );
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to resend deposits. Please try again.');
+            } finally {
+              setIsResending(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteBankAccount = async () => {
@@ -174,7 +276,16 @@ export default function PaymentSetupScreen() {
 
   return (
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['bottom', 'left', 'right']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.header}>
           <Text style={[styles.screenTitle, titleStyle]}>Payment Setup</Text>
         </View>
@@ -196,7 +307,7 @@ export default function PaymentSetupScreen() {
             {approvalStatus?.status === 'approved' ? (
               <>
                 <Text style={[styles.description, textStyle]}>
-                  Your parent has received the setup link. Once they complete the bank account setup, you'll see it here.
+                  Your parent has completed the bank account setup.
                 </Text>
               </>
             ) : approvalStatus?.status === 'pending' ? (
@@ -317,25 +428,108 @@ export default function PaymentSetupScreen() {
 
                 {bankAccount.verification_status === 'pending' && (
                   <>
-                    <View style={[styles.infoBox, { backgroundColor: '#EFF6FF' }, isDark && { backgroundColor: '#1E3A8A' }]}>
-                      <Ionicons name="information-circle" size={20} color="#3B82F6" />
-                      <Text style={[styles.infoBoxText, { color: '#1E40AF' }, isDark && { color: '#93C5FD' }]}>
-                        We've sent two small deposits to your bank account. Please verify them to complete setup.
+                    <View style={[styles.infoBox, { backgroundColor: '#F3F4F6' }, isDark && { backgroundColor: '#374151' }]}>
+                      <Ionicons name="information-circle" size={20} color="#73af17" />
+                      <Text style={[styles.infoBoxText, { color: '#374151' }, isDark && { color: '#D1D5DB' }]}>
+                        We've sent two small deposits to your bank account. Check your bank statement and enter the amounts below to verify.
                       </Text>
                     </View>
-                    <Button
-                      title="Verify Bank Account"
-                      onPress={() => router.push('/payments/bank-account-verify')}
-                      fullWidth
-                    />
+
+                    <View style={styles.verificationForm}>
+                      <Text style={[styles.formTitle, titleStyle]}>Enter Deposit Amounts</Text>
+                      
+                      <View style={styles.amountInputsRow}>
+                        {/* First Deposit Amount */}
+                        <View style={styles.amountInputContainer}>
+                          <Text style={[styles.label, textStyle]}>First Amount *</Text>
+                          <View style={[styles.amountInputWrapper, isDark ? styles.amountInputWrapperDark : styles.amountInputWrapperLight]}>
+                            <Text style={[styles.dollarSign, textStyle]}>$</Text>
+                            <Controller
+                              control={control}
+                              name="amount1"
+                              render={({ field: { onChange, onBlur, value } }) => (
+                                <TextInput
+                                  value={value}
+                                  onChangeText={(text) => {
+                                    const cleaned = text
+                                      .replace(/[^\d.]/g, '')
+                                      .replace(/\.+/g, '.')
+                                      .replace(/(\.\d{2})\d+/, '$1');
+                                    onChange(cleaned);
+                                  }}
+                                  onBlur={onBlur}
+                                  placeholder="0.32"
+                                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+                                  keyboardType="decimal-pad"
+                                  style={[styles.amountTextInput, textStyle]}
+                                />
+                              )}
+                            />
+                          </View>
+                          {errors.amount1 && (
+                            <Text style={styles.errorText}>{errors.amount1.message}</Text>
+                          )}
+                        </View>
+
+                        {/* Second Deposit Amount */}
+                        <View style={styles.amountInputContainer}>
+                          <Text style={[styles.label, textStyle]}>Second Amount *</Text>
+                          <View style={[styles.amountInputWrapper, isDark ? styles.amountInputWrapperDark : styles.amountInputWrapperLight]}>
+                            <Text style={[styles.dollarSign, textStyle]}>$</Text>
+                            <Controller
+                              control={control}
+                              name="amount2"
+                              render={({ field: { onChange, onBlur, value } }) => (
+                                <TextInput
+                                  value={value}
+                                  onChangeText={(text) => {
+                                    const cleaned = text
+                                      .replace(/[^\d.]/g, '')
+                                      .replace(/\.+/g, '.')
+                                      .replace(/(\.\d{2})\d+/, '$1');
+                                    onChange(cleaned);
+                                  }}
+                                  onBlur={onBlur}
+                                  placeholder="0.45"
+                                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+                                  keyboardType="decimal-pad"
+                                  style={[styles.amountTextInput, textStyle]}
+                                />
+                              )}
+                            />
+                          </View>
+                          {errors.amount2 && (
+                            <Text style={styles.errorText}>{errors.amount2.message}</Text>
+                          )}
+                        </View>
+                      </View>
+
+                      <Button
+                        title="Verify Account"
+                        onPress={handleSubmit(handleVerifyAccount)}
+                        loading={isVerifying}
+                        disabled={isVerifying}
+                        fullWidth
+                      />
+                    </View>
+
                     <View style={{ marginTop: 12 }}>
                       <Button
                         title="Delete Bank Account"
                         onPress={handleDeleteBankAccount}
                         loading={deleting}
                         fullWidth
-                        variant="danger"
+                        variant="secondary"
                       />
+                      <Pressable 
+                        onPress={handleResendDeposits} 
+                        disabled={isResending}
+                        style={styles.resendButton}
+                      >
+                        <Text style={[styles.resendText, textStyle]}>
+                          {isResending ? 'Resending...' : "Didn't receive deposits? Resend"}
+                        </Text>
+                      </Pressable>
                     </View>
                   </>
                 )}
@@ -354,7 +548,7 @@ export default function PaymentSetupScreen() {
                         onPress={handleDeleteBankAccount}
                         loading={deleting}
                         fullWidth
-                        variant="danger"
+                        variant="secondary"
                       />
                     </View>
                   </>
@@ -374,7 +568,7 @@ export default function PaymentSetupScreen() {
                         onPress={handleDeleteBankAccount}
                         loading={deleting}
                         fullWidth
-                        variant="danger"
+                        variant="secondary"
                       />
                     </View>
                   </>
@@ -382,7 +576,8 @@ export default function PaymentSetupScreen() {
               </>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -394,6 +589,9 @@ const styles = StyleSheet.create({
   },
   containerDark: {
     backgroundColor: '#111827',
+  },
+  keyboardView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -543,5 +741,76 @@ const styles = StyleSheet.create({
   },
   statusFailed: {
     color: '#EF4444',
+  },
+  verificationForm: {
+    marginTop: 16,
+    width: '100%',
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  amountInputsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  amountInputContainer: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  amountInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'transparent',
+    minHeight: 40,
+  },
+  amountInputWrapperLight: {
+    borderColor: '#D1D5DB',
+    backgroundColor: 'transparent',
+  },
+  amountInputWrapperDark: {
+    borderColor: '#4B5563',
+    backgroundColor: 'transparent',
+  },
+  dollarSign: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  amountTextInput: {
+    flex: 1,
+    borderWidth: 0,
+    padding: 0,
+    margin: 0,
+    fontSize: 16,
+    minHeight: 24,
+    textAlignVertical: 'center',
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  resendButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  resendText: {
+    fontSize: 14,
+    color: '#73af17',
+    textDecorationLine: 'underline',
   },
 });

@@ -12,13 +12,16 @@ interface ButtonProps {
   className?: string;
   fullWidth?: boolean;
   align?: 'left' | 'center' | 'right';
+  size?: 'small' | 'medium' | 'large';
 }
 
-export function Button({ title, onPress, variant = 'primary', loading = false, disabled = false, className, fullWidth = false, align = 'center' }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', loading = false, disabled = false, className, fullWidth = false, align = 'center', size = 'medium' }: ButtonProps) {
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
   const buttonStyle = [
     styles.button,
+    size === 'small' && styles.buttonSmall,
+    size === 'large' && styles.buttonLarge,
     variant === 'primary' && styles.primary,
     variant === 'secondary' && styles.secondary,
     variant === 'danger' && styles.danger,
@@ -37,6 +40,13 @@ export function Button({ title, onPress, variant = 'primary', loading = false, d
     
     // Start with base button style
     styleArray.push(styles.button);
+    
+    // Apply size
+    if (size === 'small') {
+      styleArray.push(styles.buttonSmall);
+    } else if (size === 'large') {
+      styleArray.push(styles.buttonLarge);
+    }
     
     // Apply alignment
     if (align === 'left') {
@@ -89,8 +99,10 @@ export function Button({ title, onPress, variant = 'primary', loading = false, d
           ) : (
             <Text style={[
               styles.text,
+              size === 'small' && styles.textSmall,
+              size === 'large' && styles.textLarge,
               variant === 'primary' && styles.textPrimary,
-              variant === 'secondary' && (isDark ? styles.textSecondaryDark : styles.textSecondary),
+              variant === 'secondary' && styles.textSecondary,
               variant === 'danger' && styles.textDanger,
             ].filter(Boolean)}>
               {title}
@@ -112,6 +124,18 @@ const styles = StyleSheet.create({
     minWidth: 120,
     minHeight: 48,
   },
+  buttonSmall: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    minWidth: 100,
+    minHeight: 40,
+  },
+  buttonLarge: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    minWidth: 140,
+    minHeight: 56,
+  },
   alignLeft: {
     alignItems: 'flex-start',
     paddingLeft: 0,
@@ -125,6 +149,8 @@ const styles = StyleSheet.create({
   },
   secondary: {
     backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#B8BDC5',
   },
   danger: {
     backgroundColor: '#dc2626',
@@ -141,6 +167,12 @@ const styles = StyleSheet.create({
   text: {
     fontWeight: '600',
     fontSize: 16,
+  },
+  textSmall: {
+    fontSize: 14,
+  },
+  textLarge: {
+    fontSize: 18,
   },
   textPrimary: {
     color: '#ffffff',
