@@ -883,34 +883,38 @@ export default function ParentBankSetupScreen() {
               </View>
             )}
 
-            {/* Financial Connections Option - Available on all platforms */}
-            <View style={[styles.section, cardStyle, { marginBottom: 16 }]}>
-              <View style={{ marginBottom: 12 }}>
-                <Ionicons name="shield-checkmark" size={24} color="#73af17" style={{ marginBottom: 8 }} />
-                <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 4 }]}>
-                  Connect Securely (Recommended)
-                </Text>
-                <Text style={[styles.sectionDescription, textStyle, { fontSize: 14 }]}>
-                  Connect your bank account instantly using Stripe's secure authentication. No manual entry required.
-                </Text>
-              </View>
-              <Button
-                onPress={handleConnectWithFinancialConnections}
-                disabled={isConnecting || isSubmitting}
-                style={{ marginTop: 8 }}
-              >
-                {isConnecting ? 'Connecting...' : 'Connect Bank Account Securely'}
-              </Button>
-            </View>
+            {/* Financial Connections Option - Hidden on web, available on native */}
+            {Platform.OS !== 'web' && (
+              <>
+                <View style={[styles.section, cardStyle, { marginBottom: 16 }]}>
+                  <View style={{ marginBottom: 12 }}>
+                    <Ionicons name="shield-checkmark" size={24} color="#73af17" style={{ marginBottom: 8 }} />
+                    <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 4 }]}>
+                      Connect Securely (Recommended)
+                    </Text>
+                    <Text style={[styles.sectionDescription, textStyle, { fontSize: 14 }]}>
+                      Connect your bank account instantly using Stripe's secure authentication. No manual entry required.
+                    </Text>
+                  </View>
+                  <Button
+                    onPress={handleConnectWithFinancialConnections}
+                    disabled={isConnecting || isSubmitting}
+                    style={{ marginTop: 8 }}
+                  >
+                    {isConnecting ? 'Connecting...' : 'Connect Bank Account Securely'}
+                  </Button>
+                </View>
 
-            {/* Divider */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 24 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
-              <Text style={[textStyle, { marginHorizontal: 16, fontSize: 14, color: isDark ? '#9CA3AF' : '#6B7280' }]}>
-                OR
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
-            </View>
+                {/* Divider */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 24 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
+                  <Text style={[textStyle, { marginHorizontal: 16, fontSize: 14, color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                    OR
+                  </Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
+                </View>
+              </>
+            )}
 
             <View style={[styles.section, cardStyle]}>
               <Text style={[styles.sectionTitle, titleStyle]}>Account Information</Text>
