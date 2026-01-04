@@ -175,3 +175,4 @@ CREATE INDEX IF NOT EXISTS idx_users_location ON public.users USING GIN (locatio
 COMMENT ON COLUMN public.users.location IS 'User location for location-based push notifications. Format: {"latitude": number, "longitude": number}';
 COMMENT ON COLUMN public.users.notification_radius IS 'Maximum distance (in miles) for location-based push notifications. Default: 25 miles.';
 
+

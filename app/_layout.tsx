@@ -64,14 +64,64 @@ export default function RootLayout() {
       (notification) => {
         console.log('Notification received:', notification);
       },
-      (response) => {
-        console.log('Notification tapped:', response);
-        const data = response.notification.request.content.data;
-        // Handle navigation based on notification data
-        if (data?.taskId) {
-          router.push(`/tasks/${data.taskId}`);
-        } else if (data?.chatTaskId) {
-          router.push(`/chat/${data.chatTaskId}`);
+      (result) => {
+        console.log('Notification tapped:', result);
+        // OneSignal uses additionalData instead of data
+        const data = result.notification?.additionalData || result.notification?.request?.content?.data || {};
+        
+        // Log the event data for debugging
+        console.log('[Notification] Event data:', JSON.stringify(data, null, 2));
+        console.log('[Notification] Event type:', data?.type);
+        console.log('[Notification] Gig ID:', data?.gig_id);
+        
+        // Handle navigation based on notification type
+        if (!data?.type) {
+          // Legacy support for old notification format
+          if (data?.taskId) {
+            router.push(`/tasks/${data.taskId}`);
+          } else if (data?.chatTaskId) {
+            router.push(`/chat/${data.chatTaskId}`);
+          } else if (data?.gig_id) {
+            router.push(`/tasks/${data.gig_id}`);
+          }
+          return;
+        }
+        
+        // Handle new notification types
+        switch (data.type) {
+          case 'new_message':
+            if (data.gig_id && data.sender_id) {
+              router.push(`/chat/${data.gig_id}?recipientId=${data.sender_id}`);
+            }
+            break;
+            
+          case 'new_gig_available':
+          case 'gig_accepted':
+          case 'gig_accepted_confirmation':
+          case 'gig_started':
+          case 'gig_completed':
+          case 'gig_cancelled':
+            if (data.gig_id) {
+              router.push(`/tasks/${data.gig_id}`);
+            }
+            break;
+            
+          case 'parent_approval_needed':
+          case 'parent_approved':
+          case 'parent_rejected':
+            if (data.approval_id) {
+              router.push('/parent/approvals');
+            } else if (data.gig_id) {
+              router.push(`/tasks/${data.gig_id}`);
+            }
+            break;
+            
+          case 'payment_received':
+            router.push('/earnings');
+            break;
+            
+          default:
+            console.log('Unhandled notification type:', data.type);
         }
       }
     );

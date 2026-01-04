@@ -250,9 +250,10 @@ export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: Marketplac
         cameraPosition={cameraPosition}
         markers={markersForMap}
         showsUserLocation={!!userLocation}
-        onMarkerClick={(event) => {
-          const markerId = event.nativeEvent.markerId;
-          if (markerId) {
+        onMarkerClick={(marker) => {
+          // The event is the marker object itself with an 'id' property
+          const markerId = marker.id;
+          if (markerId && markerId !== 'user-location') {
             onMarkerPress(markerId);
           }
         }}

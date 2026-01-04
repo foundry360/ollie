@@ -30,6 +30,7 @@ export default function TasksLayout() {
         headerShadowVisible: false,
         headerTintColor: '#FFFFFF',
         headerBackTitleVisible: false,
+        headerBackVisible: true, // Ensure back button is visible
       }}
     >
       <Stack.Screen 

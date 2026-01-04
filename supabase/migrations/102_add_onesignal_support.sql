@@ -13,3 +13,4 @@ WHERE onesignal_user_id IS NOT NULL;
 -- Add comment
 COMMENT ON COLUMN public.users.onesignal_user_id IS 'OneSignal user ID (player ID) for push notifications';
 
+

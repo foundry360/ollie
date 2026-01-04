@@ -97,3 +97,4 @@ $$;
 GRANT EXECUTE ON FUNCTION public.create_user_profile TO authenticated;
 GRANT EXECUTE ON FUNCTION public.create_user_profile TO anon;
 
+
