@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
-import * as Location from 'expo-location';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
@@ -145,25 +144,6 @@ export async function createUserProfile(userId: string, profileData: {
   phone?: string;
   address?: string;
 }) {
-  // Geocode address to get coordinates if address is provided
-  let location: { latitude: number; longitude: number } | undefined;
-  if (profileData.address) {
-    try {
-      const geocoded = await Location.geocodeAsync(profileData.address);
-      if (geocoded && geocoded.length > 0) {
-        location = {
-          latitude: geocoded[0].latitude,
-          longitude: geocoded[0].longitude
-        };
-        console.log('[createUserProfile] Geocoded address to coordinates:', location);
-      } else {
-        console.warn('[createUserProfile] Could not geocode address:', profileData.address);
-      }
-    } catch (error) {
-      console.error('[createUserProfile] Error geocoding address:', error);
-      // Continue without location - address will be saved but no coordinates
-    }
-  }
   // First, check if profile already exists (by id or email)
   // This prevents duplicate key errors
   const { data: existingById, error: checkByIdError } = await supabase
@@ -185,7 +165,6 @@ export async function createUserProfile(userId: string, profileData: {
         parent_email: profileData.parent_email ?? existingById.parent_email,
         phone: profileData.phone ?? existingById.phone,
         address: profileData.address ?? existingById.address,
-        location: location ?? existingById.location, // Include geocoded location
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId)
@@ -220,7 +199,6 @@ export async function createUserProfile(userId: string, profileData: {
         parent_email: profileData.parent_email ?? existingByEmail.parent_email,
         phone: profileData.phone ?? existingByEmail.phone,
         address: profileData.address ?? existingByEmail.address,
-        location: location ?? existingByEmail.location, // Include geocoded location
         updated_at: new Date().toISOString(),
       })
       .eq('id', existingByEmail.id)
@@ -245,7 +223,6 @@ export async function createUserProfile(userId: string, profileData: {
     p_parent_email: profileData.parent_email || null,
     p_phone: profileData.phone || null,
     p_address: profileData.address || null,
-    p_location: location || null, // Include geocoded location
   });
   
   if (error) {
@@ -269,7 +246,6 @@ export async function createUserProfile(userId: string, profileData: {
         parent_email: profileData.parent_email,
         phone: profileData.phone,
         address: profileData.address,
-        location: location, // Include geocoded location
         verified: false
       })
       .select()

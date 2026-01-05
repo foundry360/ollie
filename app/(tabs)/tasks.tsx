@@ -86,7 +86,7 @@ export default function TasksScreen() {
           title: app.gig_title || 'Unknown Gig',
           description: app.gig_description || '',
           pay: app.gig_pay || 0,
-          status: (app.status === 'approved' ? 'accepted' : 'open') as TaskStatus,
+          status: (app.status === 'approved' ? 'assigned' : 'open') as TaskStatus,
           poster_id: '', // We don't have this in the application data
           teen_id: app.status === 'approved' ? app.teen_id : null,
           location: app.gig_location || { latitude: 0, longitude: 0 },

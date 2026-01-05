@@ -37,12 +37,16 @@ export function NeighborUpcomingScheduledGigs() {
 
   const scheduledGigs = allGigs
     .filter(gig => {
-      // Only show gigs that are actually assigned (have teen_id) and scheduled
+      // Only show gigs that are approved (assigned/accepted), confirmed, and scheduled
       if (!gig.scheduled_date || !gig.teen_id) return false;
+      // Must be approved (assigned or accepted status)
+      if (!['assigned', 'accepted', 'in_progress'].includes(gig.status)) return false;
+      // Must be confirmed (schedule_confirmed is true)
+      if (!gig.schedule_confirmed) return false;
+      // Must be in the future
       const scheduledDate = new Date(gig.scheduled_date);
       scheduledDate.setHours(0, 0, 0, 0);
-      // Only show accepted or in_progress gigs (not open)
-      return scheduledDate >= today && ['accepted', 'in_progress'].includes(gig.status);
+      return scheduledDate >= today;
     })
     .sort((a, b) => {
       if (!a.scheduled_date || !b.scheduled_date) return 0;
@@ -253,7 +257,7 @@ const styles = StyleSheet.create({
   },
   cardDark: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
+    borderColor: '#374151',
   },
   titleRow: {
     flexDirection: 'row',

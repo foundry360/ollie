@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeStore } from '@/stores/themeStore';
 import { useWeeklyEarnings } from '@/hooks/useWeeklyEarnings';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,14 @@ export function WeeklyEarnings() {
   if (isLoading || !weeklyData) {
     return (
       <View style={[styles.container, cardBgStyle]}>
+        {!isDark && (
+          <LinearGradient
+            colors={['#73af17', '#5a8a12', '#73af17']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
         <View style={styles.content}>
           <Text style={styles.loadingText}>Loading earnings...</Text>
         </View>
@@ -25,6 +34,20 @@ export function WeeklyEarnings() {
 
   return (
     <View style={[styles.container, cardBgStyle]}>
+      {!isDark && (
+        <>
+          <LinearGradient
+            colors={['#73af17', '#5a8a12', '#8bc34a', '#73af17']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Decorative pattern elements */}
+          <View style={styles.patternCircle1} />
+          <View style={styles.patternCircle2} />
+          <View style={styles.patternCircle3} />
+        </>
+      )}
       <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.totalLabel}>This Week</Text>
@@ -167,6 +190,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     padding: 20,
+  },
+  patternCircle1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    top: -40,
+    right: -40,
+  },
+  patternCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    bottom: -20,
+    left: -20,
+  },
+  patternCircle3: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    top: '50%',
+    right: 20,
   },
 });
 

@@ -17,6 +17,9 @@ import {
   unsaveGig,
   isGigSaved,
   getSavedGigs,
+  confirmSchedule,
+  proposeSchedule,
+  acceptProposedSchedule,
   CreateTaskData,
   UpdateTaskData,
   type UpcomingTask,
@@ -254,5 +257,47 @@ export function useSavedGigs() {
     queryKey: ['savedGigs'],
     queryFn: getSavedGigs,
     staleTime: 30000, // 30 seconds
+  });
+}
+
+// Confirm schedule mutation (teenlancer)
+export function useConfirmSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (taskId: string) => confirmSchedule(taskId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(taskKeys.detail(data.id), data);
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.user() });
+    },
+  });
+}
+
+// Propose schedule mutation (teenlancer)
+export function useProposeSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ taskId, schedule }: { taskId: string; schedule: { proposed_scheduled_date?: string; proposed_scheduled_start_time?: string; proposed_scheduled_end_time?: string } }) =>
+      proposeSchedule(taskId, schedule),
+    onSuccess: (data) => {
+      queryClient.setQueryData(taskKeys.detail(data.id), data);
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.user() });
+    },
+  });
+}
+
+// Accept proposed schedule mutation (neighbor)
+export function useAcceptProposedSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (taskId: string) => acceptProposedSchedule(taskId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(taskKeys.detail(data.id), data);
+      queryClient.invalidateQueries({ queryKey: taskKeys.user() });
+    },
   });
 }

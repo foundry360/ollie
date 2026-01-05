@@ -64,15 +64,9 @@ export default function RootLayout() {
       (notification) => {
         console.log('Notification received:', notification);
       },
-      (result) => {
-        console.log('Notification tapped:', result);
-        // OneSignal uses additionalData instead of data
-        const data = result.notification?.additionalData || result.notification?.request?.content?.data || {};
-        
-        // Log the event data for debugging
-        console.log('[Notification] Event data:', JSON.stringify(data, null, 2));
-        console.log('[Notification] Event type:', data?.type);
-        console.log('[Notification] Gig ID:', data?.gig_id);
+      (response) => {
+        console.log('Notification tapped:', response);
+        const data = response.notification.request.content.data;
         
         // Handle navigation based on notification type
         if (!data?.type) {
@@ -81,8 +75,6 @@ export default function RootLayout() {
             router.push(`/tasks/${data.taskId}`);
           } else if (data?.chatTaskId) {
             router.push(`/chat/${data.chatTaskId}`);
-          } else if (data?.gig_id) {
-            router.push(`/tasks/${data.gig_id}`);
           }
           return;
         }
@@ -95,7 +87,6 @@ export default function RootLayout() {
             }
             break;
             
-          case 'new_gig_available':
           case 'gig_accepted':
           case 'gig_accepted_confirmation':
           case 'gig_started':

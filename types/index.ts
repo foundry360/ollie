@@ -7,7 +7,8 @@ export enum UserRole {
 
 export enum TaskStatus {
   OPEN = 'open',
-  ACCEPTED = 'accepted',
+  ASSIGNED = 'assigned', // Neighbor has selected/approved a teenlancer
+  ACCEPTED = 'accepted', // Legacy: teenlancer directly accepted (kept for backward compatibility)
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled'
@@ -58,6 +59,10 @@ export interface Task {
   scheduled_date?: string; // ISO date string (YYYY-MM-DD)
   scheduled_start_time?: string; // 24-hour format (HH:MM)
   scheduled_end_time?: string; // 24-hour format (HH:MM)
+  schedule_confirmed?: boolean; // True when teenlancer has confirmed the schedule
+  proposed_scheduled_date?: string; // Alternative date proposed by teenlancer
+  proposed_scheduled_start_time?: string; // Alternative start time proposed by teenlancer
+  proposed_scheduled_end_time?: string; // Alternative end time proposed by teenlancer
   created_at: string;
   updated_at: string;
 }

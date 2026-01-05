@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, Modal, Dimensions } from 'react-native';
 import { ThreeDotsLoader } from '@/components/ui/Loading';
-import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig, useDeleteTask, taskKeys } from '@/hooks/useTasks';
+import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig, useDeleteTask, useUpdateTask, taskKeys } from '@/hooks/useTasks';
 import { applyForGig } from '@/lib/api/tasks';
 import { useAuthStore } from '@/stores/authStore';
 import { TaskStatus } from '@/types';
@@ -15,8 +15,12 @@ import { formatAddress } from '@/lib/utils';
 import { format } from 'date-fns';
 import { CreateGigModal } from '@/components/tasks/CreateGigModal';
 import { ProfileModal } from '@/components/profile/ProfileModal';
+import { ApproveApplicationModal } from '@/components/tasks/ApproveApplicationModal';
+import { ScheduleConfirmationModal } from '@/components/tasks/ScheduleConfirmationModal';
 import { getPublicUserProfile, getUserProfileForChat } from '@/lib/api/users';
 import { useGigApplications, useHasAppliedForGig, useApproveGigApplication, useRejectGigApplication } from '@/hooks/useGigApplications';
+import { useAcceptProposedSchedule } from '@/hooks/useTasks';
+import { GigApplication } from '@/lib/api/gigApplications';
 import { AddReviewModal } from '@/components/reviews/AddReviewModal';
 import { canReviewGig, getAverageRating } from '@/lib/api/reviews';
 import { teenStatsKeys } from '@/hooks/useTeenStats';
@@ -44,6 +48,9 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [canReview, setCanReview] = useState<{ canReview: boolean; reason?: string }>({ canReview: false });
   const [selectedTeenForReview, setSelectedTeenForReview] = useState<string | null>(null);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<GigApplication | null>(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   
   // Check if gig is saved (only for teenlancers)
   const { data: isSaved = false } = useIsGigSaved(taskId);
@@ -67,6 +74,8 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   
   const approveMutation = useApproveGigApplication();
   const rejectMutation = useRejectGigApplication();
+  const updateTaskMutation = useUpdateTask();
+  const acceptProposedScheduleMutation = useAcceptProposedSchedule();
 
   // Fetch teenlancer profile if gig is assigned
   const { data: teenProfile } = useQuery({
@@ -191,26 +200,46 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   };
 
   const handleApproveApplication = async (applicationId: string) => {
-    Alert.alert(
-      'Approve Application',
-      'Are you sure you want to approve this teenlancer for this gig?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          onPress: async () => {
-            try {
-              await approveMutation.mutateAsync(applicationId);
-              queryClient.invalidateQueries({ queryKey: ['tasks'] });
-              queryClient.invalidateQueries({ queryKey: ['gigApplications'] });
-              Alert.alert('Success', 'Application approved! The teenlancer has been assigned to this gig.');
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to approve application');
-            }
-          },
-        },
-      ]
-    );
+    const application = applications.find(app => app.id === applicationId);
+    if (!application) return;
+    
+    // Show approval modal with scheduling instead of immediate approval
+    setSelectedApplication(application);
+    setShowApproveModal(true);
+  };
+
+  const handleConfirmApproval = async (schedulingData: {
+    scheduled_date?: string;
+    scheduled_start_time?: string;
+    scheduled_end_time?: string;
+  }) => {
+    if (!selectedApplication || !task) return;
+    
+    try {
+      // First approve the application
+      await approveMutation.mutateAsync(selectedApplication.id);
+      
+      // Then update the gig with scheduling info if provided
+      if (schedulingData.scheduled_date || schedulingData.scheduled_start_time || schedulingData.scheduled_end_time) {
+        await updateTaskMutation.mutateAsync({
+          taskId: task.id,
+          data: {
+            scheduled_date: schedulingData.scheduled_date,
+            scheduled_start_time: schedulingData.scheduled_start_time,
+            scheduled_end_time: schedulingData.scheduled_end_time,
+            schedule_confirmed: false, // Schedule needs teenlancer confirmation
+          }
+        });
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['gigApplications'] });
+      Alert.alert('Success', 'Application approved and scheduled!');
+      setShowApproveModal(false);
+      setSelectedApplication(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to approve application');
+    }
   };
 
   const handleRejectApplication = async (applicationId: string) => {
@@ -615,14 +644,131 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                     <View style={styles.detailRow}>
                       <Ionicons name="calendar" size={20} color="#73af17" />
                       <View style={styles.schedulingContainer}>
-                        <Text style={[styles.detailText, textStyle]}>
-                          {formatScheduledDate(task.scheduled_date)}
-                        </Text>
+                        <View style={styles.scheduleDateRow}>
+                          <Text style={[styles.detailText, textStyle]}>
+                            {formatScheduledDate(task.scheduled_date)}
+                          </Text>
+                          {task.schedule_confirmed && (
+                            <View style={styles.confirmedBadge}>
+                              <Ionicons name="checkmark-circle" size={14} color="#73af17" />
+                              <Text style={styles.confirmedBadgeText}>Confirmed</Text>
+                            </View>
+                          )}
+                        </View>
                         {task.scheduled_start_time && task.scheduled_end_time && (
                           <Text style={[styles.detailText, textStyle]}>
                             {formatTime12Hour(task.scheduled_start_time)} - {formatTime12Hour(task.scheduled_end_time)}
                           </Text>
                         )}
+                        {!task.schedule_confirmed && task.teen_id && (
+                          <View style={styles.pendingScheduleContainer}>
+                            {task.proposed_scheduled_date ? (
+                              // Teenlancer has proposed a change, waiting for neighbor
+                              <View>
+                                <Text style={[styles.pendingText, textStyle]}>
+                                  Schedule change proposed
+                                </Text>
+                                {isTeen && (
+                                  <View style={styles.proposedScheduleInfo}>
+                                    <Text style={[styles.proposedScheduleLabel, textStyle]}>
+                                      Your proposed schedule:
+                                    </Text>
+                                    <Text style={[styles.detailText, textStyle]}>
+                                      {formatScheduledDate(task.proposed_scheduled_date)}
+                                    </Text>
+                                    {task.proposed_scheduled_start_time && task.proposed_scheduled_end_time && (
+                                      <Text style={[styles.detailText, textStyle]}>
+                                        {formatTime12Hour(task.proposed_scheduled_start_time)} - {formatTime12Hour(task.proposed_scheduled_end_time)}
+                                      </Text>
+                                    )}
+                                  </View>
+                                )}
+                              </View>
+                            ) : (
+                              // No proposal yet, waiting for teenlancer to confirm/propose
+                              <>
+                                <Text style={[styles.pendingText, textStyle]}>
+                                  Waiting for teenlancer confirmation
+                                </Text>
+                                {isTeen && (
+                                  <Pressable
+                                    onPress={() => setShowScheduleModal(true)}
+                                    style={styles.confirmScheduleButton}
+                                  >
+                                    <Text style={styles.confirmScheduleButtonText}>
+                                      Confirm/Propose Schedule
+                                    </Text>
+                                  </Pressable>
+                                )}
+                              </>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  )}
+                  {/* Proposed Schedule (when teenlancer proposes different times) */}
+                  {task.proposed_scheduled_date && isNeighbor && (
+                    <View style={[styles.proposedScheduleSection, isDark && styles.proposedScheduleSectionDark]}>
+                      <View style={styles.proposedScheduleHeader}>
+                        <Text style={[styles.proposedScheduleTitle, textStyle]}>
+                          Proposed Schedule Change
+                        </Text>
+                      </View>
+                      <View style={styles.proposedScheduleContent}>
+                        <View style={styles.detailRow}>
+                          <Ionicons name="calendar-outline" size={20} color="#F59E0B" />
+                          <Text style={[styles.detailText, textStyle]}>
+                            {formatScheduledDate(task.proposed_scheduled_date)}
+                          </Text>
+                        </View>
+                        {task.proposed_scheduled_start_time && task.proposed_scheduled_end_time && (
+                          <View style={styles.detailRow}>
+                            <Ionicons name="time-outline" size={20} color="#F59E0B" />
+                            <Text style={[styles.detailText, textStyle]}>
+                              {formatTime12Hour(task.proposed_scheduled_start_time)} - {formatTime12Hour(task.proposed_scheduled_end_time)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.proposedScheduleActions}>
+                          <Button
+                            title="Accept"
+                            onPress={async () => {
+                              try {
+                                await acceptProposedScheduleMutation.mutateAsync(task.id);
+                                Alert.alert('Success', 'Proposed schedule accepted!');
+                                queryClient.invalidateQueries({ queryKey: taskKeys.detail(task.id) });
+                              } catch (error: any) {
+                                Alert.alert('Error', error.message || 'Failed to accept proposed schedule');
+                              }
+                            }}
+                            loading={acceptProposedScheduleMutation.isPending}
+                            fullWidth
+                            style={styles.acceptProposedButton}
+                          />
+                          <Button
+                            title="Reject"
+                            onPress={async () => {
+                              try {
+                                await updateTaskMutation.mutateAsync({
+                                  taskId: task.id,
+                                  data: {
+                                    proposed_scheduled_date: null,
+                                    proposed_scheduled_start_time: null,
+                                    proposed_scheduled_end_time: null,
+                                  }
+                                });
+                                Alert.alert('Success', 'Proposed schedule rejected');
+                                queryClient.invalidateQueries({ queryKey: taskKeys.detail(task.id) });
+                              } catch (error: any) {
+                                Alert.alert('Error', error.message || 'Failed to update schedule');
+                              }
+                            }}
+                            variant="secondary"
+                            fullWidth
+                            style={styles.keepOriginalButton}
+                          />
+                        </View>
                       </View>
                     </View>
                   )}
@@ -669,18 +815,6 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                           </View>
                           <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
                         </Pressable>
-                        {isNeighbor && (
-                          <Pressable
-                            style={[styles.addReviewButton, isDark && styles.addReviewButtonDark]}
-                            onPress={() => {
-                              setSelectedTeenForReview(task?.teen_id || null);
-                              setShowReviewModal(true);
-                            }}
-                          >
-                            <Ionicons name="star-outline" size={16} color="#73af17" />
-                            <Text style={styles.addReviewButtonText}>Review</Text>
-                          </Pressable>
-                        )}
                       </View>
                     </>
                   )}
@@ -785,7 +919,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                             </View>
                             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
                           </Pressable>
-                          {/* Message button for neighbors to message applicants */}
+                          {/* Message and Approve buttons for neighbors */}
                           {isNeighbor && isOpen && (
                             <View style={[styles.applicationActions, isDark && styles.applicationActionsDark]}>
                               <Button
@@ -793,6 +927,12 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                                 onPress={() => router.push(`/chat/${taskId}?recipientId=${application.teen_id}`)}
                                 variant="secondary"
                                 style={styles.messageButton}
+                              />
+                              <Button
+                                title="Approve"
+                                onPress={() => handleApproveApplication(application.id)}
+                                style={styles.approveButton}
+                                loading={approveMutation.isPending}
                               />
                             </View>
                           )}
@@ -883,15 +1023,6 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                       title="Chat"
                       onPress={handleChat}
                       variant="primary"
-                      fullWidth
-                    />
-                  )}
-                  {/* Leave Review button for teenlancers on completed gigs */}
-                  {canReviewNeighbor && canReview.canReview && (
-                    <Button
-                      title="Leave Review"
-                      onPress={() => setShowReviewModal(true)}
-                      variant="secondary"
                       fullWidth
                     />
                   )}
@@ -997,6 +1128,22 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
           queryClient.invalidateQueries({ queryKey: ['canReviewGig'] });
           queryClient.invalidateQueries({ queryKey: teenStatsKeys.all });
         }}
+      />
+      <ApproveApplicationModal
+        visible={showApproveModal}
+        application={selectedApplication}
+        gig={task}
+        onClose={() => {
+          setShowApproveModal(false);
+          setSelectedApplication(null);
+        }}
+        onConfirm={handleConfirmApproval}
+        isApproving={approveMutation.isPending || updateTaskMutation.isPending}
+      />
+      <ScheduleConfirmationModal
+        visible={showScheduleModal}
+        task={task}
+        onClose={() => setShowScheduleModal(false)}
       />
     </Modal>
   );
@@ -1594,6 +1741,9 @@ const styles = StyleSheet.create({
   messageButton: {
     flex: 1,
   },
+  approveButton: {
+    flex: 1,
+  },
   thumbsUpButton: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -1666,6 +1816,98 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#6B7280',
     lineHeight: 20,
+  },
+  schedulingContainer: {
+    flex: 1,
+  },
+  scheduleDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  confirmedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    marginLeft: 'auto',
+  },
+  confirmedBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#73af17',
+  },
+  pendingText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 4,
+    color: '#F59E0B',
+  },
+  pendingScheduleContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  confirmScheduleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#73af17',
+    alignSelf: 'flex-start',
+  },
+  confirmScheduleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  proposedScheduleInfo: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+  },
+  proposedScheduleLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#F59E0B',
+  },
+  proposedScheduleSection: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  proposedScheduleSectionDark: {
+    backgroundColor: '#451A03',
+    borderColor: '#F59E0B',
+  },
+  proposedScheduleHeader: {
+    marginBottom: 12,
+  },
+  proposedScheduleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F59E0B',
+  },
+  proposedScheduleContent: {
+    gap: 12,
+  },
+  proposedScheduleActions: {
+    flexDirection: 'column',
+    gap: 12,
+    marginTop: 12,
+  },
+  acceptProposedButton: {
+    width: '100%',
+  },
+  keepOriginalButton: {
+    width: '100%',
   },
   floatingMessageBubble: {
     position: 'absolute',

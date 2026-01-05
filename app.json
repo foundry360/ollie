@@ -16,12 +16,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.foundry360.ollie",
-      "icon": "./assets/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      },
-      "config": {
-        "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
       }
     },
     "android": {
@@ -29,17 +25,9 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "notification": {
-        "icon": "./assets/push_icon.png"
-      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.foundry360.ollie",
-      "config": {
-        "googleMaps": {
-          "apiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
-        }
-      }
+      "package": "com.foundry360.ollie"
     },
     "web": {
       "favicon": "./assets/favicon.png"

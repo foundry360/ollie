@@ -18,7 +18,7 @@ export function NeighborActiveGigs() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Get active gigs (open, accepted, in_progress)
+  // Get active gigs (open, assigned, accepted, in_progress)
   const { data: activeGigs = [], isLoading } = useUserTasks({
     role: 'poster',
   });
@@ -37,7 +37,7 @@ export function NeighborActiveGigs() {
   }, [pendingApplications]);
 
   const filteredGigs = activeGigs.filter(
-    gig => ['open', 'accepted', 'in_progress'].includes(gig.status)
+    gig => ['open', 'assigned', 'accepted', 'in_progress'].includes(gig.status)
   ).slice(0, 5);
 
   const handleGigPress = (taskId: string) => {
@@ -54,6 +54,8 @@ export function NeighborActiveGigs() {
     switch (status) {
       case 'open':
         return '#73af17';
+      case 'assigned':
+        return '#F97316';
       case 'accepted':
         return '#F97316';
       case 'in_progress':
@@ -67,6 +69,8 @@ export function NeighborActiveGigs() {
     switch (status) {
       case 'open':
         return 'Open';
+      case 'assigned':
+        return 'Assigned';
       case 'accepted':
         return 'Accepted';
       case 'in_progress':
@@ -194,12 +198,6 @@ export function NeighborActiveGigs() {
                 <Text style={[styles.description, textStyle]} numberOfLines={1}>
                   {item.description}
                 </Text>
-                {item.teen_id && (
-                  <View style={styles.assignedRow}>
-                    <Ionicons name="person" size={14} color="#F97316" />
-                    <Text style={[styles.assignedText, textStyle]}>Assigned</Text>
-                  </View>
-                )}
               </View>
             </Pressable>
           ))}

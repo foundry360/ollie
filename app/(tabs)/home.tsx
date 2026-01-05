@@ -13,7 +13,6 @@ import { useUpcomingTasks } from '@/hooks/useTasks';
 import { useQueryClient } from '@tanstack/react-query';
 import { HomeHeader } from '@/components/home/HomeHeader';
 import { NeighborHeader } from '@/components/home/NeighborHeader';
-import { ActiveTaskCard } from '@/components/home/ActiveTaskCard';
 import { WeeklyEarnings } from '@/components/home/WeeklyEarnings';
 import { TasksNearYou } from '@/components/home/TasksNearYou';
 import { UpcomingTasks } from '@/components/home/UpcomingTasks';
@@ -23,6 +22,7 @@ import { NeighborUpcomingScheduledGigs } from '@/components/home/NeighborUpcomin
 import { NeighborRecentActivity } from '@/components/home/NeighborRecentActivity';
 import { FeaturedTeenlancers } from '@/components/home/FeaturedTeenlancers';
 import { TipsCarousel } from '@/components/home/TipsCarousel';
+import { TeenUpcomingScheduledGigs } from '@/components/home/TeenUpcomingScheduledGigs';
 import { Loading } from '@/components/ui/Loading';
 
 export default function HomeScreen() {
@@ -155,10 +155,11 @@ export default function HomeScreen() {
           <>
             <View style={[styles.topSection, isDark && styles.topSectionDark]}>
               <HomeHeader />
-              <ActiveTaskCard />
               <WeeklyEarnings />
             </View>
             <View style={[styles.bottomSection, isDark && styles.bottomSectionDark]}>
+              <TeenUpcomingScheduledGigs />
+              <View style={[styles.divider, isDark && styles.dividerDark]} />
               <TasksNearYou />
               <View style={[styles.divider, isDark && styles.dividerDark]} />
               <RecentActivity />

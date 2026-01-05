@@ -1,4 +1,4 @@
-import { Tabs, useSegments, useRouter } from 'expo-router';
+import { Tabs, useSegments } from 'expo-router';
 import { Platform, Pressable, Image, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/themeStore';
@@ -7,7 +7,6 @@ import { Drawer, DrawerContext } from '@/components/Drawer';
 import { HeaderLogo } from '@/components/ui/HeaderLogo';
 import { useContext, useEffect, useMemo } from 'react';
 import { useConversations, messageKeys } from '@/hooks/useMessages';
-import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { supabase } from '@/lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -71,14 +70,12 @@ function HeaderLeft() {
 function HeaderRight() {
   const { colorScheme } = useThemeStore();
   const segments = useSegments();
-  const router = useRouter();
   const isDark = colorScheme === 'dark';
-  const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   // Get the current route name from segments
   const currentRoute = segments[segments.length - 1];
   // Show notification bell on all screens except profile, settings, and qr-code
-  const hideNotificationRoutes = ['profile', 'settings', 'qr-code', 'notifications'];
+  const hideNotificationRoutes = ['profile', 'settings', 'qr-code'];
   const showNotification = !hideNotificationRoutes.includes(currentRoute);
 
   // #region agent log
@@ -92,36 +89,13 @@ function HeaderRight() {
     <View style={{ marginRight: 16, width: showNotification ? 'auto' : 0, opacity: showNotification ? 1 : 0 }}>
       <Pressable
         onPress={() => {
-          router.push('/notifications');
+          // TODO: Navigate to notifications screen
+          console.log('Notifications pressed');
         }}
-        style={{ padding: 4, position: 'relative' }}
+        style={{ padding: 4 }}
         disabled={!showNotification}
       >
         <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
-        {unreadCount > 0 && (
-          <View style={{
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            backgroundColor: '#73af17',
-            borderRadius: 10,
-            minWidth: 18,
-            height: 18,
-            paddingHorizontal: 4,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 2,
-            borderColor: '#111827',
-          }}>
-            <Text style={{
-              color: '#FFFFFF',
-              fontSize: 10,
-              fontWeight: '700',
-            }}>
-              {unreadCount > 99 ? '99+' : unreadCount.toString()}
-            </Text>
-          </View>
-        )}
       </Pressable>
     </View>
   );
@@ -385,13 +359,6 @@ export default function TabLayout() {
         name="profile" 
         options={{ 
           title: 'Profile',
-          href: null, // Hide from tab bar
-        }} 
-      />
-      <Tabs.Screen 
-        name="notifications" 
-        options={{ 
-          title: 'Notifications',
           href: null, // Hide from tab bar
         }} 
       />

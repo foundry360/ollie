@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Loading } from '@/components/ui/Loading';
+import { ScheduleConfirmationModal } from '@/components/tasks/ScheduleConfirmationModal';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,11 +23,12 @@ export default function TaskDetailScreen() {
   const completeTaskMutation = useCompleteTask();
   const cancelTaskMutation = useCancelTask();
   const [imageLoading, setImageLoading] = useState(true);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   const isPoster = user?.id === task?.poster_id;
   const isTeen = user?.id === task?.teen_id;
   const canAccept = !isPoster && !isTeen && task?.status === 'open' && user?.role === 'teen';
-  const canStart = isTeen && task?.status === 'accepted';
+  const canStart = isTeen && (task?.status === 'assigned' || task?.status === 'accepted');
   const canComplete = isTeen && task?.status === 'in_progress';
   const canCancel = (isPoster || isTeen) && task?.status !== 'completed' && task?.status !== 'cancelled';
 
@@ -291,6 +293,66 @@ export default function TaskDetailScreen() {
             </Pressable>
           </View>
 
+          {/* Schedule Section for Assigned Gigs */}
+          {isTeen && (task.status === 'assigned' || task.status === 'accepted') && task.scheduled_date && (
+            <View style={[styles.section, sectionStyle]}>
+              <View style={styles.scheduleHeader}>
+                <Text style={[styles.sectionTitle, titleStyle]}>Schedule</Text>
+                {!task.schedule_confirmed && (
+                  <Pressable onPress={() => setShowScheduleModal(true)}>
+                    <Text style={[styles.confirmScheduleLink, isDark && styles.confirmScheduleLinkDark]}>
+                      Confirm/Propose
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+              <View style={styles.scheduleInfo}>
+                <View style={styles.scheduleRow}>
+                  <Ionicons name="calendar-outline" size={20} color="#73af17" />
+                  <View style={styles.scheduleDateRow}>
+                    <Text style={[styles.scheduleText, textStyle]}>
+                      {new Date(task.scheduled_date).toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </Text>
+                    {task.schedule_confirmed && (
+                      <View style={styles.confirmedBadge}>
+                        <Ionicons name="checkmark-circle" size={16} color="#73af17" />
+                        <Text style={styles.confirmedBadgeText}>Confirmed</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                {task.scheduled_start_time && task.scheduled_end_time && (
+                  <View style={styles.scheduleRow}>
+                    <Ionicons name="time-outline" size={20} color="#73af17" />
+                    <Text style={[styles.scheduleText, textStyle]}>
+                      {(() => {
+                        const formatTime = (time24: string): string => {
+                          const [hours, minutes] = time24.split(':');
+                          const hour = parseInt(hours, 10);
+                          const ampm = hour >= 12 ? 'PM' : 'AM';
+                          const hour12 = hour % 12 || 12;
+                          return `${hour12}:${minutes} ${ampm}`;
+                        };
+                        return `${formatTime(task.scheduled_start_time!)} - ${formatTime(task.scheduled_end_time!)}`;
+                      })()}
+                    </Text>
+                  </View>
+                )}
+                {!task.schedule_confirmed && (
+                  <View style={styles.pendingBadge}>
+                    <Ionicons name="time-outline" size={16} color="#F59E0B" />
+                    <Text style={styles.pendingBadgeText}>Pending Confirmation</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
           <View style={styles.actions}>
             {canAccept && (
               <Button
@@ -336,6 +398,11 @@ export default function TaskDetailScreen() {
           </View>
         </View>
       </ScrollView>
+      <ScheduleConfirmationModal
+        visible={showScheduleModal}
+        task={task}
+        onClose={() => setShowScheduleModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -553,5 +620,70 @@ const styles = StyleSheet.create({
   },
   errorTextDark: {
     color: '#9CA3AF',
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  scheduleInfo: {
+    gap: 12,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  scheduleDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+    gap: 8,
+  },
+  scheduleText: {
+    fontSize: 16,
+    color: '#374151',
+    flex: 1,
+  },
+  confirmScheduleLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#73af17',
+  },
+  confirmScheduleLinkDark: {
+    color: '#73af17',
+  },
+  confirmedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 16,
+    marginLeft: 'auto',
+  },
+  confirmedBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#73af17',
+  },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  pendingBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F59E0B',
   },
 });

@@ -10,7 +10,6 @@ export interface UpdateProfileData {
   bio?: string;
   phone?: string;
   address?: string;
-  location?: { latitude: number; longitude: number }; // Coordinates for location-based filtering
   skills?: string[];
   availability?: {
     monday?: { start: string; end: string };
@@ -29,45 +28,9 @@ export async function updateProfile(data: UpdateProfileData): Promise<User> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  // Always geocode address if provided (to update coordinates when address changes)
-  const updateData: any = { ...data };
-  
-  if (data.address && data.address.trim().length > 0) {
-    try {
-      console.log('[updateProfile] Attempting to geocode address:', data.address);
-      // Geocode the address to get coordinates
-      const geocoded = await Location.geocodeAsync(data.address);
-      console.log('[updateProfile] Geocoding result:', geocoded);
-      
-      if (geocoded && geocoded.length > 0) {
-        const coords = geocoded[0];
-        updateData.location = {
-          latitude: coords.latitude,
-          longitude: coords.longitude
-        };
-        console.log('[updateProfile] Successfully geocoded address to coordinates:', updateData.location);
-      } else {
-        console.warn('[updateProfile] Geocoding returned no results for address:', data.address);
-        // If geocoding fails, set location to null
-        updateData.location = null;
-      }
-    } catch (error: any) {
-      console.error('[updateProfile] Error geocoding address:', error);
-      console.error('[updateProfile] Error details:', error?.message, error?.stack);
-      // If geocoding fails, set location to null
-      updateData.location = null;
-    }
-  } else if (data.address === null || data.address === '') {
-    // If address is being cleared, also clear location
-    console.log('[updateProfile] Address is being cleared, clearing location');
-    updateData.location = null;
-  }
-  
-  console.log('[updateProfile] Final updateData:', JSON.stringify(updateData, null, 2));
-
   const { data: updatedProfile, error } = await supabase
     .from('users')
-    .update(updateData)
+    .update(data)
     .eq('id', user.id)
     .select()
     .single();

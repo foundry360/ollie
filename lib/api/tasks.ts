@@ -474,6 +474,120 @@ export async function updateTask(taskId: string, data: UpdateTaskData): Promise<
   return updatedTask;
 }
 
+// Confirm schedule (teenlancer confirms the proposed schedule)
+export async function confirmSchedule(taskId: string): Promise<Task> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Verify user is the assigned teenlancer
+  const { data: task } = await supabase
+    .from('gigs')
+    .select('teen_id, status, scheduled_date')
+    .eq('id', taskId)
+    .single();
+
+  if (!task) throw new Error('Task not found');
+  if (task.teen_id !== user.id) {
+    throw new Error('Only the assigned teenlancer can confirm the schedule');
+  }
+  if (task.status !== 'assigned' && task.status !== 'accepted') {
+    throw new Error('Can only confirm schedule for assigned gigs');
+  }
+
+  const { data: updatedTask, error } = await supabase
+    .from('gigs')
+    .update({ schedule_confirmed: true })
+    .eq('id', taskId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return updatedTask;
+}
+
+// Propose alternative schedule (teenlancer proposes different times)
+export async function proposeSchedule(
+  taskId: string,
+  schedule: {
+    proposed_scheduled_date?: string;
+    proposed_scheduled_start_time?: string;
+    proposed_scheduled_end_time?: string;
+  }
+): Promise<Task> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Verify user is the assigned teenlancer
+  const { data: task } = await supabase
+    .from('gigs')
+    .select('teen_id, status')
+    .eq('id', taskId)
+    .single();
+
+  if (!task) throw new Error('Task not found');
+  if (task.teen_id !== user.id) {
+    throw new Error('Only the assigned teenlancer can propose schedule changes');
+  }
+  if (task.status !== 'assigned' && task.status !== 'accepted') {
+    throw new Error('Can only propose schedule for assigned gigs');
+  }
+
+  const { data: updatedTask, error } = await supabase
+    .from('gigs')
+    .update({
+      proposed_scheduled_date: schedule.proposed_scheduled_date,
+      proposed_scheduled_start_time: schedule.proposed_scheduled_start_time,
+      proposed_scheduled_end_time: schedule.proposed_scheduled_end_time,
+      schedule_confirmed: false, // Reset confirmation when proposing changes
+    })
+    .eq('id', taskId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return updatedTask;
+}
+
+// Accept proposed schedule (neighbor accepts teenlancer's proposed schedule)
+export async function acceptProposedSchedule(taskId: string): Promise<Task> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Verify user is the poster
+  const { data: task } = await supabase
+    .from('gigs')
+    .select('poster_id, status, proposed_scheduled_date, proposed_scheduled_start_time, proposed_scheduled_end_time')
+    .eq('id', taskId)
+    .single();
+
+  if (!task) throw new Error('Task not found');
+  if (task.poster_id !== user.id) {
+    throw new Error('Only the gig poster can accept proposed schedule changes');
+  }
+  if (!task.proposed_scheduled_date) {
+    throw new Error('No proposed schedule to accept');
+  }
+
+  // Move proposed schedule to actual schedule and clear proposals
+  const { data: updatedTask, error } = await supabase
+    .from('gigs')
+    .update({
+      scheduled_date: task.proposed_scheduled_date,
+      scheduled_start_time: task.proposed_scheduled_start_time || null,
+      scheduled_end_time: task.proposed_scheduled_end_time || null,
+      proposed_scheduled_date: null,
+      proposed_scheduled_start_time: null,
+      proposed_scheduled_end_time: null,
+      schedule_confirmed: true, // Auto-confirm when neighbor accepts
+    })
+    .eq('id', taskId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return updatedTask;
+}
+
 // Apply for a gig (teen) - creates an application that needs neighbor approval
 export async function applyForGig(taskId: string): Promise<{ id: string; gig_id: string; teen_id: string; status: string; created_at: string; updated_at: string }> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -552,8 +666,8 @@ export async function startTask(taskId: string): Promise<Task> {
   if (task.teen_id !== user.id) {
     throw new Error('Unauthorized to start this task');
   }
-  if (task.status !== 'accepted') {
-    throw new Error('Task must be accepted before starting');
+  if (task.status !== 'assigned' && task.status !== 'accepted') {
+    throw new Error('Task must be assigned or accepted before starting');
   }
 
   const { data: updatedTask, error } = await supabase
