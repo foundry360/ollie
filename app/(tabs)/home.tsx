@@ -160,12 +160,13 @@ export default function HomeScreen() {
             <View style={[styles.bottomSection, isDark && styles.bottomSectionDark]}>
               <TeenUpcomingScheduledGigs />
               <View style={[styles.divider, isDark && styles.dividerDark]} />
+              <UpcomingTasks />
+              <View style={[styles.divider, isDark && styles.dividerDark]} />
               <TasksNearYou />
               <View style={[styles.divider, isDark && styles.dividerDark]} />
               <RecentActivity />
               <View style={[styles.divider, isDark && styles.dividerDark]} />
               <TipsCarousel />
-              <UpcomingTasks />
             </View>
           </>
         )}

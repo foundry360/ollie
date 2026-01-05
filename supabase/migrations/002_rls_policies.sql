@@ -160,10 +160,10 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- When gig is marked as completed, create earnings record
   IF NEW.status = 'completed' AND NEW.teen_id IS NOT NULL THEN
-    INSERT INTO public.earnings (teen_id, gig_id, amount, status)
-    VALUES (NEW.teen_id, NEW.id, NEW.pay, 'pending')
+    INSERT INTO public.earnings (teen_id, gig_id, amount, status, payment_status)
+    VALUES (NEW.teen_id, NEW.id, NEW.pay, 'pending', 'pending')
     ON CONFLICT (teen_id, gig_id) DO UPDATE
-    SET amount = NEW.pay, status = 'pending', updated_at = NOW();
+    SET amount = NEW.pay, status = 'pending', payment_status = 'pending', updated_at = NOW();
   END IF;
   RETURN NEW;
 END;

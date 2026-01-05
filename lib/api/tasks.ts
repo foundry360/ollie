@@ -700,6 +700,10 @@ export async function completeTask(taskId: string): Promise<Task> {
     throw new Error('Task must be in progress before completing');
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tasks.ts:703',message:'About to update gig status to completed',data:{taskId,currentStatus:task.status,teenId:task.teen_id,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
   const { data: updatedTask, error } = await supabase
     .from('gigs')
     .update({ status: 'completed' })
@@ -707,7 +711,68 @@ export async function completeTask(taskId: string): Promise<Task> {
     .select()
     .single();
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tasks.ts:710',message:'Gig status updated to completed',data:{taskId,updatedTask:updatedTask?.id,newStatus:updatedTask?.status,error:error?.message,posterId:updatedTask?.poster_id,teenId:updatedTask?.teen_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+
   if (error) throw error;
+
+  // Wait for the trigger to create the earnings record (retry up to 3 times)
+  let earnings = null;
+  let earningsError = null;
+  let retries = 0;
+  const maxRetries = 3;
+
+  while (retries < maxRetries && !earnings) {
+    await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
+
+    const { data, error } = await supabase
+      .from('earnings')
+      .select('id, payment_status')
+      .eq('gig_id', taskId)
+      .eq('teen_id', user.id)
+      .single();
+
+    earnings = data;
+    earningsError = error;
+
+    console.log(`Earnings record lookup attempt ${retries + 1}:`, {
+      taskId,
+      earnings,
+      earningsError: earningsError?.message,
+    });
+
+    if (earnings) break;
+    retries++;
+  }
+
+  // If earnings record exists, trigger payment processing
+  if (earnings && !earningsError) {
+    console.log('Triggering payment processing for earnings:', earnings.id);
+    try {
+      // Call payment processing asynchronously (don't block the response)
+      // Use dynamic import to avoid circular dependencies
+      const { processPayment } = await import('@/lib/api/payments');
+      console.log('processPayment function imported, calling...');
+      processPayment(taskId, earnings.id)
+        .then(() => {
+          console.log('Payment processing initiated successfully');
+        })
+        .catch((error) => {
+          console.error('Error processing payment after gig completion:', error);
+          // Don't throw - payment can be retried later
+        });
+    } catch (importError) {
+      console.error('Error importing processPayment:', importError);
+    }
+  } else {
+    console.warn('Earnings record not found after retries:', {
+      retries,
+      earningsError: earningsError?.message,
+      earnings,
+    });
+  }
+
   return updatedTask;
 }
 

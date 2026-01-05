@@ -62,11 +62,49 @@ export default function RootLayout() {
     // Setup notification listeners
     const cleanup = setupNotificationListeners(
       (notification) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:64',message:'Notification received',data:{current_user_id:user?.id,notification_recipient_id:notification.request.content.data?.recipient_id,notification_type:notification.request.content.data?.type,title:notification.request.content.title},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.log('Notification received:', notification);
+        
+        // CRITICAL: Filter notifications by current user
+        // If notification has recipient_id, only show if it matches current user
+        const notificationData = notification.request.content.data;
+        if (notificationData?.recipient_id && user?.id) {
+          if (notificationData.recipient_id !== user.id) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:72',message:'Notification filtered out - wrong user',data:{current_user_id:user.id,notification_recipient_id:notificationData.recipient_id,notification_type:notificationData?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            console.log('Notification filtered out - not for current user:', {
+              current_user_id: user.id,
+              notification_recipient_id: notificationData.recipient_id,
+            });
+            return; // Don't show notification if it's not for the current user
+          }
+        }
       },
       (response) => {
         console.log('Notification tapped:', response);
         const data = response.notification.request.content.data;
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:85',message:'Notification tapped',data:{current_user_id:user?.id,notification_recipient_id:data?.recipient_id,notification_type:data?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        // CRITICAL: Filter notifications by current user before handling
+        // If notification has recipient_id, only handle if it matches current user
+        if (data?.recipient_id && user?.id) {
+          if (data.recipient_id !== user.id) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:92',message:'Notification tap filtered out - wrong user',data:{current_user_id:user.id,notification_recipient_id:data.recipient_id,notification_type:data?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            console.log('Notification tap filtered out - not for current user:', {
+              current_user_id: user.id,
+              notification_recipient_id: data.recipient_id,
+            });
+            return; // Don't handle notification if it's not for the current user
+          }
+        }
         
         // Handle navigation based on notification type
         if (!data?.type) {
@@ -117,7 +155,7 @@ export default function RootLayout() {
       }
     );
     return cleanup;
-  }, [router]);
+  }, [router, user]); // Add user to dependencies so handler updates when user changes
 
   useEffect(() => {
     // Check if Supabase is configured

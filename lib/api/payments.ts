@@ -193,24 +193,98 @@ export async function getDefaultPaymentMethod(): Promise<PaymentMethod | null> {
  * This is typically called by the database trigger, but can be called manually if needed
  */
 export async function processPayment(gigId: string, earningsId: string): Promise<void> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:195',message:'processPayment entry',data:{gigId,earningsId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  console.log('processPayment called with:', { gigId, earningsId });
+  
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('User not authenticated');
-
-  // Explicitly pass Authorization header - functions.invoke() doesn't always include it automatically in React Native
-  const { data, error } = await supabase.functions.invoke('process-payment', {
-    body: {
-      gig_id: gigId,
-      earnings_id: earningsId,
-    },
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-  });
-
-  if (error) throw error;
-  if (!data?.success) {
-    throw new Error('Payment processing failed');
+  if (!session) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:200',message:'No session found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    console.error('No session found in processPayment');
+    throw new Error('User not authenticated');
   }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:210',message:'Before invoking Edge Function',data:{hasSession:!!session,supabaseClientExists:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  console.log('Invoking process-payment Edge Function...');
+  // Removed: console.log('Supabase URL:', supabaseUrl); // supabaseUrl is not defined in this scope
+  console.log('Function name: process-payment');
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:217',message:'Before invoking Edge Function',data:{gigId,earningsId,hasSession:!!session},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  // Explicitly pass Authorization header - functions.invoke() doesn't always include it automatically in React Native
+  // Workaround: Use fetch directly instead of functions.invoke() to ensure body is sent correctly in React Native
+  const requestBody = {
+    gig_id: gigId,
+    earnings_id: earningsId,
+  };
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:225',message:'Request body prepared',data:{requestBody,bodyStringified:JSON.stringify(requestBody)},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  
+  // Get Supabase URL from environment (functions.invoke() may not send body correctly in React Native)
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    throw new Error('Supabase URL not configured');
+  }
+  const functionUrl = `${supabaseUrl}/functions/v1/process-payment`;
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:232',message:'Using direct fetch',data:{functionUrl,hasRequestBody:!!requestBody},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  
+  // Use direct fetch instead of functions.invoke() to ensure body is sent correctly
+  const response = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': (supabase as any).supabaseKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
+    },
+    body: JSON.stringify(requestBody),
+  });
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:245',message:'Fetch response received',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:250',message:'Fetch error response',data:{status:response.status,errorText},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    let errorData;
+    try {
+      errorData = JSON.parse(errorText);
+    } catch {
+      errorData = { error: errorText };
+    }
+    throw new Error(errorData.error || `Edge Function returned ${response.status}`);
+  }
+  
+  const data = await response.json();
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:270',message:'Edge Function response parsed',data:{hasData:!!data,success:data?.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  console.log('process-payment Edge Function response:', { data });
+
+  if (!data?.success) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:275',message:'Payment processing failed',data:{responseData:data},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    console.error('Payment processing failed, response:', data);
+    throw new Error(data?.error || 'Payment processing failed');
+  }
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:281',message:'Payment processing successful',data:{success:data?.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  console.log('Payment processing successful');
 }
 
 /**
