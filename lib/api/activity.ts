@@ -9,6 +9,7 @@ export interface Activity {
   description: string;
   timestamp: string;
   gig_id?: string;
+  gig_title?: string;
   amount?: number;
   rating?: number;
   sender_name?: string;
@@ -48,14 +49,18 @@ export async function getRecentActivity(limit: number = 5): Promise<Activity[]> 
     });
   }
 
-  // Get paid earnings
+  // Get paid earnings with gig title
   const { data: paidEarnings, error: earningsError } = await supabase
     .from('earnings')
     .select(`
       id,
       amount,
       paid_at,
-      gig_id
+      gig_id,
+      gigs!inner(
+        id,
+        title
+      )
     `)
     .eq('teen_id', user.id)
     .eq('status', 'paid')
@@ -67,7 +72,7 @@ export async function getRecentActivity(limit: number = 5): Promise<Activity[]> 
     console.error('Error fetching paid earnings:', earningsError);
     // Don't throw, just continue without earnings
   } else if (paidEarnings && paidEarnings.length > 0) {
-    // Fetch gig titles separately if needed, or use a simpler description
+    // Include gig title in the activity
     (paidEarnings || []).forEach((earning: any) => {
       activities.push({
         id: `payment-${earning.id}`,
@@ -76,6 +81,7 @@ export async function getRecentActivity(limit: number = 5): Promise<Activity[]> 
         description: `$${parseFloat(earning.amount.toString()).toFixed(2)}`,
         timestamp: earning.paid_at,
         gig_id: earning.gig_id,
+        gig_title: earning.gigs?.title,
         amount: parseFloat(earning.amount.toString()),
       });
     });

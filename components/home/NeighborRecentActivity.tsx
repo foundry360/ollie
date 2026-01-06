@@ -11,7 +11,7 @@ export function NeighborRecentActivity() {
   const router = useRouter();
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
-  const [activeTab, setActiveTab] = useState<'completed' | 'accepted'>('completed');
+  const [activeTab, setActiveTab] = useState<'completed' | 'assigned'>('completed');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -25,12 +25,12 @@ export function NeighborRecentActivity() {
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .slice(0, 5);
 
-  const acceptedGigs = allGigs
-    .filter(gig => gig.status === 'accepted')
+  const assignedGigs = allGigs
+    .filter(gig => gig.status === 'assigned')
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .slice(0, 5);
 
-  const displayedGigs = activeTab === 'completed' ? completedGigs : acceptedGigs;
+  const displayedGigs = activeTab === 'completed' ? completedGigs : assignedGigs;
 
   const handleViewAll = () => {
     router.push('/(tabs)/tasks');
@@ -79,11 +79,11 @@ export function NeighborRecentActivity() {
           </Text>
         </Pressable>
         <Pressable
-          style={[styles.tab, activeTab === 'accepted' && styles.tabActive]}
-          onPress={() => setActiveTab('accepted')}
+          style={[styles.tab, activeTab === 'assigned' && styles.tabActive]}
+          onPress={() => setActiveTab('assigned')}
         >
-          <Text style={[styles.tabText, activeTab === 'accepted' && styles.tabTextActive, isDark && styles.tabTextDark]}>
-            Accepted
+          <Text style={[styles.tabText, activeTab === 'assigned' && styles.tabTextActive, isDark && styles.tabTextDark]}>
+            Assigned
           </Text>
         </Pressable>
       </View>
@@ -96,7 +96,7 @@ export function NeighborRecentActivity() {
             color={isDark ? '#6B7280' : '#9CA3AF'}
           />
           <Text style={[styles.emptyText, textStyle]}>
-            No {activeTab === 'completed' ? 'completed' : 'accepted'} gigs yet
+            No {activeTab === 'completed' ? 'completed' : 'assigned'} gigs yet
           </Text>
         </View>
       ) : (
@@ -107,7 +107,7 @@ export function NeighborRecentActivity() {
               style={[
                 styles.activityItem, 
                 cardStyle,
-                activeTab === 'completed' && styles.activityItemNoBorder
+                (activeTab === 'completed' || activeTab === 'assigned') && styles.activityItemNoBorder
               ]}
               onPress={() => handleGigPress(gig.id)}
               android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
@@ -129,7 +129,7 @@ export function NeighborRecentActivity() {
                 <Text style={[styles.activityDescription, textStyle]}>
                   {activeTab === 'completed' 
                     ? `Completed for $${gig.pay.toFixed(2)}`
-                    : `Accepted by a teenlancer`}
+                    : `Assigned to a teenlancer`}
                 </Text>
                 <Text style={[styles.activityTime, textStyle]}>
                   {formatTimeAgo(gig.updated_at)}

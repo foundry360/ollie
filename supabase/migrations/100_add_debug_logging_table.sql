@@ -22,3 +22,4 @@ CREATE POLICY "Service role can insert debug logs" ON public.debug_logs
 CREATE POLICY "Users can read debug logs" ON public.debug_logs
   FOR SELECT USING (true);
 
+

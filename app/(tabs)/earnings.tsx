@@ -177,21 +177,40 @@ export default function EarningsScreen() {
           </View>
           <View style={styles.earningAmount}>
             <Text style={[styles.amountText, titleStyle]}>${item.amount.toFixed(2)}</Text>
-            <View
-              style={[
-                styles.statusBadge,
-                item.payment_status === 'succeeded' && styles.statusBadgePaid,
-                (item.payment_status === 'pending' || item.payment_status === 'processing') && styles.statusBadgePending,
-                item.payment_status === 'failed' && styles.statusBadgeFailed,
-              ]}
-            >
-              <Text style={styles.statusText}>
-                {item.payment_status === 'succeeded' ? 'Paid' :
-                 item.payment_status === 'processing' ? 'Processing' :
-                 item.payment_status === 'failed' ? 'Failed' :
-                 item.status === 'paid' ? 'Paid' : 'Pending'}
-              </Text>
-            </View>
+            {(() => {
+              // Only show "Paid" when money is actually deposited to bank account
+              // Check: payout_status === 'paid' (this is set by payout.paid webhook)
+              // Do NOT check status === 'paid' or paid_at alone, as old records may have these set incorrectly
+              // payment_status === 'succeeded' only means neighbor's card was charged, not that money is in bank
+              const hasPayoutStatusColumn = item.payout_status !== undefined;
+              const isPaid = hasPayoutStatusColumn 
+                ? item.payout_status === 'paid'  // If column exists, only trust payout_status
+                : false; // If column doesn't exist, treat as pending until migration is run
+              const isPending = !isPaid && (item.payment_status === 'pending' || item.payment_status === 'processing' || item.payment_status === 'succeeded' || !hasPayoutStatusColumn);
+              const isFailed = item.payment_status === 'failed' || item.payout_status === 'failed';
+              
+              return (
+                <View
+                  style={[
+                    styles.statusBadge,
+                    isPaid && styles.statusBadgePaid,
+                    isPending && styles.statusBadgePending,
+                    isFailed && styles.statusBadgeFailed,
+                  ]}
+                >
+                  <Text style={[
+                    styles.statusText,
+                    isPaid && styles.statusTextPaid
+                  ]}>
+                    {isPaid ? 'Paid' :
+                     isFailed ? 'Failed' :
+                     item.payment_status === 'processing' ? 'Processing' :
+                     item.payment_status === 'succeeded' ? 'Pending' : // Neighbor's card charged, but not yet in bank
+                     'Pending'}
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
         </View>
         {item.platform_fee_amount && item.platform_fee_amount > 0 && (
@@ -555,7 +574,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3C7',
   },
   statusBadgePaid: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#73af17',
   },
   statusBadgePending: {
     backgroundColor: '#FEF3C7',
@@ -577,6 +596,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#92400E',
+  },
+  statusTextPaid: {
+    color: '#FFFFFF',
   },
   paidDate: {
     fontSize: 12,

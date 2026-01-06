@@ -196,12 +196,14 @@ export function TasksNearYou() {
   }
 
   if (tasks.length === 0) {
+    const emptyCardStyle = isDark ? styles.emptyCardDark : styles.emptyCardLight;
+    
     return (
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
           <Text style={[styles.sectionTitle, titleStyle]}>Gigs Near You</Text>
         </View>
-        <View style={styles.emptyContainer}>
+        <View style={[styles.emptyContainer, emptyCardStyle]}>
           <Ionicons
             name="location-outline"
             size={48}
@@ -462,6 +464,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 32,
     paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  emptyCardLight: {
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  emptyCardDark: {
+    borderColor: '#374151',
+    backgroundColor: 'transparent',
   },
   emptyText: {
     fontSize: 16,

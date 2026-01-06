@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +18,7 @@ import { TasksNearYou } from '@/components/home/TasksNearYou';
 import { UpcomingTasks } from '@/components/home/UpcomingTasks';
 import { RecentActivity } from '@/components/home/RecentActivity';
 import { NeighborActiveGigs } from '@/components/home/NeighborActiveGigs';
+import { CompletionApprovalsCard } from '@/components/home/CompletionApprovalsCard';
 import { NeighborUpcomingScheduledGigs } from '@/components/home/NeighborUpcomingScheduledGigs';
 import { NeighborRecentActivity } from '@/components/home/NeighborRecentActivity';
 import { FeaturedTeenlancers } from '@/components/home/FeaturedTeenlancers';
@@ -53,6 +54,26 @@ export default function HomeScreen() {
   const { data: activities, isLoading: activitiesLoading, refetch: refetchActivities } = useRecentActivity(5);
   const { data: activeTask, isLoading: activeTaskLoading, refetch: refetchActiveTask } = useActiveTask();
   const { data: upcomingTasks, isLoading: upcomingLoading, refetch: refetchUpcoming } = useUpcomingTasks();
+  
+  // Fetch teen's tasks to check for scheduled gigs
+  const { data: teenTasks = [] } = useUserTasks({
+    role: 'teen',
+  });
+  
+  // Check if there are scheduled gigs (same logic as TeenUpcomingScheduledGigs)
+  const hasScheduledGigs = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return teenTasks.some(gig => {
+      if (!gig.scheduled_date) return false;
+      if (!['assigned', 'accepted', 'in_progress'].includes(gig.status)) return false;
+      if (!gig.schedule_confirmed) return false;
+      const scheduledDate = new Date(gig.scheduled_date);
+      scheduledDate.setHours(0, 0, 0, 0);
+      return scheduledDate >= today;
+    });
+  }, [teenTasks]);
 
   // Fetch data for neighbor home screen
   const { data: neighborStats, isLoading: neighborStatsLoading, refetch: refetchNeighborStats } = useNeighborStats();
@@ -109,6 +130,7 @@ export default function HomeScreen() {
                 <FeaturedTeenlancers />
               </View>
               <View style={[styles.bottomSection, isDark && styles.bottomSectionDark]}>
+                <CompletionApprovalsCard />
                 <NeighborActiveGigs />
                 <View style={[styles.divider, isDark && styles.dividerDark]} />
                 <NeighborUpcomingScheduledGigs />
@@ -159,7 +181,7 @@ export default function HomeScreen() {
             </View>
             <View style={[styles.bottomSection, isDark && styles.bottomSectionDark]}>
               <TeenUpcomingScheduledGigs />
-              <View style={[styles.divider, isDark && styles.dividerDark]} />
+              {hasScheduledGigs && <View style={[styles.divider, isDark && styles.dividerDark]} />}
               <UpcomingTasks />
               <View style={[styles.divider, isDark && styles.dividerDark]} />
               <TasksNearYou />

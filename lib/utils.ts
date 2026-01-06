@@ -314,3 +314,18 @@ export function getPreviousWeekRange(): { start: Date; end: Date } {
   return { start: prevStart, end: prevEnd };
 }
 
+// Get a random fun completion message for teenlancers
+export function getRandomCompletionMessage(): string {
+  const messages = [
+    "🎉 You did it! Your completion is waiting for the neighbor's approval.",
+    "Awesome work! 🚀 The neighbor will review your completion and approve it soon!",
+    "Nice! ✨ Your gig completion is submitted. Just waiting for the neighbor to give it a thumbs up!",
+    "Boom! 💪 Gig marked complete! The neighbor will check it out and approve it.",
+    "You're all set! 🎯 Completion submitted - the neighbor will review and approve it!",
+    "Done! 🎊 Waiting for neighbor approval - you'll get paid once they approve!",
+    "Crushed it! 💯 Your completion is submitted. Neighbor will approve it soon!",
+  ];
+  
+  return messages[Math.floor(Math.random() * messages.length)];
+}
+

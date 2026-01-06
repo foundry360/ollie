@@ -17,6 +17,7 @@ export interface EarningsRecord {
   created_at: string;
   paid_at: string | null;
   payment_status?: 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded';
+  payout_status?: 'pending' | 'processing' | 'paid' | 'failed';
   platform_fee_amount?: number;
   payment_failed_reason?: string;
 }
@@ -31,7 +32,7 @@ export async function getEarningsSummary(filters?: {
 
   let query = supabase
     .from('earnings')
-    .select('amount, status')
+    .select('amount, status, payout_status, paid_at')
     .eq('teen_id', user.id);
 
   if (filters?.startDate) {
@@ -53,12 +54,24 @@ export async function getEarningsSummary(filters?: {
     completed_tasks: data?.length || 0,
   };
 
-  data?.forEach((earning) => {
+  data?.forEach((earning: any) => {
     summary.total_earnings += parseFloat(earning.amount.toString());
-    if (earning.status === 'pending') {
-      summary.pending_earnings += parseFloat(earning.amount.toString());
-    } else if (earning.status === 'paid') {
+    
+    // Only count as "paid" when money is actually deposited to bank account
+    // Check: payout_status === 'paid' (this is set by payout.paid webhook)
+    // If payout_status column doesn't exist yet (migration not run), fall back to checking paid_at
+    // BUT: paid_at should only be set when payout.paid webhook is received, not when payment_intent.succeeded
+    // payment_status === 'succeeded' only means neighbor's card was charged, not that money is in bank
+    const hasPayoutStatusColumn = earning.payout_status !== undefined;
+    const isActuallyPaid = hasPayoutStatusColumn 
+      ? earning.payout_status === 'paid'  // If column exists, only trust payout_status
+      : false; // If column doesn't exist, treat as pending until migration is run
+    
+    if (isActuallyPaid) {
       summary.paid_earnings += parseFloat(earning.amount.toString());
+    } else {
+      // Everything else is pending (including when payment_status === 'succeeded' but payout hasn't happened)
+      summary.pending_earnings += parseFloat(earning.amount.toString());
     }
   });
 
@@ -86,6 +99,7 @@ export async function getEarningsHistory(filters?: {
       created_at,
       paid_at,
       payment_status,
+      payout_status,
       platform_fee_amount,
       payment_failed_reason,
       gigs(id, title)
@@ -326,6 +340,7 @@ export async function getNeighborSpendingHistory(filters?: {
       created_at,
       paid_at,
       payment_status,
+      payout_status,
       platform_fee_amount,
       payment_failed_reason,
       gigs!earnings_gig_id_fkey(id, title, poster_id),

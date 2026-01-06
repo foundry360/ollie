@@ -10,6 +10,8 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { Loading } from '@/components/ui/Loading';
 import { ScheduleConfirmationModal } from '@/components/tasks/ScheduleConfirmationModal';
+import { getRandomCompletionMessage } from '@/lib/utils';
+import { SuccessAlert } from '@/components/ui/SuccessAlert';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,13 +26,15 @@ export default function TaskDetailScreen() {
   const cancelTaskMutation = useCancelTask();
   const [imageLoading, setImageLoading] = useState(true);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const isPoster = user?.id === task?.poster_id;
   const isTeen = user?.id === task?.teen_id;
   const canAccept = !isPoster && !isTeen && task?.status === 'open' && user?.role === 'teen';
   const canStart = isTeen && (task?.status === 'assigned' || task?.status === 'accepted');
   const canComplete = isTeen && task?.status === 'in_progress';
-  const canCancel = (isPoster || isTeen) && task?.status !== 'completed' && task?.status !== 'cancelled';
+  const canCancel = (isPoster || isTeen) && task?.status !== 'completed' && task?.status !== 'pending_completion_approval' && task?.status !== 'cancelled';
 
   const handleAccept = async () => {
     if (!task) return;
@@ -79,7 +83,8 @@ export default function TaskDetailScreen() {
           onPress: async () => {
             try {
               await completeTaskMutation.mutateAsync(task.id);
-              Alert.alert('Success', 'Task completed! Earnings will be processed.');
+              setSuccessMessage(getRandomCompletionMessage());
+              setShowSuccessAlert(true);
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to complete task');
             }
@@ -184,10 +189,14 @@ export default function TaskDetailScreen() {
     switch (status) {
       case 'open':
         return '#73af17';
+      case 'assigned':
+        return '#3B82F6';
       case 'accepted':
         return '#F97316';
       case 'in_progress':
         return '#F59E0B';
+      case 'pending_completion_approval':
+        return '#F97316';
       case 'completed':
         return '#6366F1';
       case 'cancelled':
@@ -353,6 +362,30 @@ export default function TaskDetailScreen() {
             </View>
           )}
 
+          {/* Pending Completion Approval Message */}
+          {task.status === 'pending_completion_approval' && (
+            <View style={[styles.statusMessage, isDark ? styles.statusMessageDark : styles.statusMessageLight]}>
+              <Ionicons name="time-outline" size={20} color="#F97316" />
+              <View style={styles.statusMessageText}>
+                {isTeen ? (
+                  <>
+                    <Text style={[styles.statusMessageTitle, titleStyle]}>Awaiting Neighbor Approval</Text>
+                    <Text style={[styles.statusMessageDescription, textStyle]}>
+                      Your completion has been submitted. The neighbor will review and approve before payment is processed.
+                    </Text>
+                  </>
+                ) : isPoster ? (
+                  <>
+                    <Text style={[styles.statusMessageTitle, titleStyle]}>Review Completion</Text>
+                    <Text style={[styles.statusMessageDescription, textStyle]}>
+                      The teenlancer has marked this gig as complete. Please review and approve to process payment.
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+            </View>
+          )}
+
           <View style={styles.actions}>
             {canAccept && (
               <Button
@@ -378,7 +411,7 @@ export default function TaskDetailScreen() {
                 fullWidth
               />
             )}
-            {(isPoster || isTeen) && task.status !== 'completed' && task.status !== 'cancelled' && (
+            {(isPoster || isTeen) && task.status !== 'completed' && task.status !== 'pending_completion_approval' && task.status !== 'cancelled' && (
               <Button
                 title="Chat"
                 onPress={handleChat}
@@ -402,6 +435,11 @@ export default function TaskDetailScreen() {
         visible={showScheduleModal}
         task={task}
         onClose={() => setShowScheduleModal(false)}
+      />
+      <SuccessAlert
+        visible={showSuccessAlert}
+        message={successMessage}
+        onClose={() => setShowSuccessAlert(false)}
       />
     </SafeAreaView>
   );
@@ -685,5 +723,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#F59E0B',
+  },
+  statusMessage: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  statusMessageLight: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  statusMessageDark: {
+    backgroundColor: '#1F2937',
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  statusMessageText: {
+    flex: 1,
+  },
+  statusMessageTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  statusMessageDescription: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

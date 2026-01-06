@@ -65,7 +65,7 @@ CREATE POLICY "Posters can update own tasks" ON public.gigs
 
 -- Teens can update gigs they've been assigned to (status changes)
 CREATE POLICY "Teens can update accepted tasks" ON public.gigs
-  FOR UPDATE USING (teen_id = auth.uid() AND status IN ('assigned', 'accepted', 'in_progress', 'completed'));
+  FOR UPDATE USING (teen_id = auth.uid() AND status IN ('assigned', 'accepted', 'in_progress', 'pending_completion_approval', 'completed'));
 
 -- Messages table policies
 -- Drop existing policies if they exist

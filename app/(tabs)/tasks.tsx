@@ -10,12 +10,13 @@ import { GigDetailModal } from '@/components/tasks/GigDetailModal';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useTeenApplications } from '@/hooks/useGigApplications';
+import { CompletionApprovalsCard } from '@/components/home/CompletionApprovalsCard';
 
 const STATUS_FILTERS_TEEN: { label: string; value: TaskStatus | 'all' | 'applied' }[] = [
   { label: 'All', value: 'all' },
-  { label: 'Applied', value: 'applied' },
   { label: 'Open', value: 'open' },
-  { label: 'Accepted', value: 'accepted' },
+  { label: 'Applied', value: 'applied' },
+  { label: 'Assigned', value: 'assigned' },
   { label: 'In Progress', value: 'in_progress' },
   { label: 'Completed', value: 'completed' },
   { label: 'Cancelled', value: 'cancelled' },
@@ -24,7 +25,7 @@ const STATUS_FILTERS_TEEN: { label: string; value: TaskStatus | 'all' | 'applied
 const STATUS_FILTERS_POSTER: { label: string; value: TaskStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
   { label: 'Open', value: 'open' },
-  { label: 'Accepted', value: 'accepted' },
+  { label: 'Assigned', value: 'assigned' },
   { label: 'In Progress', value: 'in_progress' },
   { label: 'Completed', value: 'completed' },
   { label: 'Cancelled', value: 'cancelled' },
@@ -79,24 +80,35 @@ export default function TasksScreen() {
   const appliedTasks = useMemo(() => {
     if (role === 'teen') {
       // Map applications to Task-like objects for display
+      // Filter out applications where the gig doesn't exist (gig_title is missing)
+      // Only include pending applications for open gigs (not assigned, completed, or cancelled)
       return teenApplications
-        .filter(app => app.status === 'pending' || app.status === 'approved')
-        .map(app => ({
-          id: app.gig_id,
-          title: app.gig_title || 'Unknown Gig',
-          description: app.gig_description || '',
-          pay: app.gig_pay || 0,
-          status: (app.status === 'approved' ? 'assigned' : 'open') as TaskStatus,
-          poster_id: '', // We don't have this in the application data
-          teen_id: app.status === 'approved' ? app.teen_id : null,
-          location: app.gig_location || { latitude: 0, longitude: 0 },
-          address: app.gig_address || '',
-          required_skills: app.gig_required_skills || [],
-          estimated_hours: app.gig_estimated_hours || null,
-          photos: app.gig_photos || [],
-          created_at: app.gig_created_at || app.created_at,
-          updated_at: app.gig_updated_at || app.updated_at,
-        })) as Task[];
+        .filter(app => {
+          if (!app.gig_title) return false;
+          // Only show pending applications
+          if (app.status !== 'pending') return false;
+          // Only show if gig is still open (not assigned, completed, or cancelled)
+          const gigStatus = app.gig_status;
+          return gigStatus === 'open' || !gigStatus; // Allow null/undefined as open
+        })
+        .map(app => {
+          return {
+            id: app.gig_id,
+            title: app.gig_title!,
+            description: app.gig_description || '',
+            pay: app.gig_pay || 0,
+            status: 'open' as TaskStatus, // Applied gigs are always open
+            poster_id: '', // We don't have this in the application data
+            teen_id: null, // Not assigned yet
+            location: app.gig_location || { latitude: 0, longitude: 0 },
+            address: app.gig_address || '',
+            required_skills: app.gig_required_skills || [],
+            estimated_hours: app.gig_estimated_hours || null,
+            photos: app.gig_photos || [],
+            created_at: app.gig_created_at || app.created_at,
+            updated_at: app.gig_updated_at || app.updated_at,
+          };
+        }) as Task[];
     }
     return [];
   }, [teenApplications, role]);
@@ -119,11 +131,25 @@ export default function TasksScreen() {
       // For other status filters, use the standard filter
       // Also include applied gigs that match the status (for teenlancers)
       if (role === 'teen') {
-        const filteredAssigned = allTasks.filter(task => task.status === statusFilter);
-        const filteredApplied = appliedTasks.filter(task => task.status === statusFilter);
+        // For 'assigned' filter, also include legacy 'accepted' status, but exclude completed/pending_completion_approval/cancelled
+        const statusToFilter = statusFilter === 'assigned' 
+          ? (task: Task) => (task.status === 'assigned' || task.status === 'accepted') && task.status !== 'completed' && task.status !== 'pending_completion_approval' && task.status !== 'cancelled'
+          : (task: Task) => task.status === statusFilter;
+        
+        const filteredAssigned = allTasks.filter(statusToFilter);
+        const filteredApplied = appliedTasks.filter(statusToFilter);
         const assignedTaskIds = new Set(filteredAssigned.map(t => t.id));
         const uniqueApplied = filteredApplied.filter(appTask => !assignedTaskIds.has(appTask.id));
         return [...filteredAssigned, ...uniqueApplied];
+      }
+      // For poster, also handle legacy 'accepted' status when filtering for 'assigned', but exclude completed/pending_completion_approval/cancelled
+      if (statusFilter === 'assigned') {
+        return allTasks.filter(task => 
+          (task.status === 'assigned' || task.status === 'accepted') && 
+          task.status !== 'completed' && 
+          task.status !== 'pending_completion_approval' &&
+          task.status !== 'cancelled'
+        );
       }
       return allTasks.filter(task => task.status === statusFilter);
     }
@@ -227,6 +253,9 @@ export default function TasksScreen() {
           />
         </View>
       </View>
+
+      {/* Completion Approvals Card - Only visible for neighbors when approvals are pending */}
+      {role === 'poster' && <CompletionApprovalsCard />}
 
       <FlatList
         data={tasks}

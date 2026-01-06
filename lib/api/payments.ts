@@ -264,15 +264,42 @@ export async function processPayment(gigId: string, earningsId: string): Promise
     } catch {
       errorData = { error: errorText };
     }
-    throw new Error(errorData.error || `Edge Function returned ${response.status}`);
+    
+    // Build a more detailed error message
+    let errorMessage = errorData.error || `Edge Function returned ${response.status}`;
+    
+    // Include Stripe-specific error details if available
+    if (errorData.stripe_error) {
+      errorMessage += `: ${errorData.stripe_error}`;
+      if (errorData.stripe_error_code) {
+        errorMessage += ` (Code: ${errorData.stripe_error_code})`;
+      }
+    }
+    
+    // Log full error details for debugging
+    console.error('Payment processing error:', {
+      status: response.status,
+      error: errorData.error,
+      stripe_error: errorData.stripe_error,
+      stripe_error_code: errorData.stripe_error_code,
+      fullError: errorData,
+    });
+    
+    throw new Error(errorMessage);
   }
   
   const data = await response.json();
   
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:270',message:'Edge Function response parsed',data:{hasData:!!data,success:data?.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payments.ts:270',message:'Edge Function response parsed',data:{hasData:!!data,success:data?.success,message:data?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
   // #endregion
   console.log('process-payment Edge Function response:', { data });
+
+  // Handle "already processed" as success (payment was already completed)
+  if (data?.message === 'Payment already processed' && data?.earnings?.payment_status === 'succeeded') {
+    console.log('Payment already processed successfully');
+    return;
+  }
 
   if (!data?.success) {
     // #region agent log

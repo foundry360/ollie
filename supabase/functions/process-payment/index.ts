@@ -17,6 +17,8 @@ serve(async (req) => {
     })
   }
 
+  let earnings_id: string | null = null; // Store for error handling
+
   try {
     // #region agent log - Check request details
     const contentType = req.headers.get('content-type') || 'none'
@@ -91,7 +93,8 @@ serve(async (req) => {
       )
     }
     
-    const { gig_id, earnings_id } = body
+    const { gig_id, earnings_id: bodyEarningsId } = body
+    earnings_id = bodyEarningsId; // Store for error handling
 
     console.log('process-payment function called with:', { gig_id, earnings_id, body })
 
@@ -133,7 +136,11 @@ serve(async (req) => {
     // Check if payment already processed
     if (earnings.payment_status === 'succeeded') {
       return new Response(
-        JSON.stringify({ message: 'Payment already processed', earnings }),
+        JSON.stringify({ 
+          success: true,
+          message: 'Payment already processed', 
+          earnings 
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -147,25 +154,95 @@ serve(async (req) => {
     }
 
     // Get neighbor's default payment method
-    const { data: paymentMethod, error: pmError } = await supabase
+    // Order by created_at DESC to get the most recently set default if multiple exist
+    console.log('Looking for payment method for poster_id:', gig.poster_id);
+    const { data: paymentMethods, error: pmError } = await supabase
       .from('payment_methods')
       .select('*')
       .eq('user_id', gig.poster_id)
       .eq('is_default', true)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
 
-    if (pmError || !paymentMethod) {
+    console.log('Payment method query result:', { 
+      found: !!paymentMethods, 
+      count: paymentMethods?.length || 0, 
+      error: pmError,
+      poster_id: gig.poster_id 
+    });
+
+    if (pmError) {
+      const errorMessage = `Error querying payment methods: ${pmError.message}`;
+      console.error('Payment method query error:', pmError);
+      
+      // Update earnings with failure reason so it's visible in the database
+      await supabase
+        .from('earnings')
+        .update({
+          payment_status: 'failed',
+          payment_failed_reason: errorMessage,
+        })
+        .eq('id', earnings_id);
+      
       return new Response(
-        JSON.stringify({ error: 'Neighbor payment method not found' }),
+        JSON.stringify({ error: errorMessage, details: pmError }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!paymentMethods || paymentMethods.length === 0) {
+      // Check if there are ANY payment methods for this user (not just default)
+      const { data: allPaymentMethods } = await supabase
+        .from('payment_methods')
+        .select('id, is_default')
+        .eq('user_id', gig.poster_id);
+      
+      console.log('All payment methods for poster:', allPaymentMethods);
+      
+      const errorMessage = `Neighbor payment method not found. Poster has ${allPaymentMethods?.length || 0} payment method(s), but none are set as default. Please ensure the poster has added a default payment method.`;
+      console.error('Payment method not found:', { 
+        poster_id: gig.poster_id, 
+        total_payment_methods: allPaymentMethods?.length || 0,
+        all_payment_methods: allPaymentMethods
+      });
+      
+      // Update earnings with failure reason so it's visible in the database
+      await supabase
+        .from('earnings')
+        .update({
+          payment_status: 'failed',
+          payment_failed_reason: errorMessage,
+        })
+        .eq('id', earnings_id);
+      
+      return new Response(
+        JSON.stringify({ 
+          error: errorMessage,
+          poster_id: gig.poster_id,
+          total_payment_methods: allPaymentMethods?.length || 0
+        }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    const paymentMethod = paymentMethods[0]
+
     // Ensure payment method has a customer ID
     if (!paymentMethod.stripe_customer_id) {
-      console.error('Payment method missing customer ID:', paymentMethod)
+      const errorMessage = 'Payment method is not attached to a Stripe customer. Please re-add your payment method.';
+      console.error('Payment method missing customer ID:', paymentMethod);
+      
+      // Update earnings with failure reason
+      await supabase
+        .from('earnings')
+        .update({
+          payment_status: 'failed',
+          payment_failed_reason: errorMessage,
+        })
+        .eq('id', earnings_id);
+      
       return new Response(
-        JSON.stringify({ error: 'Payment method is not attached to a Stripe customer. Please re-add your payment method.' }),
+        JSON.stringify({ error: errorMessage }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -190,9 +267,20 @@ serve(async (req) => {
     const pmData = await pmCheckResponse.json()
     
     if (!pmCheckResponse.ok) {
-      console.error('Error checking payment method:', pmData)
+      const errorMessage = `Payment method not found in Stripe: ${pmData?.error?.message || 'Unknown error'}`;
+      console.error('Error checking payment method:', pmData);
+      
+      // Update earnings with failure reason
+      await supabase
+        .from('earnings')
+        .update({
+          payment_status: 'failed',
+          payment_failed_reason: errorMessage,
+        })
+        .eq('id', earnings_id);
+      
       return new Response(
-        JSON.stringify({ error: 'Payment method not found in Stripe', details: pmData }),
+        JSON.stringify({ error: errorMessage, details: pmData }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -237,43 +325,111 @@ serve(async (req) => {
     const platformFeeAmount = Math.round(gig.pay * platformFeePercentage * 100) / 100
     const transferAmount = gig.pay - platformFeeAmount
 
-    // Update earnings status to processing
-    await supabase
+    // Stripe minimum charge amount is $0.50 USD (50 cents)
+    const STRIPE_MINIMUM_AMOUNT = 0.50
+    const amountInCents = Math.round(gig.pay * 100)
+    
+    if (gig.pay < STRIPE_MINIMUM_AMOUNT) {
+      console.error('Payment amount too small:', {
+        amount: gig.pay,
+        minimum: STRIPE_MINIMUM_AMOUNT,
+        amountInCents,
+      })
+      
+      // Update earnings with failure
+      await supabase
+        .from('earnings')
+        .update({
+          payment_status: 'failed',
+          payment_failed_reason: `Payment amount ($${gig.pay.toFixed(2)}) is below Stripe's minimum of $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}`,
+        })
+        .eq('id', earnings_id)
+
+      return new Response(
+        JSON.stringify({ 
+          error: 'Payment amount too small',
+          message: `Payment amount ($${gig.pay.toFixed(2)}) is below Stripe's minimum charge of $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}. Please ensure gig pay is at least $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}.`,
+          amount: gig.pay,
+          minimum_amount: STRIPE_MINIMUM_AMOUNT,
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Check if already processing to prevent duplicate charges
+    if (earnings.payment_status === 'processing' || earnings.payment_status === 'succeeded') {
+      console.log('Payment already processing or completed, skipping duplicate charge')
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          message: 'Payment already processing or completed', 
+          earnings 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Update earnings status to processing (atomic update to prevent race conditions)
+    const { data: processingEarnings, error: processingUpdateError } = await supabase
       .from('earnings')
       .update({ payment_status: 'processing' })
       .eq('id', earnings_id)
+      .eq('payment_status', 'pending') // Only update if still pending
+      .select()
+      .single()
 
-    // Get web app URL for return URL (for 3D Secure and other authentication flows)
-    const webAppUrl = Deno.env.get('EXPO_PUBLIC_WEB_APP_URL') || Deno.env.get('WEB_APP_URL') || 'https://olliejobs.com'
-    const returnUrl = `${webAppUrl}/payment/return?gig_id=${gig.id}&earnings_id=${earnings_id}`
-    
-    console.log('Setting return_url:', returnUrl, 'from webAppUrl:', webAppUrl)
+    // If update failed, it means payment_status was already changed (race condition)
+    if (processingUpdateError || !processingEarnings || processingEarnings.payment_status !== 'processing') {
+      console.log('Payment status already changed, another process is handling it')
+      // Re-fetch to get current status
+      const { data: currentEarnings } = await supabase
+        .from('earnings')
+        .select('*')
+        .eq('id', earnings_id)
+        .single()
+      
+      if (currentEarnings?.payment_status === 'succeeded') {
+        return new Response(
+          JSON.stringify({ 
+            success: true,
+            message: 'Payment already processed', 
+            earnings: currentEarnings 
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          message: 'Payment is being processed by another request', 
+          earnings: currentEarnings 
+        }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    // Create Payment Intent (platform receives all funds, will payout to teenlancer separately)
+    // Simplified Payment Intent creation for neighbors
+    // Use off_session=true since neighbor isn't actively present (automatic payment on task completion)
     const paymentIntentParams = new URLSearchParams()
-    paymentIntentParams.append('amount', Math.round(gig.pay * 100).toString()) // Convert to cents
+    paymentIntentParams.append('amount', amountInCents.toString()) // Convert to cents
     paymentIntentParams.append('currency', 'usd')
-    paymentIntentParams.append('customer', paymentMethod.stripe_customer_id) // Use customer ID
+    paymentIntentParams.append('customer', paymentMethod.stripe_customer_id)
     paymentIntentParams.append('payment_method', paymentMethod.stripe_payment_method_id)
-    paymentIntentParams.append('confirmation_method', 'automatic')
-    paymentIntentParams.append('confirm', 'true')
-    paymentIntentParams.append('return_url', returnUrl) // Required for 3D Secure and authentication flows
-    // Disable redirect-based payment methods to avoid requiring return_url handling
-    // If you want to support redirects, keep return_url and handle the redirect flow
-    paymentIntentParams.append('automatic_payment_methods[enabled]', 'true')
-    paymentIntentParams.append('automatic_payment_methods[allow_redirects]', 'never')
-    // Note: Platform receives full amount, payout to teenlancer will be handled separately
+    paymentIntentParams.append('off_session', 'true') // Customer not present - automatic payment
+    paymentIntentParams.append('confirm', 'true') // Confirm immediately
+    // Add metadata for tracking
     paymentIntentParams.append('metadata[gig_id]', gig.id)
     paymentIntentParams.append('metadata[earnings_id]', earnings_id)
     paymentIntentParams.append('metadata[teen_id]', gig.teen_id)
     paymentIntentParams.append('metadata[poster_id]', gig.poster_id)
 
-    console.log('Creating Payment Intent with params:', {
-      amount: Math.round(gig.pay * 100),
+    console.log('Creating simplified Payment Intent:', {
+      amount: amountInCents,
+      amountInDollars: gig.pay,
       customer: paymentMethod.stripe_customer_id,
       payment_method: paymentMethod.stripe_payment_method_id,
-      return_url: returnUrl,
-      has_return_url: !!returnUrl,
+      off_session: true,
     })
 
     const paymentIntentResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
@@ -307,31 +463,30 @@ serve(async (req) => {
         statusText: paymentIntentResponse.statusText,
         error: paymentIntent,
         requestParams: {
-          amount: Math.round(gig.pay * 100),
+          amount: amountInCents,
+          amountInDollars: gig.pay,
           customer: paymentMethod.stripe_customer_id,
           payment_method: paymentMethod.stripe_payment_method_id,
-          return_url: returnUrl,
-          automatic_payment_methods_enabled: 'true',
-          automatic_payment_methods_allow_redirects: 'never',
+          off_session: true,
         },
         requestBody: paymentIntentParams.toString()
       })
       
       // Update earnings with failure
+      const errorMessage = paymentIntent.error?.message || paymentIntent.error?.type || 'Payment intent creation failed'
       await supabase
         .from('earnings')
         .update({
           payment_status: 'failed',
-          payment_failed_reason: paymentIntent.error?.message || paymentIntent.error?.type || 'Payment intent creation failed',
+          payment_failed_reason: errorMessage,
         })
         .eq('id', earnings_id)
 
       return new Response(
         JSON.stringify({ 
           error: 'Failed to create payment intent',
-          stripe_error: paymentIntent.error?.message || paymentIntent.error?.type,
+          stripe_error: errorMessage,
           stripe_error_code: paymentIntent.error?.code,
-          details: paymentIntent 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -350,21 +505,24 @@ serve(async (req) => {
     })
     // #endregion
 
-    // Check if payment requires action (e.g., 3D Secure)
-    if (paymentIntent.status === 'requires_action') {
-      console.warn('Payment Intent requires action:', {
-        payment_intent_id: paymentIntent.id,
-        next_action: paymentIntent.next_action,
-        client_secret: paymentIntent.client_secret,
-      })
-      // For now, we'll mark it as processing and the webhook will handle completion
-      // In a production app, you'd redirect the user to complete 3D Secure
+    // Handle payment status
+    // If requires_action, the payment needs 3D Secure - we'll handle via webhook
+    // For off_session payments, if it requires action, we mark as pending and webhook will complete it
+    let paymentStatus: string
+    if (paymentIntent.status === 'succeeded') {
+      paymentStatus = 'succeeded'
+    } else if (paymentIntent.status === 'requires_action') {
+      // 3D Secure required - webhook will handle completion
+      console.log('Payment requires 3D Secure authentication - will be handled by webhook')
+      paymentStatus = 'requires_action'
+    } else if (paymentIntent.status === 'requires_payment_method') {
+      // Payment method failed - mark as failed
+      console.error('Payment method failed:', paymentIntent.last_payment_error)
+      paymentStatus = 'failed'
+    } else {
+      // Processing or other status
+      paymentStatus = 'processing'
     }
-
-    // Update earnings with payment info
-    // Note: Platform fee and payout will be handled separately via payout creation
-    const paymentStatus = paymentIntent.status === 'succeeded' ? 'succeeded' : 
-                         paymentIntent.status === 'requires_action' ? 'requires_action' : 'processing'
     
     // #region agent log - Earnings update
     console.log('Updating earnings with payment status:', {
@@ -375,15 +533,27 @@ serve(async (req) => {
     })
     // #endregion
     
+    // Update earnings with payment info
+    const updateData: any = {
+      stripe_payment_intent_id: paymentIntent.id,
+      platform_fee_amount: platformFeeAmount,
+      payment_status: paymentStatus,
+    }
+    
+    // Payment succeeded means neighbor's card was charged, but money hasn't been transferred to teenlancer's bank yet
+    // Keep status as 'pending' until actual bank transfer/payout is completed
+    // Only set status to 'paid' when money is actually deposited to teenlancer's bank account
+    if (paymentStatus === 'failed') {
+      updateData.payment_failed_reason = paymentIntent.last_payment_error?.message || 'Payment failed'
+      updateData.status = 'pending' // Keep as pending so it can be retried
+    }
+    // Note: We do NOT set status = 'paid' here because the payout to teenlancer's bank hasn't happened yet
+    // The payment_status = 'succeeded' indicates payment was received from neighbor, but earnings remain pending
+    // until the bank transfer is completed (which would be handled by a separate payout/transfer function)
+    
     const { data: updatedEarnings, error: updateError } = await supabase
       .from('earnings')
-      .update({
-        stripe_payment_intent_id: paymentIntent.id,
-        platform_fee_amount: platformFeeAmount,
-        payment_status: paymentStatus,
-        paid_at: paymentIntent.status === 'succeeded' ? new Date().toISOString() : null,
-        status: paymentIntent.status === 'succeeded' ? 'paid' : 'pending',
-      })
+      .update(updateData)
       .eq('id', earnings_id)
       .select()
       .single()
@@ -413,6 +583,29 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in process-payment function:', error)
+    
+    // Try to update earnings record with error if we have the earnings_id
+    if (earnings_id) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+        
+        if (supabaseUrl && supabaseServiceKey) {
+          const supabase = createClient(supabaseUrl, supabaseServiceKey)
+          await supabase
+            .from('earnings')
+            .update({
+              payment_status: 'failed',
+              payment_failed_reason: `Unexpected error: ${error?.message || String(error)}`,
+            })
+            .eq('id', earnings_id)
+          console.log('Updated earnings record with error:', earnings_id)
+        }
+      } catch (updateError) {
+        console.error('Failed to update earnings with error:', updateError)
+      }
+    }
+    
     return new Response(
       JSON.stringify({ error: error?.message || String(error) }),
       { 

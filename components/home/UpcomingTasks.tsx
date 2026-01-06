@@ -22,8 +22,25 @@ export function UpcomingTasks() {
     );
   }
 
+  // Show empty state if no upcoming tasks
   if (upcomingTasks.length === 0) {
-    return null; // Don't show section if no upcoming tasks
+    const containerStyle = isDark ? styles.containerDark : styles.containerLight;
+    const titleStyle = isDark ? styles.titleDark : styles.sectionTitle;
+    const textStyle = isDark ? styles.textDark : styles.textLight;
+    const emptyCardStyle = isDark ? styles.emptyCardDark : styles.emptyCardLight;
+    
+    return (
+      <View style={[styles.container, containerStyle]}>
+        <Text style={[styles.sectionTitle, titleStyle]}>Upcoming Gigs</Text>
+        <View style={[styles.emptyContainer, emptyCardStyle]}>
+          <Ionicons name="time-outline" size={48} color={isDark ? '#6B7280' : '#9CA3AF'} />
+          <Text style={[styles.emptyText, textStyle]}>No upcoming gigs</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
+            Gigs waiting for approval or scheduled for later will appear here
+          </Text>
+        </View>
+      </View>
+    );
   }
 
   const handleTaskPress = (taskId: string) => {
@@ -125,7 +142,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111827',
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     paddingTop: 8,
     marginBottom: 12,
@@ -221,6 +238,37 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     paddingVertical: 8,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  emptyCardLight: {
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  emptyCardDark: {
+    borderColor: '#374151',
+    backgroundColor: 'transparent',
   },
 });
 

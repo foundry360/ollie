@@ -701,77 +701,50 @@ export async function completeTask(taskId: string): Promise<Task> {
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tasks.ts:703',message:'About to update gig status to completed',data:{taskId,currentStatus:task.status,teenId:task.teen_id,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tasks.ts:703',message:'About to update gig status to pending_completion_approval',data:{taskId,currentStatus:task.status,teenId:task.teen_id,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
   
+  // Set status to pending_completion_approval - neighbor must approve before payment
   const { data: updatedTask, error } = await supabase
     .from('gigs')
-    .update({ status: 'completed' })
+    .update({ status: 'pending_completion_approval' })
     .eq('id', taskId)
     .select()
     .single();
 
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tasks.ts:710',message:'Gig status updated to completed',data:{taskId,updatedTask:updatedTask?.id,newStatus:updatedTask?.status,error:error?.message,posterId:updatedTask?.poster_id,teenId:updatedTask?.teen_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tasks.ts:710',message:'Gig status updated to pending_completion_approval',data:{taskId,updatedTask:updatedTask?.id,newStatus:updatedTask?.status,error:error?.message,posterId:updatedTask?.poster_id,teenId:updatedTask?.teen_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
 
-  if (error) throw error;
-
-  // Wait for the trigger to create the earnings record (retry up to 3 times)
-  let earnings = null;
-  let earningsError = null;
-  let retries = 0;
-  const maxRetries = 3;
-
-  while (retries < maxRetries && !earnings) {
-    await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
-
-    const { data, error } = await supabase
-      .from('earnings')
-      .select('id, payment_status')
-      .eq('gig_id', taskId)
-      .eq('teen_id', user.id)
-      .single();
-
-    earnings = data;
-    earningsError = error;
-
-    console.log(`Earnings record lookup attempt ${retries + 1}:`, {
+  if (error) {
+    // Log detailed error for debugging
+    console.error('Error updating gig status to pending_completion_approval:', {
+      error: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
       taskId,
-      earnings,
-      earningsError: earningsError?.message,
     });
-
-    if (earnings) break;
-    retries++;
-  }
-
-  // If earnings record exists, trigger payment processing
-  if (earnings && !earningsError) {
-    console.log('Triggering payment processing for earnings:', earnings.id);
-    try {
-      // Call payment processing asynchronously (don't block the response)
-      // Use dynamic import to avoid circular dependencies
-      const { processPayment } = await import('@/lib/api/payments');
-      console.log('processPayment function imported, calling...');
-      processPayment(taskId, earnings.id)
-        .then(() => {
-          console.log('Payment processing initiated successfully');
-        })
-        .catch((error) => {
-          console.error('Error processing payment after gig completion:', error);
-          // Don't throw - payment can be retried later
-        });
-    } catch (importError) {
-      console.error('Error importing processPayment:', importError);
+    
+    // If the error is about constraint violation, provide a helpful message
+    if (error.code === '23514' || error.message?.includes('check constraint') || error.message?.includes('gigs_status_check')) {
+      throw new Error('Database migration may not be applied. The pending_completion_approval status is not allowed. Please run migration 103_add_completion_approval_system.sql');
     }
-  } else {
-    console.warn('Earnings record not found after retries:', {
-      retries,
-      earningsError: earningsError?.message,
-      earnings,
-    });
+    
+    throw error;
   }
+  
+  // Verify the status was actually updated
+  if (updatedTask?.status !== 'pending_completion_approval') {
+    console.error('Status update failed - expected pending_completion_approval but got:', updatedTask?.status);
+    throw new Error(`Failed to update status to pending_completion_approval. Current status: ${updatedTask?.status}`);
+  }
+
+  // Earnings will be created and payment processed only after neighbor approves completion
+  // No need to wait for earnings here since status is now 'pending_completion_approval'
+  // Note: Payment processing is handled by the database trigger (create_earnings_on_completion)
+  // which automatically calls the process-payment Edge Function when earnings are created.
+  // The trigger only fires when status changes to 'completed' (after neighbor approval).
 
   return updatedTask;
 }
@@ -923,17 +896,24 @@ export async function getUpcomingTasks(): Promise<UpcomingTask[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
+  // Get gigs that are assigned to the teen (waiting for schedule confirmation or other action)
+  // Exclude gigs that are already confirmed and scheduled (those belong in Scheduled Gigs)
   const { data: tasks, error: tasksError } = await supabase
     .from('gigs')
     .select('*')
     .eq('teen_id', user.id)
-    .eq('status', 'accepted')
+    .eq('status', 'assigned')
     .order('created_at', { ascending: true });
 
   if (tasksError) throw tasksError;
 
+  // Filter out gigs that are both confirmed AND scheduled (these belong in Scheduled Gigs)
+  const filteredTasks = (tasks || []).filter(task => 
+    !(task.schedule_confirmed === true && task.scheduled_date)
+  );
+
   // Get parent approval status for each task
-  const taskIds = tasks?.map(t => t.id) || [];
+  const taskIds = filteredTasks.map(t => t.id);
   if (taskIds.length === 0) return [];
 
   const { data: approvals, error: approvalsError } = await supabase
@@ -948,7 +928,7 @@ export async function getUpcomingTasks(): Promise<UpcomingTask[]> {
     (approvals || []).map(a => [a.gig_id, a.status])
   );
 
-  return (tasks || []).map(task => ({
+  return filteredTasks.map(task => ({
     ...task,
     parent_approval_status: approvalMap.get(task.id),
   }));

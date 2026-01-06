@@ -173,12 +173,6 @@ export function NeighborUpcomingScheduledGigs() {
                     </View>
                   )}
                 </View>
-                {timeStr && (
-                  <View style={styles.timeRow}>
-                    <Ionicons name="time" size={14} color="#73af17" />
-                    <Text style={[styles.timeText, textStyle]}>{timeStr}</Text>
-                  </View>
-                )}
                 <View style={styles.gigDetails}>
                   <View style={styles.detailRow}>
                     <Ionicons name="cash" size={14} color="#73af17" />
@@ -197,6 +191,12 @@ export function NeighborUpcomingScheduledGigs() {
                     </Text>
                   </View>
                 </View>
+                {timeStr && (
+                  <View style={styles.timeRow}>
+                    <Ionicons name="time" size={14} color="#73af17" />
+                    <Text style={[styles.timeText, textStyle]}>{timeStr}</Text>
+                  </View>
+                )}
               </Pressable>
             );
             })}

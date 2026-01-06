@@ -50,7 +50,7 @@ export function RecentActivity() {
       case 'task_completed':
         return '#73af17';
       case 'payment_received':
-        return '#3B82F6';
+        return '#73af17';
       default:
         return '#6B7280';
     }
@@ -158,22 +158,24 @@ export function RecentActivity() {
                   {activity.type === 'task_completed' ? (
                     <Ionicons name="checkmark-circle" size={16} color={color} />
                   ) : (
-                    <View style={[styles.timelineDot, { backgroundColor: color }]} />
+                    <Ionicons name={getActivityIcon(activity.type)} size={16} color={color} />
                   )}
                   {!isLast && <View style={styles.line} />}
                 </View>
                 <View style={styles.timelineContent}>
                   <View style={styles.activityHeader}>
-                    {activity.type !== 'task_completed' && (
-                      <Ionicons name={getActivityIcon(activity.type)} size={16} color={color} />
-                    )}
                     <Text style={[styles.activityTitle, titleStyle]}>{activity.title}</Text>
+                    <Text style={[styles.activityTime, isDark && styles.activityTimeDark]}>
+                      {formatTimeAgo(activity.timestamp)}
+                    </Text>
                   </View>
+                  {activity.type === 'payment_received' && activity.gig_title && (
+                    <Text style={[styles.gigName, isDark && styles.gigNameDark]} numberOfLines={1}>
+                      {activity.gig_title}
+                    </Text>
+                  )}
                   <Text style={[styles.activityDescription, isDark && styles.activityDescriptionDark]} numberOfLines={2}>
                     {activity.description}
-                  </Text>
-                  <Text style={[styles.activityTime, isDark && styles.activityTimeDark]}>
-                    {formatTimeAgo(activity.timestamp)}
                   </Text>
                 </View>
               </View>
@@ -273,7 +275,7 @@ const styles = StyleSheet.create({
   },
   line: {
     width: 3,
-    backgroundColor: '#73af17',
+    backgroundColor: '#E5E7EB',
     height: 60,
     marginTop: 4,
   },
@@ -285,7 +287,7 @@ const styles = StyleSheet.create({
   activityHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     gap: 6,
     marginBottom: 4,
   },
@@ -293,6 +295,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#000000',
+    flex: 1,
+  },
+  gigName: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 2,
+    marginBottom: 4,
+    color: '#374151',
+  },
+  gigNameDark: {
+    color: '#374151',
   },
   activityDescription: {
     fontSize: 13,
@@ -308,6 +321,7 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 11,
     color: '#9CA3AF',
+    textAlign: 'right',
   },
   activityTimeDark: {
     color: '#6B7280',

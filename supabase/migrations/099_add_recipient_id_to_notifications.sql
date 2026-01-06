@@ -35,3 +35,4 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Note: notify_gig_completed is already updated in migration 097_debug_notify_gig_completed.sql
 -- This migration ensures recipient_id is included in all notification types
 
+

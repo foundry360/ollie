@@ -201,3 +201,4 @@ CREATE TRIGGER on_gig_completed_notify
   WHEN (NEW.status = 'completed' AND OLD.status != 'completed')
   EXECUTE FUNCTION notify_gig_completed();
 
+

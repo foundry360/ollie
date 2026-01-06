@@ -11,7 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Loading } from '@/components/ui/Loading';
 import { useRouter } from 'expo-router';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { formatAddress } from '@/lib/utils';
+import { formatAddress, getRandomCompletionMessage } from '@/lib/utils';
+import { SuccessAlert } from '@/components/ui/SuccessAlert';
 import { format } from 'date-fns';
 import { CreateGigModal } from '@/components/tasks/CreateGigModal';
 import { ProfileModal } from '@/components/profile/ProfileModal';
@@ -51,6 +52,8 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<GigApplication | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   // Check if gig is saved (only for teenlancers)
   const { data: isSaved = false } = useIsGigSaved(taskId);
@@ -151,6 +154,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   
   // Check if teenlancer can review neighbor for completed gigs
   const isCompleted = task?.status === 'completed';
+  const isPendingCompletionApproval = task?.status === 'pending_completion_approval';
   const canReviewNeighbor = task && isCompleted && isTeen && task.poster_id;
   
   // Check review eligibility when task changes
@@ -385,9 +389,8 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
             try {
               await completeTaskMutation.mutateAsync(task.id);
               queryClient.invalidateQueries({ queryKey: ['tasks'] });
-              Alert.alert('Success', 'Gig completed! Earnings will be processed.', [
-                { text: 'OK', onPress: onClose }
-              ]);
+              setSuccessMessage(getRandomCompletionMessage());
+              setShowSuccessAlert(true);
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to complete gig');
             }
@@ -428,6 +431,10 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
 
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {
+      case 'assigned':
+        return '#3B82F6';
+      case 'pending_completion_approval':
+        return '#F97316';
       case 'open':
         return '#73af17';
       case 'accepted':
@@ -590,7 +597,11 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                         numberOfLines={1}
                         ellipsizeMode="tail"
                       >
-                        {task.status ? task.status.replace('_', ' ').toUpperCase() : 'UNKNOWN'}
+                        {task.status === 'pending_completion_approval' 
+                          ? 'AWAITING APPROVAL' 
+                          : task.status 
+                            ? task.status.replace(/_/g, ' ').toUpperCase() 
+                            : 'UNKNOWN'}
                       </Text>
                     </View>
                   </View>
@@ -1018,7 +1029,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                     />
                   )}
                   {/* Chat button for assigned gigs */}
-                  {(isPoster || isTeen) && task.teen_id && task.status !== 'completed' && task.status !== 'cancelled' && (
+                  {(isPoster || isTeen) && task.teen_id && task.status !== 'completed' && task.status !== 'pending_completion_approval' && task.status !== 'cancelled' && (
                     <Button
                       title="Chat"
                       onPress={handleChat}
@@ -1074,7 +1085,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
           )}
           
           {/* Floating message bubble for neighbors viewing assigned gigs (not completed or cancelled) */}
-          {isNeighbor && task?.teen_id && task.status !== 'completed' && task.status !== 'cancelled' && (
+          {isNeighbor && task?.teen_id && task.status !== 'completed' && task.status !== 'pending_completion_approval' && task.status !== 'cancelled' && (
             <Pressable 
               style={styles.floatingMessageBubble}
               onPress={handleChat}
@@ -1144,6 +1155,14 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
         visible={showScheduleModal}
         task={task}
         onClose={() => setShowScheduleModal(false)}
+      />
+      <SuccessAlert
+        visible={showSuccessAlert}
+        message={successMessage}
+        onClose={() => {
+          setShowSuccessAlert(false);
+          onClose();
+        }}
       />
     </Modal>
   );

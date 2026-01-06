@@ -58,10 +58,14 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
     switch (status) {
       case 'open':
         return '#73af17';
+      case 'assigned':
+        return '#3B82F6';
       case 'accepted':
         return '#F97316';
       case 'in_progress':
         return '#F59E0B';
+      case 'pending_completion_approval':
+        return '#F97316';
       case 'completed':
         return '#6366F1';
       case 'cancelled':
@@ -79,10 +83,14 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
     switch (status) {
       case 'open':
         return isDark ? 'rgba(115, 175, 23, 0.2)' : 'rgba(115, 175, 23, 0.15)';
+      case 'assigned':
+        return isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.15)';
       case 'accepted':
         return isDark ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.15)';
       case 'in_progress':
         return isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)';
+      case 'pending_completion_approval':
+        return isDark ? 'rgba(249, 115, 22, 0.2)' : 'rgba(249, 115, 22, 0.15)';
       case 'completed':
         return isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.15)';
       default:
@@ -91,7 +99,16 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
   };
 
   const getStatusLabel = (status: TaskStatus) => {
-    return status.replace('_', ' ').toUpperCase();
+    const labels: Record<TaskStatus, string> = {
+      'open': 'OPEN',
+      'assigned': 'ASSIGNED',
+      'accepted': 'ACCEPTED',
+      'in_progress': 'IN PROGRESS',
+      'pending_completion_approval': 'AWAITING APPROVAL',
+      'completed': 'COMPLETED',
+      'cancelled': 'CANCELLED',
+    };
+    return labels[status] || status.replace(/_/g, ' ').toUpperCase();
   };
 
   return (

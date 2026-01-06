@@ -10,6 +10,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getUserProfileForChat } from '@/lib/api/users';
 import { Button } from '@/components/ui/Button';
+import { getRandomCompletionMessage } from '@/lib/utils';
+import { SuccessAlert } from '@/components/ui/SuccessAlert';
 
 // Helper to convert 24-hour time to 12-hour format
 const formatTime12Hour = (time24: string): string => {
@@ -27,6 +29,8 @@ export function TeenUpcomingScheduledGigs() {
   const isDark = colorScheme === 'dark';
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const startTaskMutation = useStartTask();
   const completeTaskMutation = useCompleteTask();
 
@@ -124,7 +128,8 @@ export function TeenUpcomingScheduledGigs() {
           onPress: async () => {
             try {
               await completeTaskMutation.mutateAsync(taskId);
-              Alert.alert('Success', 'Task completed! Earnings will be processed.');
+              setSuccessMessage(getRandomCompletionMessage());
+              setShowSuccessAlert(true);
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to complete task');
             }
@@ -134,16 +139,33 @@ export function TeenUpcomingScheduledGigs() {
     );
   };
 
-  // Don't render if no scheduled gigs
-  if (scheduledGigs.length === 0) {
-    return null;
-  }
-
   if (isLoading) {
     return (
       <View style={[styles.container, isDark && styles.containerDark]}>
         <Text style={[styles.sectionTitle, isDark && styles.titleDark]}>Scheduled Gigs</Text>
         <Text style={[styles.loadingText, isDark && styles.textDark]}>Loading...</Text>
+      </View>
+    );
+  }
+
+  // Show empty state if no scheduled gigs
+  if (scheduledGigs.length === 0) {
+    const containerStyle = isDark ? styles.containerDark : styles.containerLight;
+    const titleStyle = isDark ? styles.titleDark : styles.sectionTitle;
+    const textStyle = isDark ? styles.textDark : styles.detailText;
+    
+    return (
+      <View style={[styles.container, containerStyle]}>
+        <View style={styles.header}>
+          <Text style={[styles.sectionTitle, titleStyle]}>Scheduled Gigs</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Ionicons name="calendar-outline" size={48} color={isDark ? '#6B7280' : '#9CA3AF'} />
+          <Text style={[styles.emptyText, textStyle]}>No scheduled gigs</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
+            Gigs with confirmed schedules will appear here
+          </Text>
+        </View>
       </View>
     );
   }
@@ -272,6 +294,11 @@ export function TeenUpcomingScheduledGigs() {
         visible={showDetailModal}
         taskId={selectedTaskId}
         onClose={handleCloseModal}
+      />
+      <SuccessAlert
+        visible={showSuccessAlert}
+        message={successMessage}
+        onClose={() => setShowSuccessAlert(false)}
       />
     </>
   );
@@ -454,6 +481,23 @@ const styles = StyleSheet.create({
   },
   completeButton: {
     flex: 1,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
 });
 

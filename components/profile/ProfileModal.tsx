@@ -101,7 +101,7 @@ export function ProfileModal({ visible, userId, onClose, onSelect, showSelectBut
         for (const msg of messages) {
           const gig = (msg as any).gigs;
           if (!gig || gig.poster_id !== currentUser.id) continue;
-          if (gig.status === 'completed' || gig.status === 'cancelled') continue;
+          if (gig.status === 'completed' || gig.status === 'pending_completion_approval' || gig.status === 'cancelled') continue;
           
           // Check if this message involves the teenlancer
           const { data: messageWithTeen } = await supabase

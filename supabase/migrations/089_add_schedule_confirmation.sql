@@ -17,3 +17,4 @@ COMMENT ON COLUMN public.gigs.proposed_scheduled_date IS 'Alternative date propo
 COMMENT ON COLUMN public.gigs.proposed_scheduled_start_time IS 'Alternative start time proposed by teenlancer';
 COMMENT ON COLUMN public.gigs.proposed_scheduled_end_time IS 'Alternative end time proposed by teenlancer';
 
+

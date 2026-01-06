@@ -10,6 +10,7 @@ export enum TaskStatus {
   ASSIGNED = 'assigned', // Neighbor has selected/approved a teenlancer
   ACCEPTED = 'accepted', // Legacy: teenlancer directly accepted (kept for backward compatibility)
   IN_PROGRESS = 'in_progress',
+  PENDING_COMPLETION_APPROVAL = 'pending_completion_approval', // Teenlancer marked as complete, waiting for neighbor approval
   COMPLETED = 'completed',
   CANCELLED = 'cancelled'
 }

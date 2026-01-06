@@ -94,13 +94,16 @@ serve(async (req) => {
           .single()
 
         if (earnings) {
-          // Update earnings status
+          // IMPORTANT: Only update payment_status, NOT status or paid_at
+          // payment_status: 'succeeded' means neighbor's card was charged
+          // status should remain 'pending' until payout to bank account is confirmed
+          // paid_at should only be set when payout.paid webhook is received
           await supabase
             .from('earnings')
             .update({
               payment_status: 'succeeded',
-              status: 'paid',
-              paid_at: new Date().toISOString(),
+              // Do NOT set status: 'paid' here - that happens on payout.paid
+              // Do NOT set paid_at here - that happens on payout.paid
             })
             .eq('id', earnings.id)
         }
@@ -143,10 +146,12 @@ serve(async (req) => {
 
         if (earningsList && earningsList.length > 0) {
           // Update all earnings records for this payout
+          // This is when money is actually deposited to the teenlancer's bank account
           await supabase
             .from('earnings')
             .update({
               payout_status: 'paid',
+              status: 'paid', // Now set status to paid since money is in bank account
               paid_at: new Date().toISOString(),
             })
             .eq('stripe_payout_id', payout.id)
