@@ -12,8 +12,9 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { Loading } from '@/components/ui/Loading';
-import { GigDetailModal } from '@/components/tasks/GigDetailModal';
+import { PaymentSummaryModal } from '@/components/earnings/PaymentSummaryModal';
 import { DateFilter, DateFilterOption } from '@/components/earnings/DateFilter';
+import type { EarningsRecord } from '@/lib/api/earnings';
 
 export default function EarningsScreen() {
   const { user } = useAuthStore();
@@ -28,8 +29,8 @@ export default function EarningsScreen() {
   // #endregion
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid'>('all');
   const [dateFilter, setDateFilter] = useState<DateFilterOption>('all-time');
-  const [selectedGigId, setSelectedGigId] = useState<string | null>(null);
-  const [showGigModal, setShowGigModal] = useState(false);
+  const [selectedEarning, setSelectedEarning] = useState<EarningsRecord | null>(null);
+  const [showPaymentSummary, setShowPaymentSummary] = useState(false);
 
   // Calculate date range based on filter
   const getDateRange = (filter: typeof dateFilter): { startDate?: string; endDate?: string } => {
@@ -136,29 +137,26 @@ export default function EarningsScreen() {
 
   // Wallet is available for both teens and neighbors
 
-  const handleEarningPress = (gigId: string | null | undefined) => {
-    if (!gigId) {
-      console.warn('Cannot open gig details: gig_id is missing');
-      return;
-    }
-    setSelectedGigId(gigId);
-    setShowGigModal(true);
+  const handleEarningPress = (earning: EarningsRecord) => {
+    setSelectedEarning(earning);
+    setShowPaymentSummary(true);
   };
 
-  const handleCloseGigModal = () => {
-    setShowGigModal(false);
-    setSelectedGigId(null);
+  const handleClosePaymentSummary = () => {
+    setShowPaymentSummary(false);
+    setSelectedEarning(null);
   };
 
-  const renderEarningItem = ({ item }: { item: any }) => {
-    const hasGigId = !!item.gig_id;
+  const renderEarningItem = ({ item }: { item: EarningsRecord }) => {
+    // Calculate NET amount (after platform fee) - this is what the teen actually receives
+    const grossAmount = item.amount;
+    const platformFee = item.platform_fee_amount || 0;
+    const netAmount = grossAmount - platformFee;
     
     return (
       <Pressable
-        onPress={() => hasGigId && handleEarningPress(item.gig_id)}
-        disabled={!hasGigId}
+        onPress={() => handleEarningPress(item)}
         android_ripple={{ color: isDark ? '#374151' : '#E5E7EB' }}
-        style={!hasGigId && styles.earningItemDisabled}
       >
       <View style={[styles.earningItem, cardStyle]}>
         <View style={styles.earningHeader}>
@@ -176,18 +174,19 @@ export default function EarningsScreen() {
             )}
           </View>
           <View style={styles.earningAmount}>
-            <Text style={[styles.amountText, titleStyle]}>${item.amount.toFixed(2)}</Text>
+            {/* Display NET amount (what teen actually receives) */}
+            <Text style={[styles.amountText, titleStyle]}>${netAmount.toFixed(2)}</Text>
             {(() => {
               // Only show "Paid" when money is actually deposited to bank account
               // Check: payout_status === 'paid' (this is set by payout.paid webhook)
               // Do NOT check status === 'paid' or paid_at alone, as old records may have these set incorrectly
               // payment_status === 'succeeded' only means neighbor's card was charged, not that money is in bank
-              const hasPayoutStatusColumn = item.payout_status !== undefined;
-              const isPaid = hasPayoutStatusColumn 
-                ? item.payout_status === 'paid'  // If column exists, only trust payout_status
-                : false; // If column doesn't exist, treat as pending until migration is run
-              const isPending = !isPaid && (item.payment_status === 'pending' || item.payment_status === 'processing' || item.payment_status === 'succeeded' || !hasPayoutStatusColumn);
-              const isFailed = item.payment_status === 'failed' || item.payout_status === 'failed';
+              // payout_status can be: 'pending', 'processing', 'paid', 'failed', or null/undefined
+              // Use strict equality and explicit checks to avoid type coercion issues
+              const payoutStatus = item.payout_status;
+              const isPaid = payoutStatus === 'paid'; // Only exact string 'paid' means actually paid
+              const isFailed = item.payment_status === 'failed' || payoutStatus === 'failed';
+              const isPending = !isPaid && !isFailed; // Everything else is pending (including null, undefined, 'pending', 'processing', 'succeeded')
               
               return (
                 <View
@@ -205,7 +204,6 @@ export default function EarningsScreen() {
                     {isPaid ? 'Paid' :
                      isFailed ? 'Failed' :
                      item.payment_status === 'processing' ? 'Processing' :
-                     item.payment_status === 'succeeded' ? 'Pending' : // Neighbor's card charged, but not yet in bank
                      'Pending'}
                   </Text>
                 </View>
@@ -213,11 +211,6 @@ export default function EarningsScreen() {
             })()}
           </View>
         </View>
-        {item.platform_fee_amount && item.platform_fee_amount > 0 && (
-          <Text style={[styles.feeText, labelStyle]}>
-            Platform fee: ${item.platform_fee_amount.toFixed(2)} • Net: ${(item.amount - item.platform_fee_amount).toFixed(2)}
-          </Text>
-        )}
         {item.payment_failed_reason && (
           <Text style={[styles.errorText, { color: '#EF4444' }]}>
             Payment failed: {item.payment_failed_reason}
@@ -405,10 +398,10 @@ export default function EarningsScreen() {
           </>
         )}
       </ScrollView>
-      <GigDetailModal
-        visible={showGigModal}
-        taskId={selectedGigId}
-        onClose={handleCloseGigModal}
+      <PaymentSummaryModal
+        visible={showPaymentSummary}
+        earning={selectedEarning}
+        onClose={handleClosePaymentSummary}
       />
     </SafeAreaView>
   );

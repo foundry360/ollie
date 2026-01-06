@@ -3,7 +3,24 @@ import { Task } from '@/types';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useMemo } from 'react';
-import { GoogleMaps, AppleMaps, CameraPosition, Coordinates } from 'expo-maps';
+
+// Conditionally import expo-maps - only on native platforms (not web)
+let GoogleMaps: any = null;
+let AppleMaps: any = null;
+let CameraPosition: any = null;
+let Coordinates: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    const mapsModule = require('expo-maps');
+    GoogleMaps = mapsModule.GoogleMaps;
+    AppleMaps = mapsModule.AppleMaps;
+    CameraPosition = mapsModule.CameraPosition;
+    Coordinates = mapsModule.Coordinates;
+  } catch (e) {
+    console.warn('expo-maps not available:', e);
+  }
+}
 
 interface MarketplaceMapProps {
   gigs: Task[];
@@ -14,7 +31,7 @@ interface MarketplaceMapProps {
 export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: MarketplaceMapProps) {
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
-  const [cameraPosition, setCameraPosition] = useState<CameraPosition | null>(null);
+  const [cameraPosition, setCameraPosition] = useState<any>(null);
   const [mapError, setMapError] = useState<string | null>(null);
 
   // Filter out gigs with invalid locations
@@ -152,7 +169,7 @@ export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: Marketplac
         return null;
       }
 
-      if (Platform.OS === 'ios') {
+      if (Platform.OS === 'ios' && AppleMaps) {
         return {
           id: gig.id,
           coordinates: {
@@ -160,8 +177,8 @@ export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: Marketplac
             longitude: gigLng,
           },
           title: gig.title,
-        } as AppleMaps.Marker;
-      } else {
+        } as any;
+      } else if (GoogleMaps) {
         return {
           id: gig.id,
           coordinates: {
@@ -170,14 +187,15 @@ export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: Marketplac
           },
           title: gig.title,
           snippet: `$${gig.pay.toFixed(2)} - ${gig.address}`,
-        } as GoogleMaps.Marker;
+        } as any;
       }
+      return null;
     }).filter((marker): marker is NonNullable<typeof marker> => marker !== null);
 
     // Add user location marker if available
     const allMarkers = [...gigMarkers];
     if (userLocation) {
-      if (Platform.OS === 'ios') {
+      if (Platform.OS === 'ios' && AppleMaps) {
         allMarkers.push({
           id: 'user-location',
           coordinates: {
@@ -186,8 +204,8 @@ export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: Marketplac
           },
           title: 'Your Location',
           tintColor: '#73af17', // App theme color
-        } as AppleMaps.Marker);
-      } else {
+        } as any);
+      } else if (GoogleMaps) {
         allMarkers.push({
           id: 'user-location',
           coordinates: {
@@ -195,15 +213,15 @@ export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: Marketplac
             longitude: userLocation.longitude,
           },
           title: 'Your Location',
-        } as GoogleMaps.Marker);
+        } as any);
       }
     }
 
     return allMarkers;
   }, [validGigs, userLocation]);
 
-  // Show error state if map error
-  if (mapError) {
+  // Show error state if map error or on web
+  if (mapError || Platform.OS === 'web') {
     return (
       <View style={[styles.container, isDark && styles.containerDark]}>
         <View style={styles.emptyContainer}>
@@ -213,10 +231,12 @@ export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: Marketplac
             color={isDark ? '#6B7280' : '#9CA3AF'}
           />
           <Text style={[styles.title, isDark && styles.titleDark]}>
-            Map View Error
+            {Platform.OS === 'web' ? 'Map View Not Available' : 'Map View Error'}
           </Text>
           <Text style={[styles.message, isDark && styles.messageDark]}>
-            {mapError}
+            {Platform.OS === 'web' 
+              ? 'Map view is only available in the mobile app.'
+              : (mapError || 'Map error occurred')}
           </Text>
         </View>
       </View>
@@ -235,6 +255,27 @@ export function MarketplaceMap({ gigs, userLocation, onMarkerPress }: Marketplac
           />
           <Text style={[styles.message, isDark && styles.messageDark]}>
             Loading map...
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Check if maps are available before rendering
+  if (!GoogleMaps || !AppleMaps) {
+    return (
+      <View style={[styles.container, isDark && styles.containerDark]}>
+        <View style={styles.emptyContainer}>
+          <Ionicons
+            name="map-outline"
+            size={64}
+            color={isDark ? '#6B7280' : '#9CA3AF'}
+          />
+          <Text style={[styles.title, isDark && styles.titleDark]}>
+            Map View Not Available
+          </Text>
+          <Text style={[styles.message, isDark && styles.messageDark]}>
+            Maps module is not available on this platform.
           </Text>
         </View>
       </View>

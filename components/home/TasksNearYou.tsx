@@ -135,10 +135,10 @@ export function TasksNearYou() {
           <Ionicons
             name="location-outline"
             size={48}
-            color={isDark ? '#6B7280' : '#9CA3AF'}
+            color={isDark ? '#6B7280' : '#D1D5DB'}
           />
-          <Text style={[styles.emptyText, textStyle]}>Update your location</Text>
-          <Text style={[styles.emptySubtext, textStyle]}>
+          <Text style={styles.emptyText}>Update your location</Text>
+          <Text style={styles.emptySubtext}>
             {!hasProfileAddress 
               ? 'Add your address in your profile to see gigs near you'
               : 'Enable location services to see gigs near you'}
@@ -158,10 +158,10 @@ export function TasksNearYou() {
           <Ionicons
             name="alert-circle-outline"
             size={48}
-            color={isDark ? '#6B7280' : '#9CA3AF'}
+            color={isDark ? '#6B7280' : '#D1D5DB'}
           />
-          <Text style={[styles.emptyText, textStyle]}>Error loading gigs</Text>
-          <Text style={[styles.emptySubtext, textStyle]}>
+          <Text style={styles.emptyText}>Error loading gigs</Text>
+          <Text style={styles.emptySubtext}>
             Please try again later
           </Text>
         </View>
@@ -182,10 +182,10 @@ export function TasksNearYou() {
           <Ionicons
             name="location-outline"
             size={48}
-            color={isDark ? '#6B7280' : '#9CA3AF'}
+            color={isDark ? '#6B7280' : '#D1D5DB'}
           />
-          <Text style={[styles.emptyText, textStyle]}>Update your location</Text>
-          <Text style={[styles.emptySubtext, textStyle]}>
+          <Text style={styles.emptyText}>Update your location</Text>
+          <Text style={styles.emptySubtext}>
             {!hasProfileAddress 
               ? 'Add your address in your profile to see gigs near you'
               : 'Enable location services to see gigs near you'}
@@ -207,10 +207,10 @@ export function TasksNearYou() {
           <Ionicons
             name="location-outline"
             size={48}
-            color={isDark ? '#6B7280' : '#9CA3AF'}
+            color={isDark ? '#6B7280' : '#D1D5DB'}
           />
-          <Text style={[styles.emptyText, textStyle]}>No gigs nearby</Text>
-          <Text style={[styles.emptySubtext, textStyle]}>
+          <Text style={styles.emptyText}>No gigs nearby</Text>
+          <Text style={styles.emptySubtext}>
             Check back later or browse all gigs
           </Text>
         </View>
@@ -484,10 +484,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 12,
     marginBottom: 4,
+    color: '#D1D5DB',
   },
   emptySubtext: {
     fontSize: 14,
     textAlign: 'center',
+    color: '#D1D5DB',
   },
   loadingText: {
     fontSize: 14,

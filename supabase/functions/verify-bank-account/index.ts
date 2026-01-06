@@ -150,19 +150,31 @@ serve(async (req: Request) => {
       )
     }
 
-    // Verify micro-deposits with Stripe
+    // Verify micro-deposits with Stripe using Payment Methods API
     // Convert amounts to cents (Stripe uses cents)
     const amount1Cents = Math.round(parsedAmount1 * 100)
     const amount2Cents = Math.round(parsedAmount2 * 100)
 
-    // Verify the bank account with Stripe
-    // For bank accounts on a Customer, we verify using the customer's source
+    // The stripe_external_account_id stores the Payment Method ID (pm_xxxxx)
+    const paymentMethodId = bankAccount.stripe_external_account_id
+
+    if (!paymentMethodId) {
+      return new Response(
+        JSON.stringify({ error: 'Payment method ID not found. Please add a bank account again.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Verify the bank account using Payment Methods API
+    // For us_bank_account payment methods, use verify_microdeposits endpoint
     const verifyParams = new URLSearchParams()
-    verifyParams.append('amounts[]', amount1Cents.toString())
-    verifyParams.append('amounts[]', amount2Cents.toString())
+    verifyParams.append('amounts[0]', amount1Cents.toString())
+    verifyParams.append('amounts[1]', amount2Cents.toString())
+
+    console.log('Verifying micro-deposits for payment method:', paymentMethodId)
 
     const verifyResponse = await fetch(
-      `https://api.stripe.com/v1/customers/${bankAccount.stripe_customer_id}/sources/${bankAccount.stripe_external_account_id}/verify`,
+      `https://api.stripe.com/v1/payment_methods/${paymentMethodId}/verify_microdeposits`,
       {
         method: 'POST',
         headers: {
@@ -196,18 +208,44 @@ serve(async (req: Request) => {
       )
     }
 
-    // Check verification status from Stripe response
-    const isVerified = verifyResult.status === 'verified' || verifyResult.verified === true
+    // After verification, check the payment method status to confirm verification
+    // The verify_microdeposits endpoint returns the payment method object
+    // Check the us_bank_account.status field
+    const usBankAccountStatus = verifyResult.us_bank_account?.status
+
+    console.log('Payment method verification response:', {
+      payment_method_id: verifyResult.id,
+      us_bank_account_status: usBankAccountStatus,
+      verified: verifyResult.us_bank_account?.verified
+    })
+
+    // Check if verification was successful
+    // Status can be 'new', 'verified', 'verification_failed', or 'errored'
+    const isVerified = usBankAccountStatus === 'verified' || verifyResult.us_bank_account?.verified === true
 
     if (!isVerified) {
-      // Still pending verification
+      // Still pending or failed verification
+      const newStatus = usBankAccountStatus === 'verification_failed' || usBankAccountStatus === 'errored' 
+        ? 'failed' 
+        : 'pending'
+      
       await supabase
         .from('bank_accounts')
         .update({ 
-          verification_status: 'pending',
+          verification_status: newStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', bankAccount.id)
+
+      if (newStatus === 'failed') {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Verification failed. The amounts you entered do not match. Please add a new bank account.',
+            verification_status: 'failed'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
 
       return new Response(
         JSON.stringify({ 
@@ -219,6 +257,36 @@ serve(async (req: Request) => {
     }
 
     // Verification successful!
+    // Now attach the payment method to the customer so it can be used for payouts
+    console.log('Attaching verified payment method to customer:', {
+      payment_method_id: paymentMethodId,
+      customer_id: bankAccount.stripe_customer_id
+    })
+
+    const attachParams = new URLSearchParams()
+    attachParams.append('customer', bankAccount.stripe_customer_id)
+
+    const attachResponse = await fetch(
+      `https://api.stripe.com/v1/payment_methods/${paymentMethodId}/attach`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: attachParams,
+      }
+    )
+
+    if (!attachResponse.ok) {
+      const attachError = await attachResponse.json()
+      console.error('Failed to attach payment method to customer:', attachError)
+      // Don't fail the verification, but log the error
+      // The payment method is verified, attachment can be retried if needed
+    } else {
+      console.log('Payment method attached to customer successfully')
+    }
+
     const verifiedAt = new Date().toISOString()
 
     const { data: updatedAccount, error: updateError } = await supabase

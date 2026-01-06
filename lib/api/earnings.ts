@@ -32,7 +32,7 @@ export async function getEarningsSummary(filters?: {
 
   let query = supabase
     .from('earnings')
-    .select('amount, status, payout_status, paid_at')
+    .select('amount, status, payout_status, paid_at, platform_fee_amount')
     .eq('teen_id', user.id);
 
   if (filters?.startDate) {
@@ -55,7 +55,16 @@ export async function getEarningsSummary(filters?: {
   };
 
   data?.forEach((earning: any) => {
-    summary.total_earnings += parseFloat(earning.amount.toString());
+    // Calculate NET amount (after platform fee)
+    // The amount field stores GROSS (full gig pay), we need to subtract the platform fee
+    const grossAmount = parseFloat(earning.amount.toString());
+    const feeAmount = earning.platform_fee_amount 
+      ? parseFloat(earning.platform_fee_amount.toString()) 
+      : 0;
+    const netAmount = grossAmount - feeAmount;
+    
+    // Use NET amount for all calculations (what the teen actually receives)
+    summary.total_earnings += netAmount;
     
     // Only count as "paid" when money is actually deposited to bank account
     // Check: payout_status === 'paid' (this is set by payout.paid webhook)
@@ -68,10 +77,10 @@ export async function getEarningsSummary(filters?: {
       : false; // If column doesn't exist, treat as pending until migration is run
     
     if (isActuallyPaid) {
-      summary.paid_earnings += parseFloat(earning.amount.toString());
+      summary.paid_earnings += netAmount; // Use NET amount
     } else {
       // Everything else is pending (including when payment_status === 'succeeded' but payout hasn't happened)
-      summary.pending_earnings += parseFloat(earning.amount.toString());
+      summary.pending_earnings += netAmount; // Use NET amount
     }
   });
 
@@ -107,9 +116,9 @@ export async function getEarningsHistory(filters?: {
     .eq('teen_id', user.id)
     .order('created_at', { ascending: false });
 
-  if (filters?.status) {
-    query = query.eq('status', filters.status);
-  }
+  // Note: We don't filter by the old 'status' field anymore
+  // Status filtering is done client-side based on payout_status
+  // The old 'status' field may be 'paid' even when payout hasn't completed
 
   if (filters?.startDate) {
     query = query.gte('created_at', filters.startDate);
@@ -129,7 +138,22 @@ export async function getEarningsHistory(filters?: {
   const { data, error } = await query;
   if (error) throw error;
 
-  return (data || []).map((item: any) => ({
+  // Filter client-side based on payout_status (not the old status field)
+  let filteredData = data || [];
+  if (filters?.status) {
+    filteredData = filteredData.filter((item: any) => {
+      if (filters.status === 'paid') {
+        // Only show as 'paid' if payout_status is exactly 'paid'
+        return item.payout_status === 'paid';
+      } else if (filters.status === 'pending') {
+        // Show as 'pending' if payout_status is not 'paid' and not 'failed'
+        return item.payout_status !== 'paid' && item.payout_status !== 'failed';
+      }
+      return true; // 'all' or 'cancelled' - show all
+    });
+  }
+
+  return filteredData.map((item: any) => ({
     id: item.id,
     gig_id: item.gig_id,
     task_title: item.gigs?.title || 'Unknown Task',
@@ -138,6 +162,7 @@ export async function getEarningsHistory(filters?: {
     created_at: item.created_at,
     paid_at: item.paid_at,
     payment_status: item.payment_status,
+    payout_status: item.payout_status,
     platform_fee_amount: item.platform_fee_amount ? parseFloat(item.platform_fee_amount.toString()) : undefined,
     payment_failed_reason: item.payment_failed_reason,
   }));

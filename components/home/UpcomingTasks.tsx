@@ -33,9 +33,9 @@ export function UpcomingTasks() {
       <View style={[styles.container, containerStyle]}>
         <Text style={[styles.sectionTitle, titleStyle]}>Upcoming Gigs</Text>
         <View style={[styles.emptyContainer, emptyCardStyle]}>
-          <Ionicons name="time-outline" size={48} color={isDark ? '#6B7280' : '#9CA3AF'} />
-          <Text style={[styles.emptyText, textStyle]}>No upcoming gigs</Text>
-          <Text style={[styles.emptySubtext, textStyle]}>
+          <Ionicons name="time-outline" size={48} color={isDark ? '#6B7280' : '#D1D5DB'} />
+          <Text style={styles.emptyText}>No upcoming gigs</Text>
+          <Text style={styles.emptySubtext}>
             Gigs waiting for approval or scheduled for later will appear here
           </Text>
         </View>
@@ -256,11 +256,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 12,
     marginBottom: 4,
+    color: '#D1D5DB',
   },
   emptySubtext: {
     fontSize: 14,
     textAlign: 'center',
     paddingHorizontal: 16,
+    color: '#D1D5DB',
   },
   emptyCardLight: {
     borderColor: '#E5E7EB',
