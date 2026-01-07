@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
-import { supabase } from '@/lib/supabase';
+import { supabase, signOut } from '@/lib/supabase';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,7 @@ import { BottomSheet } from '@/components/ui/BottomSheet';
 import { PaymentMethodsContent } from '@/components/payments/PaymentMethodsContent';
 import { Ionicons } from '@expo/vector-icons';
 import type { User } from '@/types';
+import { deleteAccount } from '@/lib/api/users';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
@@ -102,6 +104,60 @@ export default function SettingsScreen() {
   const handleMenuItemPress = (label: string) => {
     // Placeholder for menu item actions
     Alert.alert('Coming Soon', `${label} feature coming soon`);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone. All your data, including gigs, messages, and earnings, will be permanently deleted.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            // Second confirmation
+            Alert.alert(
+              'Final Confirmation',
+              'This will permanently delete your account and all associated data. This action cannot be undone.',
+              [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Delete Account',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setIsDeletingAccount(true);
+                    try {
+                      await deleteAccount();
+                      // Sign out and clear user state
+                      await signOut();
+                      useAuthStore.getState().setUser(null);
+                      // Navigate to login
+                      router.replace('/auth/login');
+                    } catch (error: any) {
+                      Alert.alert(
+                        'Error',
+                        error.message || 'Failed to delete account. Please contact support if this issue persists.'
+                      );
+                    } finally {
+                      setIsDeletingAccount(false);
+                    }
+                  },
+                },
+              ],
+              { cancelable: true }
+            );
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (
@@ -213,7 +269,7 @@ export default function SettingsScreen() {
 
           <Pressable 
             style={[styles.menuItem, styles.menuItemWithBorder, isDark && styles.menuItemBorderDark]}
-            onPress={() => handleMenuItemPress('Terms of Use')}
+            onPress={() => router.push('/legal/terms')}
           >
             <View style={styles.menuItemLeft}>
               <Ionicons name="document-text" size={20} color="#73af17" />
@@ -224,13 +280,30 @@ export default function SettingsScreen() {
 
           <Pressable 
             style={styles.menuItem}
-            onPress={() => handleMenuItemPress('Privacy Policy')}
+            onPress={() => router.push('/legal/privacy')}
           >
             <View style={styles.menuItemLeft}>
               <Ionicons name="shield-checkmark" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Privacy Policy</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+          </Pressable>
+        </View>
+
+        <View style={[styles.section, cardStyle]}>
+          <Text style={[styles.sectionTitle, titleStyle]}>Danger Zone</Text>
+          
+          <Pressable 
+            style={styles.menuItem} 
+            onPress={handleDeleteAccount}
+            disabled={isDeletingAccount}
+          >
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="trash-outline" size={20} color="#DC2626" />
+              <Text style={[styles.menuItemLabel, styles.dangerText]}>
+                {isDeletingAccount ? 'Deleting...' : 'Delete Account'}
+              </Text>
+            </View>
           </Pressable>
         </View>
       </ScrollView>
@@ -414,5 +487,8 @@ const styles = StyleSheet.create({
   },
   savePasswordButton: {
     flex: 1,
+  },
+  dangerText: {
+    color: '#DC2626',
   },
 });

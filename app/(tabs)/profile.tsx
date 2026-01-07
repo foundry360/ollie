@@ -359,7 +359,7 @@ export default function ProfileScreen() {
           <View style={[styles.section, cardStyle]}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
-                <Text style={[styles.sectionTitle, titleStyle]}>Gigs</Text>
+                <Text style={[styles.subsectionTitle, titleStyle]}>Skills</Text>
               </View>
               <Pressable onPress={() => {
                 setEditingSection('tasks');
@@ -371,8 +371,6 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={20} color={isDark ? '#FFFFFF' : '#000000'} />
               </Pressable>
             </View>
-
-            <Text style={[styles.subsectionTitle, titleStyle]}>Skills</Text>
             {tasksData.skills && tasksData.skills.length > 0 ? (
               <View style={styles.skillsContainer}>
                 {tasksData.skills.map((skill) => (

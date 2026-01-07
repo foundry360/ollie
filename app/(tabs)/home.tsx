@@ -181,7 +181,7 @@ export default function HomeScreen() {
             </View>
             <View style={[styles.bottomSection, isDark && styles.bottomSectionDark]}>
               <TeenUpcomingScheduledGigs />
-              {hasScheduledGigs && <View style={[styles.divider, isDark && styles.dividerDark]} />}
+              <View style={[styles.divider, isDark && styles.dividerDark]} />
               <UpcomingTasks />
               <View style={[styles.divider, isDark && styles.dividerDark]} />
               <TasksNearYou />

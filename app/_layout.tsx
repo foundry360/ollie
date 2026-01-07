@@ -29,11 +29,13 @@ if (Platform.OS !== 'web') {
 const queryClient = new QueryClient({
   defaultOptions: { 
     queries: { 
-      staleTime: 30000, // 30 seconds default
+      staleTime: 60000, // 60 seconds default (increased for better caching)
+      gcTime: 300000, // 5 minutes garbage collection time (formerly cacheTime)
       retry: 2,
       refetchOnWindowFocus: false, // Don't refetch on window focus
       refetchOnReconnect: true, // Only refetch on reconnect
       refetchInterval: false, // EXPLICITLY disable polling globally
+      refetchOnMount: false, // Don't refetch on mount if data is fresh
     } 
   }
 });

@@ -118,3 +118,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION create_missing_completion_approval(UUID) TO authenticated;
 
+
+
+
+

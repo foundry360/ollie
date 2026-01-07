@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 12,
     marginTop: 12,
   },
   loadingText: {

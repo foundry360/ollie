@@ -246,7 +246,7 @@ export async function getUserProfileForChat(userId: string): Promise<User | null
   // First, try direct query (should work if RLS allows via messages relationship)
   const { data, error } = await supabase
     .from('users')
-    .select('id, full_name, profile_photo_url, role')
+    .select('id, full_name, profile_photo_url, role, verified')
     .eq('id', userId)
     .maybeSingle();
 
@@ -267,7 +267,8 @@ export async function getUserProfileForChat(userId: string): Promise<User | null
           id,
           full_name,
           profile_photo_url,
-          role
+          role,
+          verified
         )
       `)
       .eq('sender_id', currentUser.user.id)
@@ -287,7 +288,8 @@ export async function getUserProfileForChat(userId: string): Promise<User | null
           id,
           full_name,
           profile_photo_url,
-          role
+          role,
+          verified
         )
       `)
       .eq('sender_id', userId)
@@ -311,7 +313,8 @@ export async function getUserProfileForChat(userId: string): Promise<User | null
           id,
           full_name,
           profile_photo_url,
-          role
+          role,
+          verified
         )
       `)
       .eq('poster_id', userId)
@@ -334,7 +337,8 @@ export async function getUserProfileForChat(userId: string): Promise<User | null
           id,
           full_name,
           profile_photo_url,
-          role
+          role,
+          verified
         )
       `)
       .eq('teen_id', userId)
@@ -930,5 +934,63 @@ export async function getPastTeenlancers(): Promise<TeenlancerProfile[]> {
   );
 
   return profilesWithRatings.filter((p) => p !== null) as TeenlancerProfile[];
+}
+
+// Delete user account
+// This deletes the user profile and related data via database function
+// Note: The auth.users record will remain (requires admin API to delete)
+export async function deleteAccount(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  try {
+    // First, try to call the edge function for complete deletion (including auth account)
+    const { data: edgeData, error: edgeError } = await supabase.functions.invoke('delete-user-account', {
+      body: { userId: user.id }
+    });
+
+    if (edgeError) {
+      // Edge function failed or doesn't exist, fall back to database function
+      console.warn('Edge function failed or not found, using database function:', edgeError.message);
+      
+      // Use database function to delete profile
+      // This will cascade delete related data due to ON DELETE CASCADE
+      const { error: rpcError } = await supabase.rpc('delete_user_account');
+
+      if (rpcError) {
+        // If RPC function doesn't exist, try direct deletion (may fail due to RLS)
+        console.warn('RPC function failed, trying direct deletion:', rpcError);
+        const { error: deleteError } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', user.id);
+
+        if (deleteError) {
+          throw new Error(`Failed to delete account: ${deleteError.message}. Please run migration 110 to enable account deletion.`);
+        }
+      }
+
+      // Sign out the user after successful profile deletion
+      // Note: The auth.users record will remain but the profile and all data are deleted
+      await supabase.auth.signOut();
+    } else if (edgeData?.success) {
+      // Edge function successfully deleted both profile and auth account
+      // The auth account is deleted, so sign out is automatic, but we'll do it anyway for cleanup
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        // Ignore sign out errors since the account is already deleted
+        console.log('Sign out after account deletion (expected if auth account was deleted)');
+      }
+      return;
+    } else {
+      // Edge function returned but with an error message
+      const errorMessage = edgeData?.error || 'Failed to delete account';
+      throw new Error(errorMessage);
+    }
+  } catch (error: any) {
+    console.error('Error deleting account:', error);
+    throw new Error(error.message || 'Failed to delete account');
+  }
 }
 

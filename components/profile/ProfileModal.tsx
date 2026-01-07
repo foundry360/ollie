@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Linking, Modal, Dimensions, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Linking, Modal, Dimensions, Pressable, Platform } from 'react-native';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { getPublicUserProfile } from '@/lib/api/users';
@@ -467,9 +468,12 @@ export function ProfileModal({ visible, userId, onClose, onSelect, showSelectBut
                         <View style={styles.reviewHeader}>
                           <View style={styles.reviewerInfo}>
                             {review.reviewer_photo ? (
-                              <Image 
+                              <OptimizedImage 
                                 source={{ uri: review.reviewer_photo }} 
                                 style={styles.reviewerAvatar}
+                                contentFit="cover"
+                                cachePolicy="memory-disk"
+                                transition={200}
                               />
                             ) : (
                               <View style={[styles.reviewerAvatarPlaceholder, isDark && styles.reviewerAvatarPlaceholderDark]}>
@@ -608,9 +612,12 @@ export function ProfileModal({ visible, userId, onClose, onSelect, showSelectBut
           {profile && (
             <View style={styles.avatarContainer}>
               {profile.profile_photo_url ? (
-                <Image 
+                <OptimizedImage 
                   source={{ uri: profile.profile_photo_url }} 
                   style={[styles.avatar, isNeighbor && styles.avatarWhiteBorder]}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={200}
                 />
               ) : (
                 <View style={[
@@ -632,9 +639,12 @@ export function ProfileModal({ visible, userId, onClose, onSelect, showSelectBut
             >
               <View style={styles.floatingMessageContent}>
                 {profile.profile_photo_url ? (
-                  <Image
+                  <OptimizedImage
                     source={{ uri: profile.profile_photo_url }}
                     style={styles.floatingAvatar}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={200}
                   />
                 ) : (
                   <View style={styles.floatingAvatarPlaceholder}>

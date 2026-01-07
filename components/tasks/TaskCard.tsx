@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { ThreeDotsLoader } from '@/components/ui/Loading';
 import { useRouter } from 'expo-router';
 import { Task, TaskStatus } from '@/types';
@@ -121,12 +122,14 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
       <View style={[styles.leftSection, isDark && styles.leftSectionDark]}>
         <View style={styles.imageContainer}>
           {task.photos && task.photos.length > 0 && task.photos[0] ? (
-            <Image 
+            <OptimizedImage 
               source={{ uri: task.photos[0] }} 
               style={styles.image}
-              resizeMode="cover"
-              onError={(e) => {
-                console.log('Image load error for task:', task.id, 'Photo URL:', task.photos?.[0], 'Error:', e.nativeEvent.error);
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={200}
+              onError={(error: any) => {
+                console.log('Image load error for task:', task.id, 'Photo URL:', task.photos?.[0], 'Error:', error);
               }}
               onLoad={() => {
                 console.log('Image loaded successfully for task:', task.id, 'Photo URL:', task.photos?.[0]);

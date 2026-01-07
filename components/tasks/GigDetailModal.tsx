@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Pressable, Linking, Platform, Modal, Dimensions } from 'react-native';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { ThreeDotsLoader } from '@/components/ui/Loading';
 import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig, useDeleteTask, useUpdateTask, taskKeys } from '@/hooks/useTasks';
 import { applyForGig } from '@/lib/api/tasks';
@@ -8,6 +9,7 @@ import { TaskStatus } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
+import { VerifiedName } from '@/components/ui/VerifiedName';
 import { Loading } from '@/components/ui/Loading';
 import { useRouter } from 'expo-router';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -99,8 +101,8 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
   const teenRating = teenRatingData?.averageRating || 0;
   const teenReviewCount = teenRatingData?.reviewCount || 0;
   
-  // Fetch neighbor/poster profile for teenlancers viewing open gigs
-  const shouldFetchNeighborProfile = !!task?.poster_id && isOpen && isTeenlancer && !isPoster && !isTeen;
+  // Fetch neighbor/poster profile - always fetch when we have a poster_id
+  const shouldFetchNeighborProfile = !!task?.poster_id;
   const { data: neighborProfile, isLoading: isLoadingNeighborProfile, error: neighborProfileError, status: queryStatus, fetchStatus } = useQuery({
     queryKey: ['neighborProfile', task?.poster_id],
     queryFn: async () => {
@@ -528,15 +530,17 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                     fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:438',message:'Rendering gig image',data:{hasPhotos:!!task.photos,photoCount:task.photos?.length,imageUrl,isValidUrl:imageUrl?.startsWith('http')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
                     // #endregion
                     return (
-                      <Image 
+                      <OptimizedImage 
                         source={{ uri: imageUrl }} 
                         style={styles.image}
-                        resizeMode="cover"
-                        onError={(e) => {
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={200}
+                        onError={(error: any) => {
                           // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:446',message:'Gig image onError',data:{imageUrl,error:e.nativeEvent?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                          fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:446',message:'Gig image onError',data:{imageUrl,error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
                           // #endregion
-                          console.log('Gig image load error:', e.nativeEvent.error, 'URL:', imageUrl);
+                          console.log('Gig image load error:', error, 'URL:', imageUrl);
                         }}
                         onLoad={() => {
                           // #region agent log
@@ -621,17 +625,30 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
 
                 <View style={[styles.section, sectionStyle]}>
                   <Text style={[titleStyle, styles.sectionTitle]}>Details</Text>
-                  {task.estimated_hours && (
+                  <View style={styles.detailRow}>
+                    <Ionicons name="time-outline" size={20} color="#73af17" />
+                    <Text style={[styles.detailText, textStyle]}>
+                      Posted on {new Date(task.created_at).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </Text>
+                  </View>
+                  {neighborProfile?.full_name && (
                     <>
-                      <View style={styles.detailRow}>
-                        <Ionicons name="time" size={20} color="#73af17" />
-                        <Text style={[styles.detailText, textStyle]}>
-                          Estimated: {task.estimated_hours} hours
-                        </Text>
-                      </View>
                       <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+                      <View style={styles.detailRow}>
+                        <Ionicons name="person" size={20} color="#73af17" />
+                        <VerifiedName 
+                          name={neighborProfile.full_name}
+                          verified={neighborProfile.verified}
+                          nameStyle={[styles.detailText, textStyle]}
+                        />
+                      </View>
                     </>
                   )}
+                  <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
                   <View style={styles.detailRow}>
                     <Ionicons name="location" size={20} color="#73af17" />
                     <View style={styles.addressContainer}>
@@ -657,7 +674,7 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                       <View style={styles.schedulingContainer}>
                         <View style={styles.scheduleDateRow}>
                           <Text style={[styles.detailText, textStyle]}>
-                            {formatScheduledDate(task.scheduled_date)}
+                            Service Date: {formatScheduledDate(task.scheduled_date)}
                           </Text>
                           {task.schedule_confirmed && (
                             <View style={styles.confirmedBadge}>
@@ -717,6 +734,17 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                         )}
                       </View>
                     </View>
+                  )}
+                  {task.estimated_hours && (
+                    <>
+                      <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+                      <View style={styles.detailRow}>
+                        <Ionicons name="time" size={20} color="#73af17" />
+                        <Text style={[styles.detailText, textStyle]}>
+                          Estimated: {task.estimated_hours} hours
+                        </Text>
+                      </View>
+                    </>
                   )}
                   {/* Proposed Schedule (when teenlancer proposes different times) */}
                   {task.proposed_scheduled_date && isNeighbor && (
@@ -793,9 +821,12 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                         >
                           <View style={styles.teenAvatarContainer}>
                             {teenProfile?.profile_photo_url ? (
-                              <Image
+                              <OptimizedImage
                                 source={{ uri: teenProfile.profile_photo_url }}
                                 style={styles.teenAvatar}
+                                contentFit="cover"
+                                cachePolicy="memory-disk"
+                                transition={200}
                               />
                             ) : (
                               <View style={[styles.teenAvatarPlaceholder, isDark && styles.teenAvatarPlaceholderDark]}>
@@ -892,9 +923,12 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                           >
                             <View style={styles.applicationTeenInfo}>
                               {application.teen_photo ? (
-                                <Image
+                                <OptimizedImage
                                   source={{ uri: application.teen_photo }}
                                   style={styles.applicationAvatar}
+                                  contentFit="cover"
+                                  cachePolicy="memory-disk"
+                                  transition={200}
                                 />
                               ) : (
                                 <View style={[styles.applicationAvatarPlaceholder, isDark && styles.applicationAvatarPlaceholderDark]}>
@@ -1059,11 +1093,14 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                   }
                   if (neighborProfile?.profile_photo_url) {
                     return (
-                      <Image
+                      <OptimizedImage
                         source={{ uri: neighborProfile.profile_photo_url }}
                         style={styles.floatingAvatar}
-                        onError={(e) => {
-                          console.log('Floating avatar load error:', e.nativeEvent.error, 'URL:', neighborProfile.profile_photo_url);
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={200}
+                        onError={(error: any) => {
+                          console.log('Floating avatar load error:', error, 'URL:', neighborProfile.profile_photo_url);
                         }}
                         onLoad={() => {
                           console.log('Floating avatar loaded successfully:', neighborProfile.profile_photo_url);
@@ -1092,9 +1129,12 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
             >
               <View style={[styles.floatingMessageContent, isDark && styles.floatingMessageContentDark]}>
                 {teenProfile?.profile_photo_url ? (
-                  <Image
+                  <OptimizedImage
                     source={{ uri: teenProfile.profile_photo_url }}
                     style={styles.floatingAvatar}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={200}
                   />
                 ) : (
                   <View style={[styles.floatingAvatarPlaceholder, isDark && styles.floatingAvatarPlaceholderDark]}>

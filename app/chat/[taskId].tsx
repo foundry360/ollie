@@ -10,6 +10,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Loading } from '@/components/ui/Loading';
 import { Ionicons } from '@expo/vector-icons';
 import { getPublicUserProfile, getUserProfileForChat } from '@/lib/api/users';
+import { VerifiedName } from '@/components/ui/VerifiedName';
 import { format } from 'date-fns';
 import { Message } from '@/types';
 import { getTaskMessages, createMessage, markMessagesAsRead } from '@/lib/api/messages';
@@ -32,7 +33,7 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [otherUserProfile, setOtherUserProfile] = useState<any>(null);
-  const [senderProfiles, setSenderProfiles] = useState<Array<{ id: string; name: string; avatar: string | null }>>([]);
+  const [senderProfiles, setSenderProfiles] = useState<Array<{ id: string; name: string; avatar: string | null; verified?: boolean }>>([]);
 
   // Get the other user's ID
   const otherUserId = useMemo(() => {
@@ -116,7 +117,8 @@ export default function ChatScreen() {
               return { 
                 id: senderId, 
                 name: profile.full_name || 'Unknown',
-                avatar: profile.profile_photo_url || null
+                avatar: profile.profile_photo_url || null,
+                verified: profile.verified || false
               };
             }
             const chatProfile = await getUserProfileForChat(senderId);
@@ -124,10 +126,11 @@ export default function ChatScreen() {
               return { 
                 id: senderId, 
                 name: chatProfile.full_name || 'Unknown',
-                avatar: chatProfile.profile_photo_url || null
+                avatar: chatProfile.profile_photo_url || null,
+                verified: chatProfile.verified || false
               };
             }
-            return { id: senderId, name: 'Unknown', avatar: null };
+            return { id: senderId, name: 'Unknown', avatar: null, verified: false };
           } catch (error) {
             console.error(`Failed to fetch profile for ${senderId}:`, error);
             return { id: senderId, name: 'Unknown', avatar: null };
@@ -283,6 +286,19 @@ export default function ChatScreen() {
     return map;
   }, [senderProfiles, user?.id, user?.profile_photo_url]);
 
+  const senderVerified = useMemo(() => {
+    const map = new Map<string, boolean>();
+    senderProfiles.forEach(profile => {
+      if (profile.id) {
+        map.set(profile.id, profile.verified || false);
+      }
+    });
+    if (user?.id && !map.has(user.id)) {
+      map.set(user.id, user.verified || false);
+    }
+    return map;
+  }, [senderProfiles, user?.id, user?.verified]);
+
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0 && flatListRef.current) {
@@ -344,9 +360,12 @@ export default function ChatScreen() {
           {headerAvatar && (
             <Image source={{ uri: headerAvatar }} style={styles.headerAvatar} />
           )}
-          <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]}>
-            {headerTitle}
-          </Text>
+          <VerifiedName 
+            name={headerTitle}
+            verified={otherUserProfile?.verified}
+            nameStyle={[styles.headerTitle, isDark && styles.headerTitleDark]}
+            style={styles.headerTitleContainer}
+          />
         </View>
         <View style={styles.loadingContainer}>
           <Loading />
@@ -366,9 +385,12 @@ export default function ChatScreen() {
         {headerAvatar && (
           <Image source={{ uri: headerAvatar }} style={styles.headerAvatar} />
         )}
-        <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]}>
-          {headerTitle}
-        </Text>
+        <VerifiedName 
+          name={headerTitle}
+          verified={otherUserProfile?.verified}
+          nameStyle={[styles.headerTitle, isDark && styles.headerTitleDark]}
+          style={styles.headerTitleContainer}
+        />
       </View>
       
       <KeyboardAvoidingView
@@ -399,6 +421,7 @@ export default function ChatScreen() {
                   {item.messages.map((message) => {
                     const senderName = senderNames.get(message.sender_id) || 'Unknown';
                     const senderAvatar = senderAvatars.get(message.sender_id) || null;
+                    const senderVerifiedStatus = senderVerified.get(message.sender_id) || false;
                     const isOwn = message.sender_id === user?.id;
 
                     return (
@@ -407,6 +430,7 @@ export default function ChatScreen() {
                         message={message}
                         senderName={senderName}
                         senderAvatar={senderAvatar}
+                        senderVerified={senderVerifiedStatus}
                         isOwn={isOwn}
                       />
                     );
@@ -469,11 +493,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
+  headerTitleContainer: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
-    flex: 1,
   },
   headerTitleDark: {
     color: '#FFFFFF',

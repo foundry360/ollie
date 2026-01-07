@@ -202,3 +202,7 @@ CREATE TRIGGER on_gig_completed_notify
   EXECUTE FUNCTION notify_gig_completed();
 
 
+
+
+
+

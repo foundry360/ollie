@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Pressable, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 import { useUserTasks, useStartTask, useCompleteTask } from '@/hooks/useTasks';
@@ -213,9 +214,12 @@ export function TeenUpcomingScheduledGigs() {
                     {item.poster_id && (
                       <View style={styles.avatarContainer}>
                         {neighborProfile?.profile_photo_url ? (
-                          <Image
+                          <OptimizedImage
                             source={{ uri: neighborProfile.profile_photo_url }}
                             style={styles.avatar}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            transition={200}
                           />
                         ) : (
                           <View style={[styles.avatarPlaceholder, isDark && styles.avatarPlaceholderDark]}>

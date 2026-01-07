@@ -7,8 +7,10 @@ import { Drawer, DrawerContext } from '@/components/Drawer';
 import { HeaderLogo } from '@/components/ui/HeaderLogo';
 import { useContext, useEffect, useMemo } from 'react';
 import { useConversations, messageKeys } from '@/hooks/useMessages';
+import { useUnreadNotificationsCount } from '@/hooks/useNotifications';
 import { supabase } from '@/lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 
 function HeaderLeft() {
   const { openDrawer, drawerOpen } = useContext(DrawerContext);
@@ -70,18 +72,20 @@ function HeaderLeft() {
 function HeaderRight() {
   const { colorScheme } = useThemeStore();
   const segments = useSegments();
+  const router = useRouter();
   const isDark = colorScheme === 'dark';
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount();
 
   // Get the current route name from segments
   const currentRoute = segments[segments.length - 1];
-  // Show notification bell on all screens except profile, settings, and qr-code
-  const hideNotificationRoutes = ['profile', 'settings', 'qr-code'];
+  // Show notification bell on all screens except profile, settings, qr-code, and notifications
+  const hideNotificationRoutes = ['profile', 'settings', 'qr-code', 'notifications'];
   const showNotification = !hideNotificationRoutes.includes(currentRoute);
 
   // #region agent log
   useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/_layout.tsx:66',message:'HeaderRight render/segment change',data:{currentRoute,showNotification,segments:segments.join('/')},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
-  }, [segments, showNotification]);
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/_layout.tsx:66',message:'HeaderRight render/segment change',data:{currentRoute,showNotification,segments:segments.join('/'),unreadCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
+  }, [segments, showNotification, unreadCount]);
   // #endregion
 
   // Always render a container to prevent layout shifts, but hide content when not on main screens
@@ -89,13 +93,48 @@ function HeaderRight() {
     <View style={{ marginRight: 16, width: showNotification ? 'auto' : 0, opacity: showNotification ? 1 : 0 }}>
       <Pressable
         onPress={() => {
-          // TODO: Navigate to notifications screen
-          console.log('Notifications pressed');
+          router.push('/(tabs)/notifications');
         }}
         style={{ padding: 4 }}
         disabled={!showNotification}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+        <View style={{ position: 'relative', width: 24, height: 24 }}>
+          <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+          {unreadCount > 0 && (
+            <View 
+              style={{
+                position: 'absolute',
+                top: -8,
+                right: -10,
+                backgroundColor: '#EF4444',
+                borderRadius: 12,
+                minWidth: 22,
+                height: 22,
+                paddingHorizontal: 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: '#111827',
+                zIndex: 10,
+                elevation: 5, // Android shadow
+                shadowColor: '#000', // iOS shadow
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3,
+              }}
+              pointerEvents="none"
+            >
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 11,
+                fontWeight: '700',
+              }}>
+                {unreadCount > 99 ? '99+' : unreadCount.toString()}
+              </Text>
+            </View>
+          )}
+        </View>
       </Pressable>
     </View>
   );
@@ -387,6 +426,13 @@ export default function TabLayout() {
         name="payment-methods" 
         options={{ 
           title: 'Payment Methods',
+          href: null, // Hide from tab bar
+        }} 
+      />
+      <Tabs.Screen 
+        name="notifications" 
+        options={{ 
+          title: 'Notifications',
           href: null, // Hide from tab bar
         }} 
       />

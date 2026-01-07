@@ -23,3 +23,7 @@ CREATE POLICY "Users can read debug logs" ON public.debug_logs
   FOR SELECT USING (true);
 
 
+
+
+
+

@@ -37,6 +37,7 @@
       "expo-video",
       "expo-web-browser",
       "expo-maps",
+      "expo-image",
       [
         "@stripe/stripe-react-native",
         {

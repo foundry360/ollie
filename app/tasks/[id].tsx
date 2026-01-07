@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,6 +12,9 @@ import { Loading } from '@/components/ui/Loading';
 import { ScheduleConfirmationModal } from '@/components/tasks/ScheduleConfirmationModal';
 import { getRandomCompletionMessage } from '@/lib/utils';
 import { SuccessAlert } from '@/components/ui/SuccessAlert';
+import { getUserProfileForChat } from '@/lib/api/users';
+import { supabase } from '@/lib/supabase';
+import { VerifiedName } from '@/components/ui/VerifiedName';
 
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +31,8 @@ export default function TaskDetailScreen() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [posterName, setPosterName] = useState<string | null>(null);
+  const [posterVerified, setPosterVerified] = useState<boolean>(false);
 
   const isPoster = user?.id === task?.poster_id;
   const isTeen = user?.id === task?.teen_id;
@@ -130,6 +135,38 @@ export default function TaskDetailScreen() {
       Alert.alert('Error', 'Could not open maps app');
     });
   };
+
+  // Fetch poster's name and verified status
+  useEffect(() => {
+    if (task?.poster_id) {
+      // Query users table directly for the poster's name and verified status
+      // This should work because we're viewing a gig that the user has access to
+      supabase
+        .from('users')
+        .select('full_name, verified')
+        .eq('id', task.poster_id)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching poster profile:', error);
+            // Fallback: try getUserProfileForChat
+            getUserProfileForChat(task.poster_id)
+              .then((profile) => {
+                if (profile) {
+                  setPosterName(profile.full_name);
+                  setPosterVerified(profile.verified || false);
+                }
+              })
+              .catch((err) => {
+                console.error('Error fetching poster profile via chat function:', err);
+              });
+          } else if (data) {
+            setPosterName(data.full_name);
+            setPosterVerified(data.verified || false);
+          }
+        });
+    }
+  }, [task?.poster_id]);
 
   const handleChat = () => {
     console.log('TaskDetailScreen handleChat:', {
@@ -249,17 +286,41 @@ export default function TaskDetailScreen() {
 
           <View style={[styles.section, sectionStyle]}>
             <Text style={[styles.sectionTitle, titleStyle]}>Details</Text>
+            <View style={styles.detailRow}>
+              <Ionicons name="calendar-outline" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+              <Text style={[styles.detailText, textStyle]}>
+                {new Date(task.created_at).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </Text>
+            </View>
             {task.estimated_hours && (
               <>
+                <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
                 <View style={styles.detailRow}>
                   <Ionicons name="time" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
                   <Text style={[styles.detailText, textStyle]}>
                     Estimated: {task.estimated_hours} hours
                   </Text>
                 </View>
-                <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
               </>
             )}
+            {posterName && (
+              <>
+                <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
+                <View style={styles.detailRow}>
+                  <Ionicons name="person" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                  <VerifiedName 
+                    name={posterName} 
+                    verified={posterVerified}
+                    nameStyle={[styles.detailText, textStyle]}
+                  />
+                </View>
+              </>
+            )}
+            <View style={[styles.detailDivider, isDark && styles.detailDividerDark]} />
             <View style={styles.detailRow}>
               <Ionicons name="location" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
               <Text style={[styles.detailText, textStyle]}>{task.address}</Text>

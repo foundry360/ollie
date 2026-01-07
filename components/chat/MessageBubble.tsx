@@ -4,15 +4,17 @@ import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
+import { VerifiedName } from '@/components/ui/VerifiedName';
 
 interface MessageBubbleProps {
   message: Message;
   senderName?: string | null;
   senderAvatar?: string | null;
+  senderVerified?: boolean;
   isOwn?: boolean;
 }
 
-export function MessageBubble({ message, senderName, senderAvatar, isOwn: isOwnProp }: MessageBubbleProps) {
+export function MessageBubble({ message, senderName, senderAvatar, senderVerified, isOwn: isOwnProp }: MessageBubbleProps) {
   const { user } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
@@ -48,8 +50,13 @@ export function MessageBubble({ message, senderName, senderAvatar, isOwn: isOwnP
           )}
         </View>
         <View style={styles.bubbleContainer}>
-          {senderName && (
-            <Text style={senderNameStyle}>{senderName}</Text>
+          {senderName && !isOwn && (
+            <VerifiedName 
+              name={senderName}
+              verified={senderVerified}
+              nameStyle={senderNameStyle}
+              iconSize={12}
+            />
           )}
           <View style={styles.speechBubbleWrapper}>
             <View style={bubbleStyle}>

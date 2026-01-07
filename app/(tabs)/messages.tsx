@@ -37,6 +37,7 @@ export default function MessagesScreen() {
       other_user_id={item.other_user_id}
       other_user_name={item.other_user_name}
       other_user_photo={item.other_user_photo}
+      other_user_verified={item.other_user_verified}
       last_message={item.last_message}
       unread_count={item.unread_count}
     />

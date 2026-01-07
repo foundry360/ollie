@@ -134,6 +134,7 @@ export async function getConversations(): Promise<Array<{
   other_user_id: string;
   other_user_name: string;
   other_user_photo?: string | null;
+  other_user_verified?: boolean;
   last_message: Message | null;
   unread_count: number;
 }>> {
@@ -176,6 +177,7 @@ export async function getConversations(): Promise<Array<{
     other_user_id: string;
     other_user_name: string;
     other_user_photo?: string | null;
+    other_user_verified?: boolean;
     last_message: Message | null;
     unread_count: number;
   }>();
@@ -219,10 +221,10 @@ export async function getConversations(): Promise<Array<{
     seenKeys.add(key);
 
     if (!conversationsMap.has(key)) {
-      // Get other user's name and profile photo
+      // Get other user's name, profile photo, and verified status
       const { data: otherUser } = await supabase
         .from('users')
-        .select('full_name, profile_photo_url')
+        .select('full_name, profile_photo_url, verified')
         .eq('id', otherUserId)
         .single();
 
@@ -232,6 +234,7 @@ export async function getConversations(): Promise<Array<{
         other_user_id: otherUserId,
         other_user_name: otherUser?.full_name || 'Unknown',
         other_user_photo: otherUser?.profile_photo_url || null,
+        other_user_verified: otherUser?.verified || false,
         last_message: null,
         unread_count: 0,
       });

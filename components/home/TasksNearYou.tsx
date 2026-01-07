@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -126,6 +127,8 @@ export function TasksNearYou() {
   const hasProfileAddress = !!user?.address;
   
   if (!userLocation || locationError || !hasProfileAddress) {
+    const textStyle = isDark ? styles.textDark : styles.detailText;
+    
     return (
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
@@ -135,10 +138,10 @@ export function TasksNearYou() {
           <Ionicons
             name="location-outline"
             size={48}
-            color={isDark ? '#6B7280' : '#D1D5DB'}
+            color={isDark ? '#6B7280' : '#9CA3AF'}
           />
-          <Text style={styles.emptyText}>Update your location</Text>
-          <Text style={styles.emptySubtext}>
+          <Text style={[styles.emptyText, textStyle]}>Update your location</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
             {!hasProfileAddress 
               ? 'Add your address in your profile to see gigs near you'
               : 'Enable location services to see gigs near you'}
@@ -149,6 +152,8 @@ export function TasksNearYou() {
   }
 
   if (tasksError) {
+    const textStyle = isDark ? styles.textDark : styles.detailText;
+    
     return (
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
@@ -158,10 +163,10 @@ export function TasksNearYou() {
           <Ionicons
             name="alert-circle-outline"
             size={48}
-            color={isDark ? '#6B7280' : '#D1D5DB'}
+            color={isDark ? '#6B7280' : '#9CA3AF'}
           />
-          <Text style={styles.emptyText}>Error loading gigs</Text>
-          <Text style={styles.emptySubtext}>
+          <Text style={[styles.emptyText, textStyle]}>Error loading gigs</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
             Please try again later
           </Text>
         </View>
@@ -173,6 +178,8 @@ export function TasksNearYou() {
   // This ensures we never show tasks when location is unavailable, even if React Query has cached data
   // Also check profile address - user must have address in profile (reuse hasProfileAddress from above)
   if (!userLocation || locationError || !hasProfileAddress) {
+    const textStyle = isDark ? styles.textDark : styles.detailText;
+    
     return (
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
@@ -182,10 +189,10 @@ export function TasksNearYou() {
           <Ionicons
             name="location-outline"
             size={48}
-            color={isDark ? '#6B7280' : '#D1D5DB'}
+            color={isDark ? '#6B7280' : '#9CA3AF'}
           />
-          <Text style={styles.emptyText}>Update your location</Text>
-          <Text style={styles.emptySubtext}>
+          <Text style={[styles.emptyText, textStyle]}>Update your location</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
             {!hasProfileAddress 
               ? 'Add your address in your profile to see gigs near you'
               : 'Enable location services to see gigs near you'}
@@ -196,21 +203,21 @@ export function TasksNearYou() {
   }
 
   if (tasks.length === 0) {
-    const emptyCardStyle = isDark ? styles.emptyCardDark : styles.emptyCardLight;
+    const textStyle = isDark ? styles.textDark : styles.detailText;
     
     return (
       <View style={[styles.container, containerStyle]}>
         <View style={styles.header}>
           <Text style={[styles.sectionTitle, titleStyle]}>Gigs Near You</Text>
         </View>
-        <View style={[styles.emptyContainer, emptyCardStyle]}>
+        <View style={styles.emptyContainer}>
           <Ionicons
             name="location-outline"
             size={48}
-            color={isDark ? '#6B7280' : '#D1D5DB'}
+            color={isDark ? '#6B7280' : '#9CA3AF'}
           />
-          <Text style={styles.emptyText}>No gigs nearby</Text>
-          <Text style={styles.emptySubtext}>
+          <Text style={[styles.emptyText, textStyle]}>No gigs nearby</Text>
+          <Text style={[styles.emptySubtext, textStyle]}>
             Check back later or browse all gigs
           </Text>
         </View>
@@ -237,10 +244,12 @@ export function TasksNearYou() {
           >
             <View style={styles.imageContainer}>
               {task.photos && task.photos.length > 0 ? (
-                <Image 
+                <OptimizedImage 
                   source={{ uri: task.photos[0] }} 
                   style={styles.taskImage}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={200}
                 />
               ) : (
                 <View style={[styles.taskImagePlaceholder, isDark && styles.taskImagePlaceholderDark]}>
@@ -403,7 +412,7 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   textDark: {
-    color: '#000000',
+    color: '#374151',
   },
   skillsRow: {
     flexDirection: 'row',
@@ -464,32 +473,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 32,
     paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  emptyCardLight: {
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  emptyCardDark: {
-    borderColor: '#374151',
-    backgroundColor: 'transparent',
   },
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
     marginTop: 12,
     marginBottom: 4,
-    color: '#D1D5DB',
   },
   emptySubtext: {
     fontSize: 14,
     textAlign: 'center',
-    color: '#D1D5DB',
+  },
+  detailText: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   loadingText: {
     fontSize: 14,

@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
+import { VerifiedName } from '@/components/ui/VerifiedName';
 
 interface ConversationItemProps {
   task_id: string;
@@ -10,6 +11,7 @@ interface ConversationItemProps {
   other_user_id: string;
   other_user_name: string;
   other_user_photo?: string | null;
+  other_user_verified?: boolean;
   last_message: {
     content: string;
     created_at: string;
@@ -23,6 +25,7 @@ export function ConversationItem({
   other_user_id,
   other_user_name,
   other_user_photo,
+  other_user_verified,
   last_message,
   unread_count,
 }: ConversationItemProps) {
@@ -70,9 +73,13 @@ export function ConversationItem({
           </Text>
         </View>
         <View style={styles.footer}>
-          <Text style={[styles.subtitle, subtitleStyle]} numberOfLines={1}>
-            {other_user_name}
-          </Text>
+          <VerifiedName 
+            name={other_user_name}
+            verified={other_user_verified}
+            nameStyle={[styles.subtitle, subtitleStyle]}
+            style={styles.nameContainer}
+            iconSize={14}
+          />
           {last_message && (
             <Text style={timeStyle}>
               {formatDistanceToNow(new Date(last_message.created_at), { addSuffix: true })}
@@ -163,6 +170,9 @@ const styles = StyleSheet.create({
   },
   subtitleDark: {
     color: '#9CA3AF',
+  },
+  nameContainer: {
+    flex: 1,
   },
   message: {
     flex: 1,

@@ -27,3 +27,7 @@ When you complete a gig, you should see TWO separate Edge Function calls:
 If the neighbor is receiving the teen's notification, we'll see it in the logs.
 
 
+
+
+
+

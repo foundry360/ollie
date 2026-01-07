@@ -17,3 +17,7 @@ COMMENT ON COLUMN public.earnings.payment_status IS 'Status of charging the neig
 COMMENT ON COLUMN public.earnings.payout_status IS 'Status of depositing money to the teenlancer''s bank account (pending, processing, paid, failed). Only set to paid when payout.paid webhook is received.';
 COMMENT ON COLUMN public.earnings.status IS 'Overall earnings status. Should be pending until payout_status is paid, then set to paid.';
 
+
+
+
+

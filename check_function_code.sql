@@ -30,3 +30,7 @@ FROM pg_proc
 WHERE proname = 'notify_gig_completed';
 
 
+
+
+
+
