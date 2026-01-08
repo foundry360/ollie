@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Alert, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -8,6 +9,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Button } from '@/components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { Loading } from '@/components/ui/Loading';
+import { uploadVerificationPhoto, submitVerificationRequest } from '@/lib/api/verification';
 
 export default function VerificationUploadScreen() {
   const router = useRouter();
@@ -69,13 +71,33 @@ export default function VerificationUploadScreen() {
       return;
     }
 
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to submit verification.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // In production, upload photos to Supabase Storage
-      // For now, just mark as submitted
-      // TODO: Implement actual file upload to Supabase Storage
+      // Upload front photo
+      const frontPhotoUrl = await uploadVerificationPhoto(frontPhoto, 'front');
       
-      // Update user verification status (this would be done via API in production)
+      // Upload back photo if provided
+      let backPhotoUrl: string | undefined;
+      if (backPhoto) {
+        backPhotoUrl = await uploadVerificationPhoto(backPhoto, 'back');
+      }
+
+      // Submit verification request
+      const verificationRequest = await submitVerificationRequest(frontPhotoUrl, backPhotoUrl);
+      if (!verificationRequest) {
+        throw new Error('Unable to create verification request. Please ensure your profile is complete.');
+      }
+
+      // Update user's local state to reflect pending verification
+      if (setUser) {
+        setUser({ ...user, verified: false }); // Still pending, not verified yet
+      }
+
       Alert.alert(
         'Verification Submitted',
         'Your ID verification has been submitted. We will review it and notify you once it\'s approved.',
@@ -87,7 +109,11 @@ export default function VerificationUploadScreen() {
         ]
       );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to submit verification');
+      console.error('Verification submission error:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to submit verification. Please try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }

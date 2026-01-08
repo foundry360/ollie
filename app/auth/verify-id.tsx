@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Alert, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { getNeighborApplicationStatus } from '@/lib/api/neighborApplications';
+import { uploadVerificationPhoto, submitVerificationRequest } from '@/lib/api/verification';
 
 export default function VerifyIdScreen() {
   const router = useRouter();
@@ -51,60 +53,8 @@ export default function VerifyIdScreen() {
   };
 
 
-  const uploadPhoto = async (uri: string, fileName: string): Promise<string> => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    
-    // Determine content type from file extension
-    const fileExt = fileName.split('.').pop()?.toLowerCase() || 'jpg';
-    const contentType = fileExt === 'png' ? 'image/png' : 
-                       fileExt === 'webp' ? 'image/webp' : 
-                       'image/jpeg';
-    
-    const { data, error } = await supabase.storage
-      .from('id-verifications')
-      .upload(fileName, blob, {
-        contentType: contentType,
-        upsert: false,
-      });
-
-    if (error) {
-      console.error('Upload error:', error);
-      
-      if (error.message?.includes('row-level security') || error.message?.includes('violates') || error.statusCode === 403) {
-        throw new Error(
-          'Storage upload blocked by security policy. Please ensure storage policies are correctly configured.'
-        );
-      }
-      
-      if (error.message?.includes('Bucket not found') || error.message?.includes('not found')) {
-        throw new Error(
-          'Storage bucket not found. Please create an "id-verifications" bucket in Supabase Storage.'
-        );
-      }
-      
-      throw new Error(`Failed to upload image: ${error.message}`);
-    }
-
-    // For private buckets, create a signed URL (valid for 1 year)
-    console.log('🔗 [verify-id] Creating signed URL for path:', data.path);
-    const { data: signedUrlData, error: urlError } = await supabase.storage
-      .from('id-verifications')
-      .createSignedUrl(data.path, 31536000); // 1 year expiry
-
-    if (urlError) {
-      console.error('❌ [verify-id] Error creating signed URL:', urlError);
-      throw new Error(`Failed to generate file URL: ${urlError.message}`);
-    }
-
-    if (!signedUrlData?.signedUrl) {
-      console.error('❌ [verify-id] No signed URL returned:', signedUrlData);
-      throw new Error('Failed to generate file URL - no URL returned');
-    }
-
-    console.log('✅ [verify-id] Signed URL created successfully, length:', signedUrlData.signedUrl.length);
-    return signedUrlData.signedUrl;
-  };
+  // Use the new verification API function instead of direct storage upload
+  // This ensures consistent handling and uses the proper API
 
   const handleSubmit = async () => {
     if (!frontPhoto) {
@@ -151,18 +101,27 @@ export default function VerifyIdScreen() {
     setIsUploading(true);
 
     try {
-      // Generate unique file names with user ID prefix
-      const timestamp = Date.now();
-      const frontFileName = `${finalUserId}/id-front-${timestamp}.jpg`;
-      const backFileName = `${finalUserId}/id-back-${timestamp}.jpg`;
-
-      // Upload photos
+      // Upload photos using the new verification API
       const [frontPhotoUrl, backPhotoUrl] = await Promise.all([
-        uploadPhoto(frontPhoto, frontFileName),
-        uploadPhoto(backPhoto, backFileName),
+        uploadVerificationPhoto(frontPhoto, 'front'),
+        uploadVerificationPhoto(backPhoto, 'back'),
       ]);
 
-      // Update application with ID photo URLs
+      // Create verification request in the new verification_requests table
+      // Note: This may return null if user profile doesn't exist yet (during signup)
+      try {
+        const verificationRequest = await submitVerificationRequest(frontPhotoUrl, backPhotoUrl);
+        if (verificationRequest) {
+          console.log('✅ [verify-id] Verification request created successfully');
+        } else {
+          console.log('ℹ️ [verify-id] User profile not created yet, verification request will be created after profile creation');
+        }
+      } catch (verificationError: any) {
+        // Log but don't fail - the application update is more critical
+        console.warn('⚠️ [verify-id] Could not create verification request:', verificationError);
+      }
+
+      // Update application with ID photo URLs (for neighbor application flow)
       console.log('💾 [verify-id] Updating application with ID photo URLs:', {
         applicationId,
         frontPhotoUrl: frontPhotoUrl.substring(0, 50) + '...',

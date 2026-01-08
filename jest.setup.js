@@ -1,5 +1,4 @@
 require('@testing-library/jest-native/extend-expect');
-const { jest } = require('@jest/globals');
 
 // Mock Expo modules
 jest.mock('expo-router', () => ({
@@ -114,8 +113,13 @@ jest.mock('@stripe/stripe-react-native', () => ({
   }),
 }));
 
-// Note: @expo/vector-icons may need to be mocked in individual test files
-// if they import components that use it
+// Mock @expo/vector-icons
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+  MaterialIcons: () => null,
+  FontAwesome: () => null,
+  Feather: () => null,
+}));
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => ({

@@ -19,6 +19,7 @@ export interface EarningsRecord {
   payment_status?: 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded';
   payout_status?: 'pending' | 'processing' | 'paid' | 'failed';
   platform_fee_amount?: number;
+  stripe_fee_amount?: number;
   payment_failed_reason?: string;
 }
 
@@ -30,10 +31,10 @@ export async function getEarningsSummary(filters?: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  let query = supabase
-    .from('earnings')
-    .select('amount, status, payout_status, paid_at, platform_fee_amount')
-    .eq('teen_id', user.id);
+    let query = supabase
+      .from('earnings')
+      .select('amount, status, payout_status, paid_at, platform_fee_amount, stripe_fee_amount')
+      .eq('teen_id', user.id);
 
   if (filters?.startDate) {
     query = query.gte('created_at', filters.startDate);
@@ -110,6 +111,7 @@ export async function getEarningsHistory(filters?: {
       payment_status,
       payout_status,
       platform_fee_amount,
+      stripe_fee_amount,
       payment_failed_reason,
       gigs(id, title)
     `)
@@ -164,6 +166,7 @@ export async function getEarningsHistory(filters?: {
     payment_status: item.payment_status,
     payout_status: item.payout_status,
     platform_fee_amount: item.platform_fee_amount ? parseFloat(item.platform_fee_amount.toString()) : undefined,
+    stripe_fee_amount: item.stripe_fee_amount ? parseFloat(item.stripe_fee_amount.toString()) : undefined,
     payment_failed_reason: item.payment_failed_reason,
   }));
 }
@@ -367,6 +370,7 @@ export async function getNeighborSpendingHistory(filters?: {
       payment_status,
       payout_status,
       platform_fee_amount,
+      stripe_fee_amount,
       payment_failed_reason,
       gigs!earnings_gig_id_fkey(id, title, poster_id),
       teen:users!earnings_teen_id_fkey(full_name)
@@ -410,6 +414,7 @@ export async function getNeighborSpendingHistory(filters?: {
       teen_name: item.teen?.full_name,
       payment_status: item.payment_status,
       platform_fee_amount: item.platform_fee_amount ? parseFloat(item.platform_fee_amount.toString()) : undefined,
+      stripe_fee_amount: item.stripe_fee_amount ? parseFloat(item.stripe_fee_amount.toString()) : undefined,
       payment_failed_reason: item.payment_failed_reason,
     }));
 

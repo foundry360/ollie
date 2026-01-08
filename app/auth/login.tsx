@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Pressable, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -398,19 +399,18 @@ export default function LoginScreen() {
         }
       }
 
-      // Wait for router to be ready before navigating
-      // Use a longer delay and check if we can navigate
+      // Navigate to loading screen first, which will handle data prefetching and then navigate to home
       setTimeout(() => {
         try {
-          router.replace('/(tabs)/home');
+          router.replace('/loading');
         } catch (navError: any) {
           // If navigation fails, try again after a bit more delay
           console.log('Navigation failed, retrying...', navError);
           setTimeout(() => {
-            router.replace('/(tabs)/home');
+            router.replace('/loading');
           }, 500);
         }
-      }, 300);
+      }, 100);
     } catch (error: any) {
       console.error('Login error:', error);
       

@@ -37,9 +37,6 @@ jest.mock('expo-router', () => ({
     back: jest.fn(),
   }),
 }));
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: () => null,
-}));
 
 const CreateTaskScreen = require('@/app/tasks/create').default;
 

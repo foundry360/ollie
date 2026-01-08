@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { approveTeenSignup, rejectTeenSignup, getPendingSignupByTokenAnyStatus } from '@/lib/supabase';
@@ -78,34 +79,19 @@ export default function ParentApproveScreen() {
           const approvalPromise = Promise.race([
             (async () => {
               try {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/parent-approve.tsx:81',message:'Before approveTeenSignup call',data:{hasToken:!!params.token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-                // #endregion
                 console.log('🔄 [parent-approve] Calling approveTeenSignup with token:', params.token);
                 const result = await approveTeenSignup(params.token!);
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/parent-approve.tsx:85',message:'After approveTeenSignup call',data:{hasResult:!!result,hasPendingSignup:!!result?.pendingSignup,resultPendingSignupStatus:result?.pendingSignup?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'Q'})}).catch(()=>{});
-                // #endregion
                 console.log('✅ [parent-approve] Approval completed successfully, result:', result);
                 
                 // Update state immediately - don't wait
                 console.log('🔄 [parent-approve] Updating state to success...');
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/parent-approve.tsx:90',message:'Before state updates',data:{currentResult:result,currentActionTaken:actionTaken,currentProcessing:processing},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'R'})}).catch(()=>{});
-                // #endregion
                 setActionTaken('approved');
                 setPendingSignup((prev: any) => {
                   const updated = prev ? { ...prev, status: 'approved' } : (result?.pendingSignup || null);
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/parent-approve.tsx:94',message:'Inside setPendingSignup callback',data:{hasPrev:!!prev,updatedStatus:updated?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'S'})}).catch(()=>{});
-                  // #endregion
                   return updated;
                 });
                 setResult('success');
                 setProcessing(false);
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/parent-approve.tsx:100',message:'After all state updates called',data:{setResultCalled:true,setProcessingCalled:true,setActionTakenCalled:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'T'})}).catch(()=>{});
-                // #endregion
                 console.log('✅ [parent-approve] Success state set, processing set to false');
                 
                 // Show success alert for debugging
@@ -113,9 +99,6 @@ export default function ParentApproveScreen() {
                   Alert.alert('Success', 'Approval completed! State updated to success.');
                 }
               } catch (error: any) {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/parent-approve.tsx:97',message:'Error caught in approval handler',data:{errorMessage:error?.message,errorName:error?.name,errorCode:error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
-                // #endregion
                 console.error('❌ [parent-approve] Approval error:', error);
                 console.error('❌ [parent-approve] Error details:', {
                   message: error?.message,
@@ -197,9 +180,6 @@ export default function ParentApproveScreen() {
   const subtitleStyle = isDark ? styles.subtitleDark : styles.subtitleLight;
 
   // Check success FIRST - this is the most important state
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/parent-approve.tsx:197',message:'Render check',data:{result,actionTaken,loading,processing,hasPendingSignup:!!pendingSignup,pendingSignupStatus:pendingSignup?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'W'})}).catch(()=>{});
-  // #endregion
   if (result === 'success') {
     return (
       <SafeAreaView style={[styles.container, containerStyle]}>

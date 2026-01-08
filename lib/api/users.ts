@@ -378,14 +378,8 @@ export interface TeenStats {
 }
 
 export async function getTeenStats(): Promise<TeenStats> {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:133',message:'getTeenStats ENTRY',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:135',message:'getTeenStats user authenticated',data:{userId:user.id,userEmail:user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
 
   // Get completed tasks for rating calculation
   const { data: completedTasks, error: tasksError } = await supabase
@@ -401,21 +395,12 @@ export async function getTeenStats(): Promise<TeenStats> {
   // Get actual rating and review count from reviews table
   let rating = 0;
   let reviewCount = 0;
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:151',message:'getTeenStats BEFORE getAverageRating',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   try {
     const ratingData = await getAverageRating(user.id);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:153',message:'getTeenStats AFTER getAverageRating',data:{userId:user.id,rating:ratingData.averageRating,reviewCount:ratingData.reviewCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     rating = ratingData.averageRating || 0;
     reviewCount = ratingData.reviewCount || 0;
     console.log('Teen stats - Rating:', rating, 'Review Count:', reviewCount, 'User ID:', user.id);
   } catch (ratingError: any) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:156',message:'getTeenStats ERROR in getAverageRating',data:{userId:user.id,errorMessage:ratingError?.message,errorCode:ratingError?.code,errorDetails:ratingError?.details},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     // If reviews table doesn't exist yet or there's an error, fall back to 0
     console.error('Could not fetch ratings for user:', user.id, ratingError);
     console.error('Rating error details:', ratingError?.message, ratingError?.code, ratingError?.details);
@@ -470,9 +455,6 @@ export async function getTeenStats(): Promise<TeenStats> {
     tasksCompleted,
     weeklyEarnings,
   };
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:221',message:'getTeenStats RETURN',data:{rating,reviewCount,tasksCompleted,weeklyEarnings,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   return result;
 }
 
@@ -522,14 +504,8 @@ export async function getNeighborStats(): Promise<NeighborStats> {
 }
 
 export async function uploadProfilePhoto(uri: string): Promise<string> {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:29',message:'uploadProfilePhoto entry',data:{uri:uri.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:33',message:'Auth check',data:{hasUser:!!user,userId:user?.id,hasAuthError:!!authError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   if (!user) throw new Error('User not authenticated');
 
   try {
@@ -543,9 +519,6 @@ export async function uploadProfilePhoto(uri: string): Promise<string> {
     const fileName = `${user.id}-${Date.now()}.${fileExt}`;
     const filePath = `profile-photos/${fileName}`;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:45',message:'File path generated',data:{filePath,fileName,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
 
     // Delete old profile photo if it exists
     const { data: currentUser } = await supabase
@@ -579,9 +552,6 @@ export async function uploadProfilePhoto(uri: string): Promise<string> {
                        'image/jpeg';
 
     // Upload to Supabase Storage using ArrayBuffer
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:76',message:'BEFORE upload attempt',data:{filePath,contentType,arrayBufferSize:arrayBuffer.byteLength},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(filePath, arrayBuffer, {
@@ -589,17 +559,11 @@ export async function uploadProfilePhoto(uri: string): Promise<string> {
         upsert: false,
       });
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:82',message:'AFTER upload attempt',data:{hasData:!!uploadData,hasError:!!uploadError,errorCode:uploadError?.statusCode,errorMessage:uploadError?.message,errorName:uploadError?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (uploadError) {
       console.error('Upload error:', uploadError);
       
       // Provide helpful error message for RLS policy violation
       if (uploadError.message?.includes('row-level security') || uploadError.message?.includes('violates') || uploadError.statusCode === 403) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/users.ts:88',message:'RLS policy violation detected',data:{errorMessage:uploadError.message,statusCode:uploadError.statusCode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         throw new Error(
           'Storage upload blocked by security policy. Please add storage policies to allow authenticated users to upload. ' +
           'See PROFILE_PHOTO_SETUP.md for the correct policies.'

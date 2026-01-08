@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, Pressable, Image, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
@@ -34,9 +35,6 @@ export default function ConfirmEmailScreen() {
       const screenLoadTime = Date.now();
       setEmail(normalizedEmail);
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/confirm-email.tsx:36',message:'confirm-email screen loaded',data:{email:normalizedEmail,timestamp:screenLoadTime},timestamp:screenLoadTime,sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       
       // Don't auto-request code here - Supabase already sends one during signup
       // Auto-requesting immediately causes rate limiting (60 second cooldown)
@@ -98,9 +96,6 @@ export default function ConfirmEmailScreen() {
       // Calculate time since signup if available
       const timeSinceSignup = (globalThis as any)._lastSignupTime ? codeEntryTime - (globalThis as any)._lastSignupTime : null;
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/confirm-email.tsx:85',message:'user entered code',data:{email:normalizedEmail,codeLength:codeString.length,codeValue:codeString,timeSinceSignup,timestamp:codeEntryTime},timestamp:codeEntryTime,sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       
       // Verify the OTP code - this will try 'signup' type first, then 'email' type
       console.log('🔐 [handleVerifyCode] Calling verifyEmailCode...');

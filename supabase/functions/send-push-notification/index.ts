@@ -31,9 +31,6 @@ serve(async (req) => {
     const requestBody = await req.json();
     const { recipient_id, title, body, data, priority = 'default', badge } = requestBody;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'send-push-notification:31',message:'Edge Function received request',data:{recipient_id,title,body,recipient_role:data?.recipient_role||'unknown',full_request:JSON.stringify(requestBody)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
 
     console.log('[send-push-notification] Received request:', { 
       recipient_id, 
@@ -73,9 +70,6 @@ serve(async (req) => {
       );
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'send-push-notification:70',message:'Edge Function found user',data:{user_id:user.id,user_email:user.email,user_name:user.full_name,expected_recipient_id:recipient_id,recipient_role:data?.recipient_role||'unknown',body_text:body},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
 
     console.log('[send-push-notification] Found user:', {
       user_id: user.id,
@@ -178,9 +172,6 @@ serve(async (req) => {
     
     // If recipient_role is 'neighbor', verify body doesn't contain teen markers
     if (recipient_role === 'neighbor' && is_teen_notification) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'send-push-notification:118',message:'CRITICAL ERROR: Teen notification sent to neighbor',data:{recipient_id,recipient_role,body,title,user_email:user.email,user_name:user.full_name,user_role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       
       console.error('[send-push-notification] CRITICAL ERROR: Teen notification being sent to neighbor!', {
         recipient_id,

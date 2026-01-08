@@ -37,9 +37,6 @@ jest.mock('expo-router', () => ({
   }),
   useLocalSearchParams: () => ({}),
 }));
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: () => null,
-}));
 
 // Import LoginScreen after mocks
 const LoginScreen = require('@/app/auth/login').default;

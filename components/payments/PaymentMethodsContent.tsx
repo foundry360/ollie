@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, AppState, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, AppState, Image } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { getPaymentMethods, setDefaultPaymentMethod, removePaymentMethod } from '@/lib/api/payments';

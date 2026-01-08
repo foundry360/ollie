@@ -1,16 +1,7 @@
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:1',message:'Function file loading started',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-// #endregion
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:2',message:'serve import completed',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-// #endregion
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:3',message:'createClient import completed',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-// #endregion
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,20 +9,11 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:10',message:'corsHeaders defined, about to call serve()',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-// #endregion
 
 serve(async (req: Request) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:12',message:'Request handler called',data:{method:req.method,url:req.url,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:15',message:'OPTIONS handler executing',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     return new Response('ok', { 
       status: 200,
       headers: corsHeaders 
@@ -40,31 +22,19 @@ serve(async (req: Request) => {
 
   // Wrap everything in try-catch to ensure we always return a valid response
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:42',message:'POST request handler entered',data:{method:req.method,hasBody:!!req.body,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     console.log('=== create-bank-account-for-teen function called ===')
     
     // Get request body
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:45',message:'About to parse request body',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     let body: any
     try {
       body = await req.json()
     } catch (parseError: any) {
       console.error('Error parsing request body:', parseError)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:51',message:'Request body parse error',data:{errorMessage:parseError?.message,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       return new Response(
         JSON.stringify({ error: 'Invalid request body', details: parseError?.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:46',message:'Request body parsed',data:{hasSetupToken:!!body.setup_token,hasRoutingNumber:!!body.routing_number,hasAccountNumber:!!body.account_number,hasAccountType:!!body.account_type,hasBankName:!!body.bank_name,hasAccountHolderName:!!body.account_holder_name,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     console.log('Request body received:', {
       setup_token: body.setup_token ? '***' : undefined,
       routing_number: body.routing_number ? '***' : undefined,
@@ -84,13 +54,7 @@ serve(async (req: Request) => {
     } = body
 
     // Validate required fields
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:65',message:'Validating required fields',data:{hasSetupToken:!!setup_token,hasRoutingNumber:!!routing_number,hasAccountNumber:!!account_number,hasAccountType:!!account_type,hasBankName:!!bank_name,hasAccountHolderName:!!account_holder_name,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     if (!setup_token || !routing_number || !account_number || !account_type || !bank_name || !account_holder_name) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:66',message:'Validation failed - missing fields',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       return new Response(
         JSON.stringify({ error: 'Missing required fields: setup_token, routing_number, account_number, account_type, bank_name, account_holder_name' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -229,14 +193,8 @@ serve(async (req: Request) => {
     }
 
     // Initialize Stripe
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:183',message:'Checking Stripe secret key',data:{hasStripeKey:!!Deno.env.get('STRIPE_SECRET_KEY'),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'H'})}).catch(()=>{});
-    // #endregion
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY')
     if (!stripeSecretKey) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:185',message:'Stripe secret key missing',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'H'})}).catch(()=>{});
-      // #endregion
       console.error('STRIPE_SECRET_KEY not found in environment')
       return new Response(
         JSON.stringify({ error: 'Stripe not configured' }),
@@ -244,9 +202,6 @@ serve(async (req: Request) => {
       )
     }
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:192',message:'Stripe secret key found, proceeding',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'H'})}).catch(()=>{});
-    // #endregion
     console.log('Stripe secret key found, proceeding with customer lookup/creation...')
 
     // Get or create Stripe Customer
@@ -537,9 +492,6 @@ serve(async (req: Request) => {
       account_holder_type: 'individual'
     })
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:343',message:'About to create Stripe Payment Method',data:{customerId:customerId,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'I'})}).catch(()=>{});
-    // #endregion
     
     // Create the payment method
     const paymentMethodResponse = await fetch('https://api.stripe.com/v1/payment_methods', {
@@ -551,9 +503,6 @@ serve(async (req: Request) => {
       body: paymentMethodParams,
     })
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:377',message:'Stripe Payment Method API response received',data:{status:paymentMethodResponse.status,ok:paymentMethodResponse.ok,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'I'})}).catch(()=>{});
-    // #endregion
     console.log('Stripe Payment Method API response status:', paymentMethodResponse.status)
 
     const paymentMethod = await paymentMethodResponse.json()
@@ -635,9 +584,6 @@ serve(async (req: Request) => {
     }
 
     // Store bank account in database
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:430',message:'About to save bank account to database',data:{userId:teenUser.id,externalAccountId:externalAccountId,customerId:customerId,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'J'})}).catch(()=>{});
-    // #endregion
     const { data: savedAccount, error: saveError } = await supabase
       .from('bank_accounts')
       .insert({
@@ -658,9 +604,6 @@ serve(async (req: Request) => {
       .select()
       .single()
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:448',message:'Database save completed',data:{hasSavedAccount:!!savedAccount,hasSaveError:!!saveError,errorMessage:saveError?.message,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'J'})}).catch(()=>{});
-    // #endregion
 
     if (saveError) {
       console.error('Error saving bank account to database:', {
@@ -733,9 +676,6 @@ serve(async (req: Request) => {
     // After verification, it should be attached to the customer
 
     // Return success response
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:463',message:'Returning success response',data:{savedAccountId:savedAccount.id,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'K'})}).catch(()=>{});
-    // #endregion
     return new Response(
       JSON.stringify({
         success: true,
@@ -753,9 +693,6 @@ serve(async (req: Request) => {
     )
 
   } catch (error: any) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:552',message:'Error caught in handler',data:{errorType:error?.constructor?.name,errorMessage:error?.message,hasStack:!!error?.stack,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     console.error('=== UNHANDLED ERROR in create-bank-account-for-teen function ===')
     console.error('Error type:', error?.constructor?.name)
     console.error('Error message:', error?.message)
@@ -789,7 +726,4 @@ serve(async (req: Request) => {
     )
   }
 })
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'create-bank-account-for-teen/index.ts:498',message:'serve() call completed, function should be registered',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-// #endregion
 

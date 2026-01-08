@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -43,9 +44,6 @@ export function AddReviewModal({ visible, teenlancerId, neighborId, onClose, onR
         Alert.alert('Error', 'Invalid review target');
         return;
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/reviews/AddReviewModal.tsx:127',message:'AddReviewModal BEFORE createReview',data:{revieweeId,teenlancerId,neighborId,rating,hasComment:!!comment.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       console.log('AddReviewModal - Creating review:', { revieweeId, rating });
       
       const review = await createReview({
@@ -54,9 +52,6 @@ export function AddReviewModal({ visible, teenlancerId, neighborId, onClose, onR
         rating,
         comment: comment.trim() || undefined,
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/reviews/AddReviewModal.tsx:140',message:'AddReviewModal AFTER createReview',data:{reviewId:review.id,revieweeId:review.reviewee_id,reviewerId:review.reviewer_id,rating:review.rating},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       console.log('AddReviewModal - Review created:', review);
       console.log('AddReviewModal - Review reviewee_id:', review.reviewee_id, 'Review reviewer_id:', review.reviewer_id);
 
@@ -69,9 +64,6 @@ export function AddReviewModal({ visible, teenlancerId, neighborId, onClose, onR
         }}
       ]);
     } catch (error: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/reviews/AddReviewModal.tsx:150',message:'AddReviewModal ERROR creating review',data:{errorMessage:error?.message,errorCode:error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       console.error('Error creating review:', error);
       Alert.alert('Error', error.message || 'Failed to submit review');
     } finally {

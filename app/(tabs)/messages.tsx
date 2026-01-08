@@ -14,11 +14,6 @@ export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
   const isTeenlancer = user?.role === 'teen';
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/messages.tsx:10',message:'MessagesScreen mount',data:{insetsTop:insets.top,insetsBottom:insets.bottom},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  }, [insets.top, insets.bottom]);
-  // #endregion
   const {
     data: conversations = [],
     isLoading,

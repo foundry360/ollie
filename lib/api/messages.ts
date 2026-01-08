@@ -100,9 +100,6 @@ export async function getTaskMessages(taskId: string, recipientId?: string): Pro
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:149',message:'getTaskMessages API CALLED',data:{taskId,recipientId,currentUserId:user.id,stack:new Error().stack?.split('\n').slice(1,5).join('|')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
-  // #endregion
   
   const { data, error } = await supabase
     .from('messages')
@@ -138,16 +135,10 @@ export async function getConversations(): Promise<Array<{
   last_message: Message | null;
   unread_count: number;
 }>> {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:209',message:'getConversations called',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'J'})}).catch(()=>{});
-  // #endregion
   
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:216',message:'Fetching messages for conversations',data:{userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'J'})}).catch(()=>{});
-  // #endregion
 
   // Get all messages where user is sender or recipient
   const { data: messages, error } = await supabase
@@ -160,15 +151,9 @@ export async function getConversations(): Promise<Array<{
     .order('created_at', { ascending: false });
 
   if (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:228',message:'getConversations error',data:{error:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'J'})}).catch(()=>{});
-    // #endregion
     throw error;
   }
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:233',message:'Messages fetched for conversations',data:{messageCount:messages?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'J'})}).catch(()=>{});
-  // #endregion
 
   // Group by task_id
   const conversationsMap = new Map<string, {
@@ -185,9 +170,6 @@ export async function getConversations(): Promise<Array<{
   // Track seen keys to prevent duplicates
   const seenKeys = new Set<string>();
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:245',message:'Starting conversation grouping',data:{messageCount:messages?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'J'})}).catch(()=>{});
-  // #endregion
   
   for (const msg of messages || []) {
     const task = (msg as any).task;
@@ -196,15 +178,9 @@ export async function getConversations(): Promise<Array<{
     const otherUserId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
     const key = `${task.id}-${otherUserId}`;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:253',message:'Processing message for conversation',data:{messageId:msg.id,key,otherUserId,taskId:task.id,alreadySeen:seenKeys.has(key)},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'J'})}).catch(()=>{});
-    // #endregion
 
     // Skip if we've already processed this conversation (prevent duplicates)
     if (seenKeys.has(key)) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:260',message:'Duplicate key detected, updating existing conversation',data:{key,hasConversation:conversationsMap.has(key)},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'J'})}).catch(()=>{});
-      // #endregion
       // Update existing conversation if this message is newer
       const conv = conversationsMap.get(key);
       if (conv) {
@@ -255,25 +231,16 @@ export async function getConversations(): Promise<Array<{
     return new Date(b.last_message.created_at).getTime() - new Date(a.last_message.created_at).getTime();
   });
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:300',message:'getConversations result',data:{conversationCount:conversations.length,conversationKeys:conversations.map(c=>`${c.gig_id}-${c.other_user_id}`),totalUnread:conversations.reduce((sum,c)=>sum+c.unread_count,0)},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'J'})}).catch(()=>{});
-  // #endregion
   
   return conversations;
 }
 
 // Mark messages as read
 export async function markMessagesAsRead(taskId: string, senderId: string): Promise<void> {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:287',message:'markMessagesAsRead called',data:{taskId,senderId},timestamp:Date.now(),sessionId:'debug-session',runId:'run4',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:293',message:'Updating messages to read',data:{taskId,senderId,recipientId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run4',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
 
   const { data, error } = await supabase
     .from('messages')
@@ -284,9 +251,6 @@ export async function markMessagesAsRead(taskId: string, senderId: string): Prom
     .eq('read', false)
     .select();
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/api/messages.ts:302',message:'markMessagesAsRead result',data:{updatedCount:data?.length || 0,error:error?.message || null},timestamp:Date.now(),sessionId:'debug-session',runId:'run4',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
 
   if (error) throw error;
 }

@@ -126,3 +126,4 @@ GRANT EXECUTE ON FUNCTION create_missing_completion_approval(UUID) TO authentica
 
 
 
+

@@ -22,11 +22,6 @@ export default function EarningsScreen() {
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/earnings.tsx:12',message:'EarningsScreen mount',data:{insetsTop:insets.top,insetsBottom:insets.bottom},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  }, [insets.top, insets.bottom]);
-  // #endregion
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid'>('all');
   const [dateFilter, setDateFilter] = useState<DateFilterOption>('all-time');
   const [selectedEarning, setSelectedEarning] = useState<EarningsRecord | null>(null);

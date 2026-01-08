@@ -15,6 +15,16 @@ jobs:
       matrix:
         node-version: [18.x, 20.x]
     
+    env:
+      # Test environment variables (mocked in tests, but needed for module initialization)
+      EXPO_PUBLIC_SUPABASE_URL: https://test.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      EXPO_PUBLIC_SENTRY_DSN: https://test@sentry.io/test
+      EXPO_PUBLIC_WEB_APP_URL: http://localhost:8081
+      EXPO_PUBLIC_PROJECT_ID: test-project-id
+      CI: true
+      NODE_ENV: test
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,6 +40,7 @@ jobs:
       
       - name: Run unit tests
         run: npm run test:unit
+        continue-on-error: false
       
       - name: Run integration tests
         run: npm run test:integration
@@ -55,6 +66,16 @@ jobs:
   lint-and-typecheck:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    
+    env:
+      # Environment variables for type checking
+      EXPO_PUBLIC_SUPABASE_URL: https://test.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      EXPO_PUBLIC_SENTRY_DSN: https://test@sentry.io/test
+      EXPO_PUBLIC_WEB_APP_URL: http://localhost:8081
+      EXPO_PUBLIC_PROJECT_ID: test-project-id
+      CI: true
+      NODE_ENV: test
     
     steps:
       - name: Checkout code

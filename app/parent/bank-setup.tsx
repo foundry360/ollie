@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Pressable, KeyboardAvoidingView, Platform, Image, Dimensions, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Platform, Image, Dimensions, Modal } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -271,21 +272,12 @@ export default function ParentBankSetupScreen() {
   }, [params.token]);
 
   const onSubmit = async (data: BankAccountFormData) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:208',message:'onSubmit called',data:{hasApprovalData:!!approvalData,hasToken:!!params.token,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'L'})}).catch(()=>{});
-    // #endregion
     if (!approvalData || !params.token) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:210',message:'Validation failed - missing approvalData or token',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'L'})}).catch(()=>{});
-      // #endregion
       Alert.alert('Error', 'Invalid setup token. Please use the link from your email.');
       return;
     }
 
     setIsSubmitting(true);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:214',message:'About to call edge function',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'M'})}).catch(()=>{});
-    // #endregion
     try {
       // Call edge function to create bank account for the teen
       let result: any, submitError: any
@@ -330,13 +322,7 @@ export default function ParentBankSetupScreen() {
           }
         }
         
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:228',message:'Function invoke response',data:{hasData:!!result,hasError:!!submitError,dataKeys:result?Object.keys(result):[],resultStringified:JSON.stringify(result||{}),errorMessage:submitError?.message,errorDetails:submitError?.details,errorContext:JSON.stringify((submitError as any)?.context||{}),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'M'})}).catch(()=>{});
-        // #endregion
       } catch (invokeError: any) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:260',message:'Exception during function invoke',data:{errorMessage:invokeError?.message,errorType:invokeError?.constructor?.name,errorStack:invokeError?.stack,errorContext:JSON.stringify(invokeError?.context||{}),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'M'})}).catch(()=>{});
-        // #endregion
         submitError = invokeError
       }
       
@@ -427,9 +413,6 @@ export default function ParentBankSetupScreen() {
         }
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:240',message:'Edge function response received',data:{hasResult:!!result,hasError:!!submitError,resultSuccess:result?.success,resultError:result?.error,resultErrorType:result?.error_type,resultDetails:result?.details,errorMessage:submitError?.message,errorContext:submitError?.context,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'M'})}).catch(()=>{});
-      // #endregion
       
       // Log the full result for debugging
       console.log('Full function response:', { result, submitError })
@@ -447,9 +430,6 @@ export default function ParentBankSetupScreen() {
       }
 
       if (submitError) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:325',message:'submitError detected, throwing',data:{errorMessage:submitError?.message,errorDetails:submitError?.details,errorContext:JSON.stringify(submitError?.context||{}),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'M'})}).catch(()=>{});
-        // #endregion
         
         // Extract error message properly - handle Response objects and other edge cases
         let errorMsg = 'Failed to set up bank account'
@@ -484,16 +464,10 @@ export default function ParentBankSetupScreen() {
       }
 
       if (!result?.success) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:266',message:'result.success is false, throwing',data:{resultError:result?.error,resultErrorType:result?.error_type,resultDetails:result?.details,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'M'})}).catch(()=>{});
-        // #endregion
         const errorMsg = result?.details || result?.error || 'Failed to set up bank account';
         throw new Error(errorMsg);
       }
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:236',message:'Success - showing alert',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'M'})}).catch(()=>{});
-      // #endregion
 
       Alert.alert(
         'Bank Account Setup Complete',
@@ -515,9 +489,6 @@ export default function ParentBankSetupScreen() {
         ]
       );
     } catch (error: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:260',message:'Error caught in onSubmit',data:{errorMessage:error?.message,errorType:error?.constructor?.name,errorStack:error?.stack,errorContext:JSON.stringify(error?.context||{}),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'N'})}).catch(()=>{});
-      // #endregion
       console.error('Error setting up bank account:', error);
       console.error('Error details:', {
         message: error?.message,
@@ -528,9 +499,6 @@ export default function ParentBankSetupScreen() {
       const errorMessage = error?.context?.message || error?.message || 'Failed to set up bank account. Please try again.';
       Alert.alert('Error', errorMessage);
     } finally {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'bank-setup.tsx:257',message:'onSubmit finally block - setting isSubmitting to false',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'N'})}).catch(()=>{});
-      // #endregion
       setIsSubmitting(false);
     }
   };

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, Platform, Alert, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, Platform, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';

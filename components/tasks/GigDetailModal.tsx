@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Pressable, Linking, Platform, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Linking, Platform, Modal, Dimensions } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { ThreeDotsLoader } from '@/components/ui/Loading';
 import { useTask, useStartTask, useCompleteTask, useIsGigSaved, useSaveGig, useUnsaveGig, useDeleteTask, useUpdateTask, taskKeys } from '@/hooks/useTasks';
@@ -414,9 +415,6 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
       isOpen,
     });
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/tasks/GigDetailModal.tsx:330',message:'handleChat called',data:{taskId:task.id,taskStatus:task.status,taskTeenId:task.teen_id,taskPosterId:task.poster_id,isNeighbor,isTeenlancer,isOpen},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     
     onClose();
     
@@ -526,9 +524,6 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                 {task.photos && task.photos.length > 0 ? (
                   (() => {
                     const imageUrl = task.photos[0];
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:438',message:'Rendering gig image',data:{hasPhotos:!!task.photos,photoCount:task.photos?.length,imageUrl,isValidUrl:imageUrl?.startsWith('http')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                    // #endregion
                     return (
                       <OptimizedImage 
                         source={{ uri: imageUrl }} 
@@ -537,15 +532,9 @@ export function GigDetailModal({ visible, taskId, onClose }: GigDetailModalProps
                         cachePolicy="memory-disk"
                         transition={200}
                         onError={(error: any) => {
-                          // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:446',message:'Gig image onError',data:{imageUrl,error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                          // #endregion
                           console.log('Gig image load error:', error, 'URL:', imageUrl);
                         }}
                         onLoad={() => {
-                          // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GigDetailModal.tsx:451',message:'Gig image onLoad',data:{imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                          // #endregion
                           console.log('Gig image loaded successfully:', imageUrl);
                         }}
                       />

@@ -58,9 +58,6 @@ export function ProfileModal({ visible, userId, onClose, onSelect, showSelectBut
 
   useEffect(() => {
     if (visible && userId) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:40',message:'Modal opened - initial state',data:{visible,userId,isNeighbor,isDark,headerZIndex:10,scrollWrapperMarginTop:80},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       loadProfile();
       if (isNeighbor && userId) {
         findExistingGig();
@@ -280,23 +277,10 @@ export function ProfileModal({ visible, userId, onClose, onSelect, showSelectBut
       <View style={styles.modalOverlay}>
         <Pressable style={styles.overlayPressable} onPress={onClose} />
         <View style={[styles.modalContent, modalStyle]}>
-          {/* #region agent log */}
-          {(() => {
-            fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:270',message:'ModalContent render',data:{hasOverflow:false,flexDirection:'column'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            return null;
-          })()}
-          {/* #endregion */}
           {isNeighbor && (
             <View style={styles.greenHeaderBackground} />
           )}
           <View style={[styles.modalHeader, headerStyle, isNeighbor && styles.modalHeaderWithGreen]}>
-            {/* #region agent log */}
-            {(() => {
-              const headerBg = isNeighbor ? 'transparent' : (isDark ? '#111827' : '#FFFFFF');
-              fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:284',message:'Header render - BEFORE ScrollView (original solution)',data:{isNeighbor,isDark,headerBg,zIndex:100,position:'absolute',renderedBeforeScrollView:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run3',hypothesisId:'C'})}).catch(()=>{});
-              return null;
-            })()}
-            {/* #endregion */}
             <View style={[styles.handle, isNeighbor && styles.handleOnGreen]} />
             <View style={styles.headerRow}>
               <Text style={[styles.modalTitle, titleStyle, isNeighbor && styles.modalTitleOnGreen]}>
@@ -342,10 +326,6 @@ export function ProfileModal({ visible, userId, onClose, onSelect, showSelectBut
               bounces={false}
               contentInsetAdjustmentBehavior="never"
               onScroll={(e) => {
-                // #region agent log
-                const scrollY = e.nativeEvent.contentOffset.y;
-                fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProfileModal.tsx:300',message:'Scroll event - checking if content goes over header',data:{scrollY,contentHeight:e.nativeEvent.contentSize.height,layoutHeight:e.nativeEvent.layoutMeasurement.height,scrollWrapperPaddingTop:75,avatarMarginTop:-25},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'E'})}).catch(()=>{});
-                // #endregion
               }}
               scrollEventThrottle={16}
             >

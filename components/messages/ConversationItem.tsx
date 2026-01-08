@@ -34,9 +34,6 @@ export function ConversationItem({
   const isDark = colorScheme === 'dark';
 
   const handlePress = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/messages/ConversationItem.tsx:33',message:'ConversationItem handlePress',data:{task_id,other_user_id,url:`/chat/${task_id}?recipientId=${other_user_id}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
-    // #endregion
     // Pass other_user_id as recipientId so the chat screen knows who to message
     router.push(`/chat/${task_id}?recipientId=${other_user_id}`);
   };

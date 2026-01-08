@@ -125,3 +125,16 @@ export interface PaymentIntent {
 
 export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded';
 
+export interface VerificationRequest {
+  id: string;
+  user_id: string;
+  front_photo_url: string;
+  back_photo_url?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  reviewed_by?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+

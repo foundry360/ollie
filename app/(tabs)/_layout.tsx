@@ -19,12 +19,6 @@ function HeaderLeft() {
   const segments = useSegments();
   const isDark = colorScheme === 'dark';
 
-  // #region agent log
-  useEffect(() => {
-    const currentRoute = segments[segments.length - 1];
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/_layout.tsx:14',message:'HeaderLeft render/segment change',data:{currentRoute,segments:segments.join('/'),drawerOpen},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-  }, [segments, drawerOpen]);
-  // #endregion
 
   // Hide the avatar when drawer is open
   if (drawerOpen) {
@@ -82,11 +76,6 @@ function HeaderRight() {
   const hideNotificationRoutes = ['profile', 'settings', 'qr-code', 'notifications'];
   const showNotification = !hideNotificationRoutes.includes(currentRoute);
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/_layout.tsx:66',message:'HeaderRight render/segment change',data:{currentRoute,showNotification,segments:segments.join('/'),unreadCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
-  }, [segments, showNotification, unreadCount]);
-  // #endregion
 
   // Always render a container to prevent layout shifts, but hide content when not on main screens
   return (
@@ -196,12 +185,6 @@ export default function TabLayout() {
     };
   }, [user?.id, queryClient]);
 
-  // #region agent log
-  useEffect(() => {
-    const currentRoute = segments[segments.length - 1];
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/_layout.tsx:100',message:'TabLayout render/segment change',data:{isDark,colorScheme,currentRoute,segments:segments.join('/')},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'F'})}).catch(()=>{});
-  }, [segments, isDark, colorScheme]);
-  // #endregion
 
   // Memoize header style config to prevent recreation on every render
   const headerStyleConfig = useMemo(() => ({
@@ -288,11 +271,6 @@ export default function TabLayout() {
     tabBarLabelStyle,
   }), [isDark, headerLeft, headerRight, headerTitle, tabBarStyle, headerStyleConfig, headerTitleContainerStyle, headerLeftContainerStyle, headerRightContainerStyle, tabBarLabelStyle]);
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/_layout.tsx:145',message:'Screen options memoized',data:{headerHeight:headerStyleConfig.height,paddingBottom:24,isDark},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
-  }, [isDark, headerStyleConfig.height]);
-  // #endregion
 
   return (
     <Drawer>

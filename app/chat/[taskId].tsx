@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Pressable, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Pressable, Image } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTask } from '@/hooks/useTasks';

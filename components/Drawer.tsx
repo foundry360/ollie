@@ -1,5 +1,5 @@
 import { useState, createContext } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, ScrollView, Platform } from 'react-native';
 import { Drawer as DrawerLayout } from 'react-native-drawer-layout';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import { signOut } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert } from '@/components/ui/Alert';
 
 // Create a context to pass openDrawer function and drawer state
 export const DrawerContext = createContext<{ openDrawer: () => void; drawerOpen: boolean }>({ 
@@ -35,13 +36,12 @@ export function Drawer({ children }: DrawerProps) {
 
   const handleLogout = async () => {
     Alert.alert(
-      'Logout',
+      'Come back soon!',
       'Are you sure you want to logout?',
       [
-        { text: 'Cancel', style: 'cancel', onPress: closeDrawer },
         {
-          text: 'Logout',
-          style: 'destructive',
+          text: 'Yes',
+          style: 'default',
           onPress: async () => {
             try {
               // Clear user state first
@@ -64,10 +64,11 @@ export function Drawer({ children }: DrawerProps) {
               setUser(null);
               closeDrawer();
               router.replace('/splash');
-              Alert.alert('Logout', 'You have been logged out.');
+              Alert.alert('Come back soon!', 'You have been logged out.');
             }
           },
         },
+        { text: 'No', style: 'cancel', onPress: closeDrawer },
       ]
     );
   };

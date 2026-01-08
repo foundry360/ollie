@@ -416,7 +416,12 @@ export async function getUserTasks(filters?: {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data || [];
+  
+  // Normalize photos field like other functions
+  return (data || []).map(task => {
+    const photos = normalizePhotos(task.photos);
+    return { ...task, photos };
+  });
 }
 
 // Update task
@@ -700,9 +705,6 @@ export async function completeTask(taskId: string): Promise<Task> {
     throw new Error('Task must be in progress before completing');
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tasks.ts:703',message:'About to update gig status to pending_completion_approval',data:{taskId,currentStatus:task.status,teenId:task.teen_id,userId:user.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   
   // Set status to pending_completion_approval - neighbor must approve before payment
   const { data: updatedTask, error } = await supabase
@@ -712,9 +714,6 @@ export async function completeTask(taskId: string): Promise<Task> {
     .select()
     .single();
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'tasks.ts:710',message:'Gig status updated to pending_completion_approval',data:{taskId,updatedTask:updatedTask?.id,newStatus:updatedTask?.status,error:error?.message,posterId:updatedTask?.poster_id,teenId:updatedTask?.teen_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
 
   if (error) {
     // Log detailed error for debugging

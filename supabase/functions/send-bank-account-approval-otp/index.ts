@@ -11,9 +11,6 @@ const corsHeaders = {
 // Note: OTP code generation removed - Twilio Verify generates the code automatically
 
 serve(async (req: Request) => {
-  // #region agent log
-  console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:22',message:'Function entry',data:{method:req.method,hasAuthHeader:!!req.headers.get('Authorization')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'}));
-  // #endregion
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -27,9 +24,6 @@ serve(async (req: Request) => {
     // Get authenticated user
     const authHeader = req.headers.get('Authorization')
     
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:35',message:'Auth header check',data:{hasAuthHeader:!!authHeader,authHeaderLength:authHeader?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'}));
-    // #endregion
     
     if (!authHeader) {
       return new Response(
@@ -42,9 +36,6 @@ serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:47',message:'Environment variables check',data:{hasSupabaseUrl:!!supabaseUrl,hasServiceKey:!!supabaseServiceKey},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'}));
-    // #endregion
     
     if (!supabaseUrl || !supabaseServiceKey) {
       return new Response(
@@ -58,15 +49,9 @@ serve(async (req: Request) => {
     // Verify user token
     const token = authHeader.replace('Bearer ', '')
     
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:52',message:'Before getUser',data:{tokenLength:token.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'}));
-    // #endregion
     
     const { data: { user }, error: userError } = await supabase.auth.getUser(token)
 
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:57',message:'After getUser',data:{hasUser:!!user,hasError:!!userError,errorMessage:userError?.message,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'}));
-    // #endregion
 
     if (userError || !user) {
       return new Response(
@@ -82,9 +67,6 @@ serve(async (req: Request) => {
       .eq('id', user.id)
       .single()
 
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:70',message:'After teen user query',data:{hasTeenUser:!!teenUser,hasError:!!teenError,errorMessage:teenError?.message,teenRole:teenUser?.role,hasParentId:!!teenUser?.parent_id,parentId:teenUser?.parent_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'}));
-    // #endregion
 
     if (teenError || !teenUser) {
       return new Response(
@@ -116,9 +98,6 @@ serve(async (req: Request) => {
       .eq('id', teenUser.parent_id)
       .single()
 
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:95',message:'After parent user query',data:{hasParentUser:!!parentUser,hasError:!!parentError,errorMessage:parentError?.message,hasPhone:!!parentUser?.phone,phoneLength:parentUser?.phone?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'}));
-    // #endregion
 
     if (parentError || !parentUser) {
       console.error('Parent user query error:', parentError)
@@ -229,9 +208,6 @@ serve(async (req: Request) => {
     // For now, use a placeholder that will be replaced
     approvalData.otp_code = 'PENDING_VERIFICATION'
 
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:178',message:'Before upsert approval',data:{teenId:approvalData.teen_id,hasParentPhone:!!approvalData.parent_phone},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'}));
-    // #endregion
     
     const { data: approval, error: approvalError } = await supabase
       .from('bank_account_approvals')
@@ -242,9 +218,6 @@ serve(async (req: Request) => {
       .select()
       .single()
 
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:189',message:'After upsert approval',data:{hasApproval:!!approval,hasError:!!approvalError,errorMessage:approvalError?.message,errorCode:approvalError?.code,errorDetails:approvalError?.details},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'}));
-    // #endregion
 
     if (approvalError) {
       console.error('Error creating approval record:', approvalError)
@@ -378,9 +351,6 @@ serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error: any) {
-    // #region agent log
-    console.log(JSON.stringify({location:'send-bank-account-approval-otp/index.ts:270',message:'Catch block error',data:{errorMessage:error?.message,errorName:error?.name,errorStack:error?.stack},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'}));
-    // #endregion
     
     console.error('Error in send-bank-account-approval-otp:', error)
     return new Response(

@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, FlatList, RefreshControl, Pressable, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, FlatList, RefreshControl, Pressable, TextInput } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';

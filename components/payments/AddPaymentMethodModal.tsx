@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, Platform, Image } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { useThemeStore } from '@/stores/themeStore';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheet } from '@/components/ui/BottomSheet';

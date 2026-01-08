@@ -69,10 +69,20 @@ export function useUserTasks(filters?: {
   status?: TaskStatus;
   role?: 'poster' | 'teen';
 }) {
+  const queryClient = useQueryClient();
+  const queryKey = taskKeys.user(filters);
+  
+  // Check if data exists in cache
+  const cachedData = queryClient.getQueryData(queryKey);
+  
   return useQuery({
-    queryKey: taskKeys.user(filters),
+    queryKey,
     queryFn: () => getUserTasks(filters),
     staleTime: 30000,
+    refetchOnMount: true, // Always refetch on mount to ensure fresh data
+    // If data exists in cache, use it immediately and don't show loading
+    initialData: cachedData ? () => cachedData : undefined,
+    placeholderData: cachedData ? () => cachedData : undefined,
   });
 }
 

@@ -13,21 +13,6 @@ export function HomeHeader() {
   const isDark = colorScheme === 'dark';
   const { data: stats, isLoading, error, isError, status } = useTeenStats();
   const [showReviewsModal, setShowReviewsModal] = useState(false);
-  // #region agent log
-  useEffect(() => {
-    const statsStr = stats ? JSON.stringify(stats) : 'null';
-    const ratingValue = stats?.rating;
-    const reviewCountValue = stats?.reviewCount;
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/home/HomeHeader.tsx:14',message:'HomeHeader stats data',data:{isLoading,hasStats:!!stats,statsObject:statsStr,rating:ratingValue,ratingType:typeof ratingValue,reviewCount:reviewCountValue,reviewCountType:typeof reviewCountValue,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    console.log('HomeHeader render - stats:', stats, 'isLoading:', isLoading, 'error:', error, 'isError:', isError, 'status:', status);
-    console.log('HomeHeader - rating:', ratingValue, 'type:', typeof ratingValue, 'reviewCount:', reviewCountValue, 'type:', typeof reviewCountValue);
-    if (stats) {
-      console.log('HomeHeader - Full stats object:', JSON.stringify(stats, null, 2));
-    } else {
-      console.log('HomeHeader - stats is NULL/UNDEFINED - error:', error, 'isError:', isError, 'status:', status);
-    }
-  }, [stats, isLoading, error, isError, status, user?.id]);
-  // #endregion
 
   const greeting = getGreeting();
   const userName = user?.full_name?.split(' ')[0] || 'there';

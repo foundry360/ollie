@@ -4,11 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { useTeenStats } from '@/hooks/useTeenStats';
-import { useNeighborStats } from '@/hooks/useNeighborStats';
-import { useWeeklyEarnings } from '@/hooks/useWeeklyEarnings';
-import { useRecentActivity } from '@/hooks/useRecentActivity';
-import { useActiveTask, useUserTasks } from '@/hooks/useTasks';
+import { useTeenStats, teenStatsKeys } from '@/hooks/useTeenStats';
+import { useNeighborStats, neighborStatsKeys } from '@/hooks/useNeighborStats';
+import { useWeeklyEarnings, weeklyEarningsKeys } from '@/hooks/useWeeklyEarnings';
+import { useRecentActivity, activityKeys } from '@/hooks/useRecentActivity';
+import { useActiveTask, useUserTasks, taskKeys } from '@/hooks/useTasks';
 import { useUpcomingTasks } from '@/hooks/useTasks';
 import { useQueryClient } from '@tanstack/react-query';
 import { HomeHeader } from '@/components/home/HomeHeader';
@@ -32,11 +32,6 @@ export default function HomeScreen() {
   const isDark = colorScheme === 'dark';
   const queryClient = useQueryClient();
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/home.tsx:22',message:'HomeScreen mount',data:{isTeen:user?.role === 'teen'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  }, [user?.role]);
-  // #endregion
 
   // Check user role
   const isTeen = user?.role === 'teen';
@@ -44,12 +39,6 @@ export default function HomeScreen() {
 
   // Fetch data for teen home screen
   const { data: teenStats, isLoading: teenStatsLoading, refetch: refetchTeenStats } = useTeenStats();
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/home.tsx:43',message:'home.tsx teenStats data',data:{isLoading:teenStatsLoading,hasStats:!!teenStats,statsObject:teenStats ? JSON.stringify(teenStats) : 'null',rating:teenStats?.rating,reviewCount:teenStats?.reviewCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    console.log('home.tsx - teenStats:', teenStats, 'isLoading:', teenStatsLoading, 'rating:', teenStats?.rating, 'reviewCount:', teenStats?.reviewCount);
-  }, [teenStats, teenStatsLoading]);
-  // #endregion
   const { data: weeklyEarnings, isLoading: earningsLoading, refetch: refetchEarnings } = useWeeklyEarnings();
   const { data: activities, isLoading: activitiesLoading, refetch: refetchActivities } = useRecentActivity(5);
   const { data: activeTask, isLoading: activeTaskLoading, refetch: refetchActiveTask } = useActiveTask();
@@ -81,8 +70,26 @@ export default function HomeScreen() {
     role: 'poster',
   });
 
-  const teenIsLoading = teenStatsLoading || earningsLoading || activitiesLoading || activeTaskLoading || upcomingLoading;
-  const neighborIsLoading = neighborStatsLoading || neighborGigsLoading;
+  // For teen loading: only show loading if critical data doesn't exist AND is loading
+  // This prevents showing loading if data was prefetched and is already in cache
+  // Individual components will handle their own loading states gracefully
+  const teenStatsInCache = queryClient.getQueryData(teenStatsKeys.stats());
+  const teenTasksInCache = queryClient.getQueryData(taskKeys.user({ role: 'teen' }));
+  const earningsInCache = queryClient.getQueryData(weeklyEarningsKeys.data());
+  const activitiesInCache = queryClient.getQueryData(activityKeys.recent(5));
+  const teenIsLoading = (
+    (teenStatsLoading && !teenStatsInCache) ||
+    (earningsLoading && !earningsInCache) ||
+    (activitiesLoading && !activitiesInCache) ||
+    (activeTaskLoading) ||
+    (upcomingLoading && !teenTasksInCache)
+  );
+  
+  // For neighbor loading: only show loading if data doesn't exist AND is loading
+  // This prevents showing loading if data was prefetched and is already in cache
+  const neighborStatsInCache = queryClient.getQueryData(neighborStatsKeys.stats());
+  const neighborGigsInCache = queryClient.getQueryData(taskKeys.user({ role: 'poster' }));
+  const neighborIsLoading = (neighborStatsLoading && !neighborStatsInCache) || (neighborGigsLoading && !neighborGigsInCache);
 
   const handleTeenRefresh = useCallback(() => {
     refetchTeenStats();

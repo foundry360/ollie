@@ -20,17 +20,6 @@ serve(async (req) => {
   let earnings_id: string | null = null; // Store for error handling
 
   try {
-    // #region agent log - Check request details
-    const contentType = req.headers.get('content-type') || 'none'
-    const contentLength = req.headers.get('content-length')
-    console.log('Request details:', {
-      method: req.method,
-      contentType,
-      contentLength,
-      url: req.url,
-      hasBody: req.body !== null,
-    })
-    // #endregion
 
     // Check if body is expected
     if (req.method !== 'POST') {
@@ -321,17 +310,41 @@ serve(async (req) => {
       .eq('key', 'platform_fee_percentage')
       .single()
 
-    const platformFeePercentage = feeSetting ? parseFloat(feeSetting.value) : 0.10 // Default 10%
+    const platformFeePercentage = feeSetting ? parseFloat(feeSetting.value) : 0.12 // Default 12%
+    
+    // Calculate amount to charge neighbor including Stripe fees
+    // We want to receive gig.pay after Stripe fees, so:
+    // total - (total × 0.029 + $0.30) = gig.pay
+    // total × (1 - 0.029) = gig.pay + $0.30
+    // total = (gig.pay + $0.30) / 0.971
+    const STRIPE_FEE_PERCENTAGE = 0.029 // 2.9%
+    const STRIPE_FIXED_FEE = 0.30 // $0.30
+    const totalToCharge = (gig.pay + STRIPE_FIXED_FEE) / (1 - STRIPE_FEE_PERCENTAGE)
+    const estimatedStripeFee = (totalToCharge * STRIPE_FEE_PERCENTAGE) + STRIPE_FIXED_FEE
+    
+    // Calculate platform fee on the net amount (gig.pay), not the total charged
     const platformFeeAmount = Math.round(gig.pay * platformFeePercentage * 100) / 100
     const transferAmount = gig.pay - platformFeeAmount
+    
+    console.log('Fee calculation:', {
+      gig_pay: gig.pay,
+      total_to_charge: totalToCharge,
+      estimated_stripe_fee: estimatedStripeFee,
+      net_after_stripe_fee: totalToCharge - estimatedStripeFee,
+      platform_fee_percentage: platformFeePercentage,
+      platform_fee: platformFeeAmount,
+      transfer_to_teen: transferAmount,
+    })
 
     // Stripe minimum charge amount is $0.50 USD (50 cents)
     const STRIPE_MINIMUM_AMOUNT = 0.50
-    const amountInCents = Math.round(gig.pay * 100)
+    // Check minimum on the total amount to charge (including fees)
+    const amountInCents = Math.round(totalToCharge * 100)
     
-    if (gig.pay < STRIPE_MINIMUM_AMOUNT) {
+    if (totalToCharge < STRIPE_MINIMUM_AMOUNT) {
       console.error('Payment amount too small:', {
-        amount: gig.pay,
+        gig_pay: gig.pay,
+        total_to_charge: totalToCharge,
         minimum: STRIPE_MINIMUM_AMOUNT,
         amountInCents,
       })
@@ -341,15 +354,15 @@ serve(async (req) => {
         .from('earnings')
         .update({
           payment_status: 'failed',
-          payment_failed_reason: `Payment amount ($${gig.pay.toFixed(2)}) is below Stripe's minimum of $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}`,
+          payment_failed_reason: `Payment amount ($${totalToCharge.toFixed(2)} including fees) is below Stripe's minimum of $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}`,
         })
         .eq('id', earnings_id)
 
       return new Response(
         JSON.stringify({ 
           error: 'Payment amount too small',
-          message: `Payment amount ($${gig.pay.toFixed(2)}) is below Stripe's minimum charge of $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}. Please ensure gig pay is at least $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}.`,
-          amount: gig.pay,
+          message: `Payment amount ($${totalToCharge.toFixed(2)} including fees) is below Stripe's minimum charge of $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}. Please ensure gig pay is at least $${STRIPE_MINIMUM_AMOUNT.toFixed(2)}.`,
+          amount: totalToCharge,
           minimum_amount: STRIPE_MINIMUM_AMOUNT,
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -426,7 +439,9 @@ serve(async (req) => {
 
     console.log('Creating simplified Payment Intent:', {
       amount: amountInCents,
-      amountInDollars: gig.pay,
+      amountInDollars: totalToCharge,
+      gig_pay: gig.pay,
+      stripe_fee: estimatedStripeFee,
       customer: paymentMethod.stripe_customer_id,
       payment_method: paymentMethod.stripe_payment_method_id,
       off_session: true,
@@ -443,19 +458,6 @@ serve(async (req) => {
 
     const paymentIntent = await paymentIntentResponse.json()
     
-    // #region agent log - Payment Intent response
-    console.log('Payment Intent API response:', {
-      ok: paymentIntentResponse.ok,
-      status: paymentIntentResponse.status,
-      paymentIntentStatus: paymentIntent.status,
-      paymentIntentId: paymentIntent.id,
-      requiresAction: paymentIntent.status === 'requires_action',
-      requiresPaymentMethod: paymentIntent.status === 'requires_payment_method',
-      succeeded: paymentIntent.status === 'succeeded',
-      clientSecret: paymentIntent.client_secret,
-      nextAction: paymentIntent.next_action,
-    })
-    // #endregion
 
     if (!paymentIntentResponse.ok) {
       console.error('Payment Intent creation error:', {
@@ -492,18 +494,6 @@ serve(async (req) => {
       )
     }
 
-    // #region agent log - Payment Intent status check
-    console.log('Payment Intent created successfully:', {
-      id: paymentIntent.id,
-      status: paymentIntent.status,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      customer: paymentIntent.customer,
-      payment_method: paymentIntent.payment_method,
-      charges: paymentIntent.charges?.data?.length || 0,
-      latest_charge: paymentIntent.latest_charge,
-    })
-    // #endregion
 
     // Handle payment status
     // If requires_action, the payment needs 3D Secure - we'll handle via webhook
@@ -524,18 +514,11 @@ serve(async (req) => {
       paymentStatus = 'processing'
     }
     
-    // #region agent log - Earnings update
-    console.log('Updating earnings with payment status:', {
-      earnings_id,
-      payment_status: paymentStatus,
-      payment_intent_id: paymentIntent.id,
-      payment_intent_status: paymentIntent.status,
-    })
-    // #endregion
     
     // Update earnings with payment info
     const updateData: any = {
       stripe_payment_intent_id: paymentIntent.id,
+      stripe_fee_amount: estimatedStripeFee, // Store Stripe fee charged to neighbor
       platform_fee_amount: platformFeeAmount,
       payment_status: paymentStatus,
     }
@@ -561,13 +544,6 @@ serve(async (req) => {
     if (updateError) {
       console.error('Error updating earnings:', updateError)
     } else {
-      // #region agent log - Earnings updated
-      console.log('Earnings updated successfully:', {
-        earnings_id: updatedEarnings?.id,
-        payment_status: updatedEarnings?.payment_status,
-        stripe_payment_intent_id: updatedEarnings?.stripe_payment_intent_id,
-      })
-      // #endregion
     }
 
     return new Response(

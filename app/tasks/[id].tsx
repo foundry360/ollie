@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable, Linking, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable, Linking, Platform, ActivityIndicator } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTask, useAcceptTask, useStartTask, useCompleteTask, useCancelTask } from '@/hooks/useTasks';
@@ -179,9 +180,6 @@ export default function TaskDetailScreen() {
       isTeen,
     });
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/tasks/[id].tsx:125',message:'handleChat called',data:{taskId:task?.id,taskStatus:task?.status,taskTeenId:task?.teen_id,taskPosterId:task?.poster_id,userId:user?.id,isPoster,isTeen},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     
     // For neighbors on open gigs, they need to select an applicant first
     if (isPoster && task?.status === 'open' && !task?.teen_id) {

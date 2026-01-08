@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, Pressable, Image, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -121,18 +122,6 @@ export default function CompleteNeighborProfileScreen() {
       return;
     }
     
-    // #region agent log
-    console.log('[DEBUG] complete-neighbor-profile - User ID verification', {
-      authUserId: authUser?.id,
-      storeUserId: userId,
-      applicationUserId: application?.user_id,
-      targetUserId,
-      authMatchesApplication: authUser?.id === application?.user_id,
-      authMatchesStore: authUser?.id === userId,
-      authMatchesTarget: authUser?.id === targetUserId
-    });
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/complete-neighbor-profile.tsx:111',message:'User ID verification',data:{authUserId:authUser?.id,storeUserId:userId,applicationUserId:application?.user_id,targetUserId,authMatchesApplication:authUser?.id===application?.user_id,authMatchesStore:authUser?.id===userId,authMatchesTarget:authUser?.id===targetUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'O'})}).catch(()=>{});
-    // #endregion
     
     // Warn if there's a mismatch (but continue anyway - the trigger may have created the profile)
     if (authUser?.id && targetUserId !== authUser.id) {
@@ -175,17 +164,6 @@ export default function CompleteNeighborProfileScreen() {
       const finalAddress = address || application?.address;
       console.log('💾 [complete-profile] Saving address:', finalAddress);
 
-      // #region agent log
-      console.log('[DEBUG] complete-neighbor-profile - BEFORE createUserProfile', {
-        storeUserId: userId,
-        applicationUserId: application?.user_id,
-        targetUserId,
-        applicationId: application?.id,
-        idsMatch: userId === application?.user_id,
-        usingApplicationId: !!application?.user_id
-      });
-      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/complete-neighbor-profile.tsx:151',message:'BEFORE createUserProfile',data:{storeUserId:userId,applicationUserId:application?.user_id,targetUserId,applicationId:application?.id,idsMatch:userId===application?.user_id,usingApplicationId:!!application?.user_id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
-      // #endregion
       
       // Create or update user profile
       // Use application.user_id to match what the trigger created
@@ -195,14 +173,6 @@ export default function CompleteNeighborProfileScreen() {
           ...profileData,
           address: finalAddress,
         });
-        // #region agent log
-        console.log('[DEBUG] complete-neighbor-profile - Profile created', {
-          profileId: profile?.id,
-          storeUserId: userId,
-          idsMatch: profile?.id === userId
-        });
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/auth/complete-neighbor-profile.tsx:158',message:'Profile created',data:{profileId:profile?.id,storeUserId:userId,idsMatch:profile?.id===userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
-        // #endregion
         console.log('✅ [complete-profile] Profile created, address:', profile?.address);
       } catch (error: any) {
         // If profile exists, update it with address and other data

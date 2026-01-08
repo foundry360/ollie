@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Pressable, Image, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, TextInput } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';

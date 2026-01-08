@@ -42,11 +42,6 @@ export default function TasksScreen() {
 
   const role = user?.role === 'poster' ? 'poster' : 'teen';
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/(tabs)/tasks.tsx:22',message:'TasksScreen mount',data:{role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  }, [role]);
-  // #endregion
 
   // Reset filter if neighbor has 'applied' selected (not applicable to neighbors)
   useEffect(() => {

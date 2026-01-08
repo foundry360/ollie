@@ -125,7 +125,7 @@ export function PaymentSummaryModal({ visible, earning, onClose }: PaymentSummar
               {platformFee > 0 && (
                 <View style={styles.breakdownRow}>
                   <Text style={[styles.breakdownLabel, labelStyle, styles.feeLabel]}>
-                    Platform Fee (10%)
+                    Platform Fee
                   </Text>
                   <Text style={[styles.breakdownValue, styles.feeValue]}>
                     ${platformFee.toFixed(2)}

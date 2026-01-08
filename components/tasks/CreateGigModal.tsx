@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, Alert, Image, Pressable, Modal, Platform, Dimensions, StatusBar } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, Image, Pressable, Modal, Platform, Dimensions, StatusBar } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';

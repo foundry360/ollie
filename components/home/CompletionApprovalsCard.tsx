@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPendingCompletionApprovals, approveCompletion, rejectCompletion, CompletionApproval } from '@/lib/api/completionApprovals';
 import { format } from 'date-fns';
-import { Alert } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { useRouter } from 'expo-router';
 
 export function CompletionApprovalsCard() {

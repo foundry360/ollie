@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Alert } from '@/components/ui/Alert';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useRouter } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';

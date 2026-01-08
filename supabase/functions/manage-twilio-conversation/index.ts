@@ -17,17 +17,8 @@ serve(async (req) => {
   }
 
   try {
-    // #region agent log
-    console.log('=== AUTH DEBUG ===');
-    const authHeader = req.headers.get('Authorization');
-    console.log('Auth header present:', !!authHeader);
-    console.log('Auth header value:', authHeader ? `${authHeader.substring(0, 20)}...` : 'null');
-    // #endregion
     
     if (!authHeader) {
-      // #region agent log
-      console.log('ERROR: No Authorization header');
-      // #endregion
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -37,37 +28,16 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
     
-    // #region agent log
-    console.log('Supabase URL present:', !!supabaseUrl);
-    console.log('Supabase Anon Key present:', !!supabaseAnonKey);
-    // #endregion
     
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     const token = authHeader.replace('Bearer ', '');
     
-    // #region agent log
-    console.log('Token extracted, length:', token.length);
-    console.log('Token prefix:', token.substring(0, 20));
-    // #endregion
     
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    // #region agent log
-    console.log('Auth result - user present:', !!user);
-    console.log('Auth result - error:', authError ? {
-      message: authError.message,
-      status: authError.status,
-      name: authError.name
-    } : 'none');
-    // #endregion
 
     if (authError || !user) {
-      // #region agent log
-      console.log('AUTH FAILED - Returning 401');
-      console.log('Auth error details:', JSON.stringify(authError, null, 2));
-      console.log('User data:', user ? 'present' : 'null');
-      // #endregion
       return new Response(
         JSON.stringify({ 
           error: 'Invalid authentication',
@@ -81,9 +51,6 @@ serve(async (req) => {
       );
     }
     
-    // #region agent log
-    console.log('AUTH SUCCESS - User ID:', user.id);
-    // #endregion
 
     const { gig_id, participant1_id, participant2_id } = await req.json();
 
