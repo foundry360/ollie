@@ -309,6 +309,16 @@ export default function PaymentSetupScreen() {
                 <Text style={[styles.description, textStyle]}>
                   Your parent has completed the bank account setup.
                 </Text>
+                {/* Show option to add bank account if it doesn't exist (e.g., after resend) */}
+                {!bankAccount && (
+                  <View style={{ marginTop: 16 }}>
+                    <Button
+                      title="Add Bank Account"
+                      onPress={() => router.push('/payments/bank-account-setup')}
+                      fullWidth
+                    />
+                  </View>
+                )}
               </>
             ) : approvalStatus?.status === 'pending' ? (
               <>

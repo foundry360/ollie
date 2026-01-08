@@ -67,3 +67,7 @@ Before using this function, make sure to run migration `110_add_delete_user_acco
 
 The edge function is the preferred method as it handles complete deletion including the auth account.
 
+
+
+
+

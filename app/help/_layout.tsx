@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { useThemeStore } from '@/stores/themeStore';
 
-export default function LegalLayout() {
+export default function HelpLayout() {
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
 
@@ -12,28 +12,12 @@ export default function LegalLayout() {
       }}
     >
       <Stack.Screen 
-        name="terms" 
+        name="help-center" 
         options={{ 
-          title: 'Terms of Use',
-        }} 
-      />
-      <Stack.Screen 
-        name="privacy" 
-        options={{ 
-          title: 'Privacy Policy',
-        }} 
-      />
-      <Stack.Screen 
-        name="community-guidelines" 
-        options={{ 
-          title: 'Community Guidelines',
+          title: 'Help Center',
         }} 
       />
     </Stack>
   );
 }
-
-
-
-
 

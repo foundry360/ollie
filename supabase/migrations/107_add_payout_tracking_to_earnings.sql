@@ -21,3 +21,7 @@ COMMENT ON COLUMN public.earnings.status IS 'Overall earnings status. Should be 
 
 
 
+
+
+
+

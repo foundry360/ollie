@@ -109,7 +109,7 @@ export default function BankAccountSetupScreen() {
             {
               text: 'OK',
               onPress: () => {
-                router.replace('/payments/bank-account-verify');
+                router.replace('/(tabs)/payment-setup');
               },
             },
           ]
@@ -132,6 +132,8 @@ export default function BankAccountSetupScreen() {
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to add bank account';
       console.error('Error creating bank account:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
       
       // If error is about parent approval, show helpful message
       if (errorMessage.toLowerCase().includes('parent approval')) {
@@ -146,7 +148,26 @@ export default function BankAccountSetupScreen() {
           ]
         );
       } else {
-        Alert.alert('Error', errorMessage);
+        // Show detailed error message
+        Alert.alert(
+          'Error Adding Bank Account',
+          errorMessage,
+          [
+            {
+              text: 'OK',
+            },
+            {
+              text: 'View Logs',
+              onPress: () => {
+                Alert.alert(
+                  'View Logs',
+                  'To see detailed error logs:\n\n1. Go to Supabase Dashboard\n2. Navigate to Edge Functions\n3. Click on "create-bank-account"\n4. Check the Logs tab\n\nOr check the console for detailed error information.',
+                  [{ text: 'OK' }]
+                );
+              },
+            },
+          ]
+        );
       }
     } finally {
       setIsSubmitting(false);

@@ -615,11 +615,70 @@ export async function createBankAccount(data: CreateBankAccountData): Promise<Cr
     },
   });
 
-  if (error) {
+  // Check for error response - Supabase may return error in result even with error object
+  if (error || (result && (result as any).error)) {
     console.error('Edge Function error:', error);
-    const errorMessage = error.message || 'Unknown error';
-    const errorDetails = (error as any).context?.message || (error as any).details;
-    throw new Error(errorDetails || errorMessage);
+    console.error('Edge Function result:', result);
+    
+    const err = error as any;
+    let errorMessage = 'Unknown error';
+    
+    // Priority 1: Check result.error (edge function may return error in result body)
+    if (result && (result as any).error) {
+      errorMessage = (result as any).error;
+      if ((result as any).details) {
+        errorMessage += `: ${(result as any).details}`;
+      }
+    }
+    // Priority 2: Try to read response body from error.context (Response object)
+    else if (error && err.context && err.context.text && typeof err.context.text === 'function') {
+      try {
+        // Read the response body - this is async but we need to await it
+        const responseText = await err.context.text();
+        try {
+          const parsed = JSON.parse(responseText);
+          console.error('Parsed error from response body:', parsed);
+          if (parsed.error) {
+            errorMessage = parsed.error;
+            if (parsed.details) {
+              errorMessage += `: ${parsed.details}`;
+            }
+          } else if (parsed.message) {
+            errorMessage = parsed.message;
+          }
+        } catch (parseError) {
+          // If not JSON, use the text as error message
+          errorMessage = responseText || errorMessage;
+        }
+      } catch (readError) {
+        console.error('Failed to read error response body:', readError);
+        // Fall through to status code based message
+      }
+    }
+    
+    // If we still don't have a specific error message, use status code
+    if (errorMessage === 'Unknown error' || errorMessage === 'Edge Function returned a non-2xx status code') {
+      const statusCode = err.status || err.statusCode || err.context?.status;
+      
+      // Provide helpful messages based on status code
+      if (statusCode === 403) {
+        errorMessage = 'Parent approval required. Please request and complete parent approval first.';
+      } else if (statusCode === 400) {
+        errorMessage = 'Invalid bank account information. Please check your account details and try again.';
+      } else if (statusCode === 401) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (statusCode === 404) {
+        errorMessage = 'Bank account setup not found. Please request a new setup link.';
+      } else if (statusCode === 500) {
+        errorMessage = 'Server error occurred. Please check your bank account details and try again.';
+      } else if (statusCode) {
+        errorMessage = `Server error (${statusCode}). Please try again or contact support.`;
+      } else {
+        errorMessage = 'Failed to create bank account. Please check your information and try again.';
+      }
+    }
+    
+    throw new Error(errorMessage);
   }
 
   if (!result) {

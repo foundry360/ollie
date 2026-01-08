@@ -133,8 +133,8 @@ serve(async (req) => {
         console.log('Searching Stripe for customer by email:', userEmail)
         // Check Stripe for existing customer with this email (to avoid duplicates)
         const searchParams = new URLSearchParams()
-        searchParams.append('email', userEmail)
-        searchParams.append('limit', '1')
+        searchParams.append('query', `email:'${userEmail}'`)  // Use 'query' with email: syntax
+        searchParams.append('limit', '10')  // Get more results to check all matches
         
         const searchResponse = await fetch(`https://api.stripe.com/v1/customers/search?${searchParams.toString()}`, {
           method: 'GET',
@@ -153,7 +153,12 @@ serve(async (req) => {
             
             if (foundCustomer && foundCustomer.id) {
               customerId = foundCustomer.id
-              console.log('Found existing Stripe customer by email:', customerId)
+              console.log(`Found ${searchResult.data.length} existing Stripe customer(s), using:`, customerId)
+              
+              // Log if there are duplicates
+              if (searchResult.data.length > 1) {
+                console.warn(`WARNING: Found ${searchResult.data.length} Stripe customers for email ${userEmail}. Consider consolidating.`)
+              }
             }
           }
         } else {
@@ -173,7 +178,7 @@ serve(async (req) => {
             headers: {
               'Authorization': `Bearer ${stripeSecretKey}`,
               'Content-Type': 'application/x-www-form-urlencoded',
-              'Idempotency-Key': userId, // Use user ID as idempotency key to prevent duplicates
+              'Idempotency-Key': `customer-${userId}`, // More specific idempotency key
             },
             body: customerParams,
           })
@@ -183,11 +188,35 @@ serve(async (req) => {
             customerId = customer.id
             console.log('Created new Stripe customer:', customerId)
           } else {
-            console.error('Failed to create Stripe customer:', customer)
-            return new Response(
-              JSON.stringify({ error: 'Failed to create customer', details: customer }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
+            // If customer creation fails due to duplicate, try to find it again
+            if (customer.error?.code === 'resource_already_exists' || customer.error?.type === 'idempotency_error') {
+              console.log('Customer already exists (idempotency), searching again...')
+              // Retry the search
+              const retrySearch = await fetch(`https://api.stripe.com/v1/customers/search?query=email:'${userEmail}'&limit=1`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${stripeSecretKey}`,
+                },
+              })
+              if (retrySearch.ok) {
+                const retryResult = await retrySearch.json()
+                if (retryResult.data && retryResult.data.length > 0) {
+                  customerId = retryResult.data[0].id
+                  console.log('Found customer after idempotency error:', customerId)
+                }
+              }
+            }
+            
+            if (!customerId) {
+              console.error('Failed to create Stripe customer:', customer)
+              return new Response(
+                JSON.stringify({ 
+                  error: 'Failed to create customer', 
+                  details: customer.error?.message || JSON.stringify(customer) 
+                }),
+                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              )
+            }
           }
         }
       }

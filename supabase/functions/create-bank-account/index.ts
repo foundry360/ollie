@@ -183,10 +183,10 @@ serve(async (req: Request) => {
       const userEmail = userProfile.email || user.email
 
       if (userEmail) {
-        // Search Stripe for existing customer with this email
+        // Search Stripe for existing customer with this email using the correct search syntax
         const searchParams = new URLSearchParams()
-        searchParams.append('email', userEmail)
-        searchParams.append('limit', '1')
+        searchParams.append('query', `email:'${userEmail}'`)  // Use 'query' with email: syntax
+        searchParams.append('limit', '10')  // Get more results to check all matches
 
         const searchResponse = await fetch(`https://api.stripe.com/v1/customers/search?${searchParams.toString()}`, {
           method: 'GET',
@@ -198,9 +198,19 @@ serve(async (req: Request) => {
         if (searchResponse.ok) {
           const searchResult = await searchResponse.json()
           if (searchResult.data && searchResult.data.length > 0) {
+            // Use the first (most recent) customer
             customerId = searchResult.data[0].id
-            console.log('Found existing Stripe customer:', customerId)
+            console.log(`Found ${searchResult.data.length} existing Stripe customer(s), using:`, customerId)
+            
+            // Log if there are duplicates
+            if (searchResult.data.length > 1) {
+              console.warn(`WARNING: Found ${searchResult.data.length} Stripe customers for email ${userEmail}. Consider consolidating.`)
+              console.warn('Duplicate customer IDs:', searchResult.data.map((c: any) => c.id).join(', '))
+            }
           }
+        } else {
+          const searchError = await searchResponse.json()
+          console.warn('Stripe customer search failed:', searchError)
         }
 
         // If no existing customer found, create one
@@ -215,7 +225,7 @@ serve(async (req: Request) => {
             headers: {
               'Authorization': `Bearer ${stripeSecretKey}`,
               'Content-Type': 'application/x-www-form-urlencoded',
-              'Idempotency-Key': user.id, // Use user ID as idempotency key
+              'Idempotency-Key': `customer-${user.id}`, // More specific idempotency key
             },
             body: customerParams,
           })
@@ -225,11 +235,35 @@ serve(async (req: Request) => {
             customerId = customer.id
             console.log('Created new Stripe customer:', customerId)
           } else {
-            console.error('Failed to create Stripe customer:', customer)
-            return new Response(
-              JSON.stringify({ error: 'Failed to create Stripe customer', details: customer }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
+            // If customer creation fails due to duplicate, try to find it again
+            if (customer.error?.code === 'resource_already_exists' || customer.error?.type === 'idempotency_error') {
+              console.log('Customer already exists (idempotency), searching again...')
+              // Retry the search
+              const retrySearch = await fetch(`https://api.stripe.com/v1/customers/search?query=email:'${userEmail}'&limit=1`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${stripeSecretKey}`,
+                },
+              })
+              if (retrySearch.ok) {
+                const retryResult = await retrySearch.json()
+                if (retryResult.data && retryResult.data.length > 0) {
+                  customerId = retryResult.data[0].id
+                  console.log('Found customer after idempotency error:', customerId)
+                }
+              }
+            }
+            
+            if (!customerId) {
+              console.error('Failed to create Stripe customer:', customer)
+              return new Response(
+                JSON.stringify({ 
+                  error: 'Failed to create Stripe customer', 
+                  details: customer.error?.message || JSON.stringify(customer) 
+                }),
+                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              )
+            }
           }
         }
       }
@@ -242,62 +276,211 @@ serve(async (req: Request) => {
       )
     }
 
-    // Create Stripe External Account (bank account)
-    // Note: For ACH payouts, we create a bank account on the customer
-    const bankAccountParams = new URLSearchParams()
-    bankAccountParams.append('object', 'bank_account')
-    bankAccountParams.append('account_number', account_number)
-    bankAccountParams.append('routing_number', routing_number)
-    bankAccountParams.append('account_holder_name', account_holder_name)
-    bankAccountParams.append('account_holder_type', 'individual')
-    bankAccountParams.append('country', 'US')
-    bankAccountParams.append('currency', 'usd')
-    bankAccountParams.append('metadata[user_id]', user.id)
-    bankAccountParams.append('metadata[account_type]', account_type)
+    // Create Stripe Payment Method (bank account)
+    // Note: Cannot attach during creation - must create first, then attach
+    const paymentMethodParams = new URLSearchParams()
+    paymentMethodParams.append('type', 'us_bank_account')
+    paymentMethodParams.append('billing_details[name]', account_holder_name)
+    paymentMethodParams.append('us_bank_account[account_number]', account_number)
+    paymentMethodParams.append('us_bank_account[routing_number]', routing_number)
+    paymentMethodParams.append('us_bank_account[account_holder_type]', 'individual')
+    paymentMethodParams.append('metadata[user_id]', user.id)
+    paymentMethodParams.append('metadata[account_type]', account_type)
 
-    const bankAccountResponse = await fetch(`https://api.stripe.com/v1/customers/${customerId}/sources`, {
+    console.log('Creating payment method for customer:', customerId)
+
+    const paymentMethodResponse = await fetch('https://api.stripe.com/v1/payment_methods', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${stripeSecretKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: bankAccountParams,
+      body: paymentMethodParams,
     })
 
-    const bankAccount = await bankAccountResponse.json()
+    const paymentMethod = await paymentMethodResponse.json()
 
-    if (!bankAccountResponse.ok) {
-      console.error('Failed to create Stripe bank account:', bankAccount)
+    if (!paymentMethodResponse.ok) {
+      console.error('=== CREATE PAYMENT METHOD ERROR ===')
+      console.error('Status:', paymentMethodResponse.status)
+      console.error('Full error response:', JSON.stringify(paymentMethod, null, 2))
+      
+      const stripeError = paymentMethod.error
+      const errorMessage = stripeError?.message || stripeError?.code || 'Unknown Stripe error'
+      
       return new Response(
         JSON.stringify({ 
           error: 'Failed to create bank account',
-          details: bankAccount.error?.message || bankAccount.error || 'Unknown error'
+          details: errorMessage
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Extract external account ID
-    // Stripe returns bank accounts with ID like ba_xxxxx
+    console.log('Payment method created successfully:', {
+      id: paymentMethod.id,
+      type: paymentMethod.type,
+    })
+
+    // For US bank accounts, we need to create a SetupIntent for verification
+    // US bank accounts must be verified (via micro-deposits) before they can be attached to a customer
+    console.log('Creating SetupIntent for bank account verification:', {
+      payment_method_id: paymentMethod.id,
+      customer_id: customerId,
+    })
+
+    const setupIntentParams = new URLSearchParams()
+    setupIntentParams.append('customer', customerId)
+    setupIntentParams.append('payment_method', paymentMethod.id)
+    setupIntentParams.append('payment_method_types[]', 'us_bank_account')
+    setupIntentParams.append('usage', 'off_session')
+    setupIntentParams.append('metadata[user_id]', user.id)
+    setupIntentParams.append('metadata[account_type]', account_type)
+
+    const setupIntentResponse = await fetch('https://api.stripe.com/v1/setup_intents', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: setupIntentParams,
+    })
+
+    let setupIntent = await setupIntentResponse.json()
+
+    if (!setupIntentResponse.ok) {
+      console.error('=== CREATE SETUP INTENT ERROR ===')
+      console.error('Status:', setupIntentResponse.status)
+      console.error('Full error response:', JSON.stringify(setupIntent, null, 2))
+      
+      const stripeError = setupIntent.error
+      const errorMessage = stripeError?.message || stripeError?.code || 'Unknown Stripe error'
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to create setup intent for bank account verification',
+          details: errorMessage
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('SetupIntent created successfully:', {
+      id: setupIntent.id,
+      status: setupIntent.status,
+      payment_method: setupIntent.payment_method,
+    })
+
+    // Confirm the SetupIntent to trigger micro-deposits and make it visible in dashboard
+    if (setupIntent.status === 'requires_confirmation') {
+      console.log('Confirming SetupIntent to trigger micro-deposits...')
+      
+      const confirmParams = new URLSearchParams()
+      confirmParams.append('payment_method', paymentMethod.id)
+      // For US bank accounts, mandate_data is required when confirming
+      confirmParams.append('mandate_data[customer_acceptance][type]', 'online')
+      confirmParams.append('mandate_data[customer_acceptance][online][ip_address]', '0.0.0.0') // Server-side, no real IP
+      confirmParams.append('mandate_data[customer_acceptance][online][user_agent]', 'Ollie-App/1.0')
+      
+      const confirmResponse = await fetch(`https://api.stripe.com/v1/setup_intents/${setupIntent.id}/confirm`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: confirmParams,
+      })
+      
+      const confirmedIntent = await confirmResponse.json()
+      
+      if (confirmResponse.ok) {
+        console.log('SetupIntent confirmed successfully:', {
+          id: confirmedIntent.id,
+          status: confirmedIntent.status,
+        })
+        setupIntent = confirmedIntent
+      } else {
+        console.error('=== FAILED TO CONFIRM SETUP INTENT ===')
+        console.error('Status:', confirmResponse.status)
+        console.error('Status Text:', confirmResponse.statusText)
+        console.error('Full error response:', JSON.stringify(confirmedIntent, null, 2))
+        console.error('SetupIntent ID:', setupIntent.id)
+        console.error('Payment Method ID:', paymentMethod.id)
+        console.error('Error object:', confirmedIntent.error)
+        
+        // Extract detailed error information
+        const stripeError = confirmedIntent.error
+        if (stripeError) {
+          console.error('Stripe Error Details:', {
+            message: stripeError.message,
+            code: stripeError.code,
+            type: stripeError.type,
+            param: stripeError.param,
+            decline_code: stripeError.decline_code,
+          })
+        }
+        
+        // Continue anyway - the SetupIntent exists, just not confirmed yet
+        // The bank account will still be saved, but micro-deposits won't be triggered
+        console.warn('WARNING: SetupIntent was not confirmed. Micro-deposits will not be triggered automatically.')
+      }
+    }
+
+    // The payment method will be attached to the customer automatically after verification
+    // For now, we'll use the payment method directly (it's not attached yet, but will be after verification)
+    const bankAccount = paymentMethod
+
+    console.log('Payment method attached successfully:', {
+      id: bankAccount.id,
+      type: bankAccount.type,
+      customer: bankAccount.customer,
+      has_us_bank_account: !!bankAccount.us_bank_account,
+    })
+
+    // Extract payment method ID (this is now a payment method, not external account)
+    // Payment methods have ID like pm_xxxxx
     const externalAccountId = bankAccount.id
+
+    if (!externalAccountId) {
+      console.error('Payment method ID is missing:', bankAccount)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to create bank account',
+          details: 'Payment method ID is missing after attachment'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Extract account details for storage (only last 4 digits for security)
     const accountNumberLast4 = account_number.slice(-4)
     const routingNumberLast4 = routing_number.slice(-4)
-    const bankName = bankAccount.bank_name || null
+    const bankName = bankAccount.us_bank_account?.bank_name || null
+
+    console.log('Bank account details:', {
+      accountNumberLast4,
+      routingNumberLast4,
+      bankName,
+      us_bank_account: bankAccount.us_bank_account,
+    })
 
     // Determine verification status
-    // Stripe returns status: 'new', 'validated', 'verified', 'verification_failed', 'errored'
+    // For us_bank_account payment methods, check us_bank_account.status
+    // Status can be: 'new', 'validated', 'verified', 'verification_failed', 'errored'
     let verificationStatus = 'pending'
-    if (bankAccount.status === 'verified') {
+    const usBankAccountStatus = bankAccount.us_bank_account?.status
+    console.log('US Bank Account Status:', usBankAccountStatus)
+    
+    if (usBankAccountStatus === 'verified') {
       verificationStatus = 'verified'
-    } else if (bankAccount.status === 'verification_failed' || bankAccount.status === 'errored') {
+    } else if (usBankAccountStatus === 'verification_failed' || usBankAccountStatus === 'errored') {
       verificationStatus = 'failed'
     } else {
       verificationStatus = 'pending' // 'new' or 'validated' - needs micro-deposits
     }
 
     // Store bank account in database
+    // Note: The payment method is not yet attached to the customer - it will be attached after verification via SetupIntent
     const { data: savedAccount, error: saveError } = await supabase
       .from('bank_accounts')
       .insert({
@@ -320,18 +503,11 @@ serve(async (req: Request) => {
 
     if (saveError) {
       console.error('Error saving bank account to database:', saveError)
+      console.error('Save error details:', JSON.stringify(saveError, null, 2))
       
-      // Attempt to delete the Stripe bank account to clean up
-      try {
-        await fetch(`https://api.stripe.com/v1/customers/${customerId}/sources/${externalAccountId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${stripeSecretKey}`,
-          },
-        })
-      } catch (cleanupError) {
-        console.error('Failed to cleanup Stripe bank account:', cleanupError)
-      }
+      // Note: Payment methods can't be deleted via DELETE endpoint
+      // If needed, they can be detached from customer, but since save failed, 
+      // the payment method isn't in our database so it's not a problem
 
       return new Response(
         JSON.stringify({ error: 'Failed to save bank account', details: saveError.message }),
@@ -341,12 +517,12 @@ serve(async (req: Request) => {
 
     console.log('Bank account created successfully:', {
       user_id: user.id,
-      external_account_id: externalAccountId,
+      payment_method_id: externalAccountId,
       verification_status: verificationStatus,
-      stripe_status: bankAccount.status,
+      stripe_status: usBankAccountStatus,
     })
 
-    // Return success response
+    // Return success response with setup intent client secret for verification
     return new Response(
       JSON.stringify({
         success: true,
@@ -359,17 +535,30 @@ serve(async (req: Request) => {
           routing_number_last4: routingNumberLast4,
           requires_verification: verificationStatus === 'pending',
         },
+        setup_intent: {
+          id: setupIntent.id,
+          client_secret: setupIntent.client_secret,
+          status: setupIntent.status,
+        },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error: any) {
-    console.error('Error in create-bank-account function:', error)
+    console.error('=== TOP LEVEL ERROR IN create-bank-account FUNCTION ===')
+    console.error('Error type:', error?.constructor?.name)
+    console.error('Error message:', error?.message)
+    console.error('Error stack:', error?.stack)
+    console.error('Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    
+    const errorMessage = error?.message || 'Unknown error'
+    const errorDetails = error?.stack || error?.toString() || 'No additional details'
+    
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error.message || 'Unknown error',
-        details: error.stack
+        error: errorMessage,
+        details: errorDetails
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

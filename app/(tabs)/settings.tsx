@@ -258,11 +258,22 @@ export default function SettingsScreen() {
           
           <Pressable 
             style={[styles.menuItem, styles.menuItemWithBorder, isDark && styles.menuItemBorderDark]}
-            onPress={() => handleMenuItemPress('Help Center')}
+            onPress={() => router.push('/help/help-center')}
           >
             <View style={styles.menuItemLeft}>
               <Ionicons name="help-circle" size={20} color="#73af17" />
               <Text style={[styles.menuItemLabel, labelStyle]}>Help Center</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+          </Pressable>
+
+          <Pressable 
+            style={[styles.menuItem, styles.menuItemWithBorder, isDark && styles.menuItemBorderDark]}
+            onPress={() => router.push('/legal/community-guidelines')}
+          >
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="people" size={20} color="#73af17" />
+              <Text style={[styles.menuItemLabel, labelStyle]}>Community Guidelines</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
           </Pressable>
