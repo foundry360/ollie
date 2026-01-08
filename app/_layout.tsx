@@ -9,7 +9,29 @@ import { getNeighborApplicationByUserId } from '@/lib/api/neighborApplications';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { Loading } from '@/components/ui/Loading';
+import { AlertComponent } from '@/components/ui/Alert';
 import { registerForPushNotifications, setupNotificationListeners } from '@/lib/notifications';
+import { initSentry, setSentryUser, clearSentryUser } from '@/lib/sentry';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import * as Sentry from 'sentry-expo';
+
+// Initialize Sentry before anything else
+initSentry();
+
+// Add global error handler
+if (typeof ErrorUtils !== 'undefined') {
+  const originalHandler = ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+    if (!__DEV__) {
+      Sentry.Native.captureException(error, {
+        tags: {
+          isFatal: isFatal ? 'true' : 'false',
+        },
+      });
+    }
+    originalHandler(error, isFatal);
+  });
+}
 
 // Conditionally import StripeProvider - only on native platforms (not web)
 let StripeProvider: any;
@@ -36,9 +58,12 @@ const queryClient = new QueryClient({
       refetchOnReconnect: true, // Only refetch on reconnect
       refetchInterval: false, // EXPLICITLY disable polling globally
       refetchOnMount: false, // Don't refetch on mount if data is fresh
-    } 
+    },
   }
 });
+
+// Note: React Query errors are handled at the component level or caught by ErrorBoundary
+// For global error tracking, use onError callbacks in individual queries/mutations
 
 export default function RootLayout() {
   const router = useRouter();
@@ -53,6 +78,20 @@ export default function RootLayout() {
     return cleanup;
   }, [initializeTheme]);
 
+  // Update Sentry user context when user changes
+  useEffect(() => {
+    if (user) {
+      setSentryUser({
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+      });
+    } else {
+      clearSentryUser();
+    }
+  }, [user]);
+
   useEffect(() => {
     // Register for push notifications
     if (user) {
@@ -64,9 +103,6 @@ export default function RootLayout() {
     // Setup notification listeners
     const cleanup = setupNotificationListeners(
       (notification) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:64',message:'Notification received',data:{current_user_id:user?.id,notification_recipient_id:notification.request.content.data?.recipient_id,notification_type:notification.request.content.data?.type,title:notification.request.content.title},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         console.log('Notification received:', notification);
         
         // CRITICAL: Filter notifications by current user
@@ -74,9 +110,6 @@ export default function RootLayout() {
         const notificationData = notification.request.content.data;
         if (notificationData?.recipient_id && user?.id) {
           if (notificationData.recipient_id !== user.id) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:72',message:'Notification filtered out - wrong user',data:{current_user_id:user.id,notification_recipient_id:notificationData.recipient_id,notification_type:notificationData?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             console.log('Notification filtered out - not for current user:', {
               current_user_id: user.id,
               notification_recipient_id: notificationData.recipient_id,
@@ -89,17 +122,10 @@ export default function RootLayout() {
         console.log('Notification tapped:', response);
         const data = response.notification.request.content.data;
         
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:85',message:'Notification tapped',data:{current_user_id:user?.id,notification_recipient_id:data?.recipient_id,notification_type:data?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
-        
         // CRITICAL: Filter notifications by current user before handling
         // If notification has recipient_id, only handle if it matches current user
         if (data?.recipient_id && user?.id) {
           if (data.recipient_id !== user.id) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/_layout.tsx:92',message:'Notification tap filtered out - wrong user',data:{current_user_id:user.id,notification_recipient_id:data.recipient_id,notification_type:data?.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             console.log('Notification tap filtered out - not for current user:', {
               current_user_id: user.id,
               notification_recipient_id: data.recipient_id,
@@ -308,7 +334,7 @@ export default function RootLayout() {
     }
     
     // Wait for router and segments to be ready
-    if (!router || !segments || segments.length === 0) {
+    if (!router || !segments || !segments[0]) {
       return;
     }
     
@@ -529,9 +555,12 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <StatusBar style="light" />
-          <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#111827' : '#ffffff' }}>
-            <Slot />
-          </View>
+          <ErrorBoundary>
+            <View style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? '#111827' : '#ffffff' }}>
+              <Slot />
+              <AlertComponent />
+            </View>
+          </ErrorBoundary>
         </SafeAreaProvider>
       </QueryClientProvider>
     </StripeProvider>

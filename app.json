@@ -43,6 +43,14 @@
         {
           "merchantIdentifier": "merchant.com.foundry360.ollie"
         }
+      ],
+      [
+        "sentry-expo",
+        {
+          "organization": "foundry360-llc",
+          "project": "ollie",
+          "authToken": "${SENTRY_AUTH_TOKEN}"
+        }
       ]
     ],
     "extra": {
