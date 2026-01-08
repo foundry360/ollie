@@ -1,9 +1,16 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import * as Sentry from 'sentry-expo';
 import { useThemeStore } from '@/stores/themeStore';
 import { Button } from '@/components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
+
+// Conditionally import Sentry - may not be available during build
+let Sentry: any = null;
+try {
+  Sentry = require('sentry-expo');
+} catch (e) {
+  // Sentry not available - continue without it
+}
 
 interface Props {
   children: ReactNode;
@@ -26,17 +33,23 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to Sentry
-    Sentry.Native.captureException(error, {
-      contexts: {
-        react: {
-          componentStack: errorInfo.componentStack,
-        },
-      },
-      tags: {
-        error_boundary: true,
-      },
-    });
+    // Log error to Sentry if available
+    if (Sentry) {
+      try {
+        Sentry.Native.captureException(error, {
+          contexts: {
+            react: {
+              componentStack: errorInfo.componentStack,
+            },
+          },
+          tags: {
+            error_boundary: true,
+          },
+        });
+      } catch (sentryError) {
+        // Sentry not available - continue without it
+      }
+    }
 
     console.error('ErrorBoundary caught an error:', error, errorInfo);
   }

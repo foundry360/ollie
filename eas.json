@@ -12,13 +12,27 @@
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "store",
+      "ios": {
+        "simulator": false,
+        "cocoapods": "1.15.2",
+        "buildConfiguration": "Release"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": {
+        "cocoapods": "1.15.2",
+        "buildConfiguration": "Release"
+      }
     }
   },
   "submit": {
+    "preview": {
+      "ios": {
+        "ascAppId": "6757497389"
+      }
+    },
     "production": {}
   }
 }

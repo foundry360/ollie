@@ -50,7 +50,10 @@ module.exports = {
         {
           merchantIdentifier: "merchant.com.foundry360.ollie"
         }
-      ]
+      ],
+      // Sentry plugin - DISABLED for iOS build due to RCT-Folly dependency issue
+      // Sentry is excluded from auto-linking in react-native.config.js
+      // Runtime Sentry code will work, but native linking is disabled for iOS
     ],
     extra: {
       router: {},

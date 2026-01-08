@@ -1,8 +1,20 @@
-import * as Sentry from 'sentry-expo';
+// Conditionally import Sentry - may not be available during build
+let Sentry: any = null;
+try {
+  Sentry = require('sentry-expo');
+} catch (e) {
+  console.warn('Sentry not available - error tracking disabled during build');
+}
+
 import Constants from 'expo-constants';
 
 // Initialize Sentry
 export function initSentry() {
+  if (!Sentry) {
+    console.warn('Sentry not available - error tracking disabled.');
+    return;
+  }
+
   const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
   
   if (!dsn) {
@@ -34,6 +46,7 @@ export function initSentry() {
 
 // Set user context when user logs in
 export function setSentryUser(user: { id: string; email?: string; full_name?: string; role?: string }) {
+  if (!Sentry) return;
   Sentry.Native.setUser({
     id: user.id,
     email: user.email,
@@ -44,6 +57,7 @@ export function setSentryUser(user: { id: string; email?: string; full_name?: st
 
 // Clear user context on logout
 export function clearSentryUser() {
+  if (!Sentry) return;
   Sentry.Native.setUser(null);
 }
 
@@ -53,6 +67,7 @@ export function trackApiError(
   error: Error,
   context?: Record<string, any>
 ) {
+  if (!Sentry) return;
   Sentry.Native.captureException(error, {
     tags: {
       error_type: 'api_error',
@@ -71,6 +86,7 @@ export function trackEvent(
   eventName: string,
   data?: Record<string, any>
 ) {
+  if (!Sentry) return;
   Sentry.Native.captureMessage(eventName, {
     level: 'info',
     extra: data,
@@ -83,6 +99,7 @@ export function addBreadcrumb(
   category: string,
   data?: Record<string, any>
 ) {
+  if (!Sentry) return;
   Sentry.Native.addBreadcrumb({
     message,
     category,

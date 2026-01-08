@@ -4,7 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '@/stores/themeStore';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
-import * as Sentry from 'sentry-expo';
+// Conditionally import Sentry - may not be available during build
+let Sentry: any = null;
+try {
+  Sentry = require('sentry-expo');
+} catch (e) {
+  // Sentry not available - continue without it
+}
 import { trackApiError, trackEvent, addBreadcrumb } from '@/lib/sentry';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +27,10 @@ export default function SentryTestScreen() {
 
   // Test 1: Simple Error
   const testSimpleError = () => {
+    if (!Sentry) {
+      Alert.alert('Sentry Not Available', 'Sentry is not available in this build.');
+      return;
+    }
     try {
       throw new Error('Test Error: Simple error from Sentry test screen');
     } catch (error) {
@@ -32,6 +42,10 @@ export default function SentryTestScreen() {
 
   // Test 2: Error with Context
   const testErrorWithContext = () => {
+    if (!Sentry) {
+      Alert.alert('Sentry Not Available', 'Sentry is not available in this build.');
+      return;
+    }
     try {
       throw new Error('Test Error: Error with additional context');
     } catch (error) {

@@ -13,16 +13,23 @@ import { AlertComponent } from '@/components/ui/Alert';
 import { registerForPushNotifications, setupNotificationListeners } from '@/lib/notifications';
 import { initSentry, setSentryUser, clearSentryUser } from '@/lib/sentry';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import * as Sentry from 'sentry-expo';
+
+// Conditionally import Sentry for global error handler
+let Sentry: any = null;
+try {
+  Sentry = require('sentry-expo');
+} catch (e) {
+  // Sentry not available - continue without it
+}
 
 // Initialize Sentry before anything else
 initSentry();
 
 // Add global error handler
-if (typeof ErrorUtils !== 'undefined') {
+if (typeof ErrorUtils !== 'undefined' && Sentry) {
   const originalHandler = ErrorUtils.getGlobalHandler();
   ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-    if (!__DEV__) {
+    if (!__DEV__ && Sentry) {
       Sentry.Native.captureException(error, {
         tags: {
           isFatal: isFatal ? 'true' : 'false',
