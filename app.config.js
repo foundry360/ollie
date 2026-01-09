@@ -16,7 +16,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.foundry360.ollie",
-      buildNumber: "3",
+      buildNumber: "4",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
       },
