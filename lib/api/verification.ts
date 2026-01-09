@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { trackApiError } from '@/lib/sentry';
 
 export interface VerificationRequest {
   id: string;
@@ -106,10 +105,6 @@ export async function uploadVerificationPhoto(
     return signedUrlData.signedUrl;
   } catch (error: any) {
     const errorObj = error instanceof Error ? error : new Error(error.message || 'Failed to upload verification photo');
-    trackApiError('uploadVerificationPhoto', errorObj, {
-      side,
-      uri: uri.substring(0, 50), // Don't log full URI
-    });
     console.error('Error uploading verification photo:', error);
     throw errorObj;
   }
@@ -185,9 +180,6 @@ export async function submitVerificationRequest(
     }
   } catch (error: any) {
     const errorObj = error instanceof Error ? error : new Error(error.message || 'Failed to submit verification request');
-    trackApiError('submitVerificationRequest', errorObj, {
-      hasBackPhoto: !!backPhotoUrl,
-    });
     console.error('Error submitting verification request:', error);
     throw errorObj;
   }

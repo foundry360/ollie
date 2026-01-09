@@ -11,44 +11,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import { Loading } from '@/components/ui/Loading';
 import { AlertComponent } from '@/components/ui/Alert';
 import { registerForPushNotifications, setupNotificationListeners } from '@/lib/notifications';
-import { initSentry, setSentryUser, clearSentryUser } from '@/lib/sentry';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-
-// Conditionally import Sentry for global error handler
-let Sentry: any = null;
-try {
-  Sentry = require('sentry-expo');
-} catch (e) {
-  // Sentry not available - continue without it
-}
-
-// Initialize Sentry before anything else
-initSentry();
-
-// Add global error handler
-if (typeof ErrorUtils !== 'undefined' && Sentry && Sentry.Native) {
-  try {
-    const originalHandler = ErrorUtils.getGlobalHandler();
-    ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-      if (!__DEV__ && Sentry && Sentry.Native) {
-        try {
-          Sentry.Native.captureException(error, {
-            tags: {
-              isFatal: isFatal ? 'true' : 'false',
-            },
-          });
-        } catch (sentryError) {
-          // Silently fail if Sentry capture fails
-          console.warn('Failed to capture exception in Sentry:', sentryError);
-        }
-      }
-      originalHandler(error, isFatal);
-    });
-  } catch (errorHandlerError) {
-    // Silently fail if error handler setup fails
-    console.warn('Failed to set up global error handler:', errorHandlerError);
-  }
-}
 
 // Conditionally import StripeProvider - only on native platforms (not web)
 let StripeProvider: any;
@@ -95,19 +58,6 @@ export default function RootLayout() {
     return cleanup;
   }, [initializeTheme]);
 
-  // Update Sentry user context when user changes
-  useEffect(() => {
-    if (user) {
-      setSentryUser({
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        role: user.role,
-      });
-    } else {
-      clearSentryUser();
-    }
-  }, [user]);
 
   useEffect(() => {
     // Register for push notifications
@@ -219,7 +169,16 @@ export default function RootLayout() {
     }
 
     // Wrap in try-catch to prevent crashes
+    let authSubscription: any = null;
     try {
+      // Check if supabase client is valid
+      if (!supabase || !supabase.auth) {
+        console.warn('⚠️ Supabase client not available, skipping auth check');
+        setLoading(false);
+        setUser(null);
+        return;
+      }
+
       supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         // Email confirmation is disabled - proceed with user session
@@ -258,13 +217,10 @@ export default function RootLayout() {
       setUser(null);
       setLoading(false);
     });
-    } catch (error) {
-      console.error('Error in auth initialization:', error);
-      setUser(null);
-      setLoading(false);
-    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Set up auth state change listener
+      try {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Skip updating auth store if we're suppressing navigation (e.g., during OTP verification)
       const { suppressingNavigation } = useAuthStore.getState();
       if (suppressingNavigation) {
