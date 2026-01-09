@@ -112,7 +112,13 @@ export default function RootLayout() {
   useEffect(() => {
     // Register for push notifications
     if (user) {
-      registerForPushNotifications();
+      try {
+        registerForPushNotifications().catch((error) => {
+          console.error('Error registering for push notifications:', error);
+        });
+      } catch (error) {
+        console.error('Error in push notification registration:', error);
+      }
     }
   }, [user]);
 
@@ -206,12 +212,15 @@ export default function RootLayout() {
     // Check if Supabase is configured
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      console.warn('⚠️ Supabase URL not configured, skipping auth check');
       setLoading(false);
       setUser(null);
       return;
     }
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Wrap in try-catch to prevent crashes
+    try {
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         // Email confirmation is disabled - proceed with user session
         try {
@@ -244,10 +253,16 @@ export default function RootLayout() {
         setUser(null);
         setLoading(false);
       }
-    }).catch(() => {
+    }).catch((error) => {
+      console.error('Error getting session:', error);
       setUser(null);
       setLoading(false);
     });
+    } catch (error) {
+      console.error('Error in auth initialization:', error);
+      setUser(null);
+      setLoading(false);
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Skip updating auth store if we're suppressing navigation (e.g., during OTP verification)
