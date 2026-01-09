@@ -26,18 +26,28 @@ try {
 initSentry();
 
 // Add global error handler
-if (typeof ErrorUtils !== 'undefined' && Sentry) {
-  const originalHandler = ErrorUtils.getGlobalHandler();
-  ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-    if (!__DEV__ && Sentry) {
-      Sentry.Native.captureException(error, {
-        tags: {
-          isFatal: isFatal ? 'true' : 'false',
-        },
-      });
-    }
-    originalHandler(error, isFatal);
-  });
+if (typeof ErrorUtils !== 'undefined' && Sentry && Sentry.Native) {
+  try {
+    const originalHandler = ErrorUtils.getGlobalHandler();
+    ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+      if (!__DEV__ && Sentry && Sentry.Native) {
+        try {
+          Sentry.Native.captureException(error, {
+            tags: {
+              isFatal: isFatal ? 'true' : 'false',
+            },
+          });
+        } catch (sentryError) {
+          // Silently fail if Sentry capture fails
+          console.warn('Failed to capture exception in Sentry:', sentryError);
+        }
+      }
+      originalHandler(error, isFatal);
+    });
+  } catch (errorHandlerError) {
+    // Silently fail if error handler setup fails
+    console.warn('Failed to set up global error handler:', errorHandlerError);
+  }
 }
 
 // Conditionally import StripeProvider - only on native platforms (not web)

@@ -34,20 +34,21 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error to Sentry if available
-    if (Sentry) {
+    if (Sentry && Sentry.Native) {
       try {
         Sentry.Native.captureException(error, {
-          contexts: {
-            react: {
-              componentStack: errorInfo.componentStack,
-            },
+        contexts: {
+          react: {
+            componentStack: errorInfo.componentStack,
           },
-          tags: {
-            error_boundary: true,
-          },
-        });
+        },
+        tags: {
+          error_boundary: true,
+        },
+      });
       } catch (sentryError) {
         // Sentry not available - continue without it
+        console.warn('Failed to capture exception in ErrorBoundary:', sentryError);
       }
     }
 

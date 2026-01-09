@@ -1,0 +1,6 @@
+Tester Name,Email,Role,Category,Platform,Device,OS Version,Invitation Sent,Invitation Accepted,Testing Started,Status,Feedback Received,Notes
+Development Team Member 1,dev1@example.com,Developer,Internal,iOS,iPhone 14,iOS 17,Pending,Pending,Pending,Pending,,
+QA Team Member 1,qa1@example.com,QA,Internal,iOS,iPhone 13,iOS 16,Pending,Pending,Pending,Pending,,
+Beta Tester - Teen 1,teen1@example.com,Teen,External,iOS,iPhone SE,iOS 15,Pending,Pending,Pending,Pending,,
+Beta Tester - Neighbor 1,neighbor1@example.com,Neighbor,External,iOS,iPhone 15,iOS 17,Pending,Pending,Pending,Pending,,
+Beta Tester - Parent 1,parent1@example.com,Parent,External,iOS,iPad,iOS 16,Pending,Pending,Pending,Pending,,
