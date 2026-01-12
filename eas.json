@@ -1,37 +1,21 @@
 {
   "cli": {
-    "version": ">= 16.28.0"
+    "version": ">= 16.28.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "cocoapods": "1.15.2"
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "store",
-      "ios": {
-        "simulator": false,
-        "cocoapods": "1.15.2",
-        "buildConfiguration": "Release"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "ios": {
-        "cocoapods": "1.15.2",
-        "buildConfiguration": "Release"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
-    "preview": {
-      "ios": {
-        "ascAppId": "6757497389"
-      }
-    },
     "production": {}
   }
 }

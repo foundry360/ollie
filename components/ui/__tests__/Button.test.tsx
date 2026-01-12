@@ -15,9 +15,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   </QueryClientProvider>
 );
 
-jest.mock('@/stores/themeStore', () => ({
-  useThemeStore: jest.fn(),
-}));
+jest.mock('@/stores/themeStore');
 
 describe('Button Component', () => {
   beforeEach(() => {

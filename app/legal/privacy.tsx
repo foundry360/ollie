@@ -171,6 +171,29 @@ export default function PrivacyPolicyScreen() {
             support channels.
           </Text>
         </View>
+
+        <View style={[styles.footerLinks, cardStyle]}>
+          <Pressable
+            style={styles.footerLinkItem}
+            onPress={() => router.push('/(tabs)/home')}
+          >
+            <Text style={[styles.footerLinkText, textStyle]}>Home</Text>
+          </Pressable>
+          <Text style={[styles.footerLinkSeparator, textStyle]}>•</Text>
+          <Pressable
+            style={styles.footerLinkItem}
+            onPress={() => router.push('/legal/community-guidelines')}
+          >
+            <Text style={[styles.footerLinkText, textStyle]}>Community Guidelines</Text>
+          </Pressable>
+          <Text style={[styles.footerLinkSeparator, textStyle]}>•</Text>
+          <Pressable
+            style={styles.footerLinkItem}
+            onPress={() => router.push('/legal/terms')}
+          >
+            <Text style={[styles.footerLinkText, textStyle]}>Terms of Use</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -277,6 +300,28 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     flex: 1,
     flexShrink: 1,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    marginTop: 16,
+    gap: 12,
+  },
+  footerLinkItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  footerLinkText: {
+    fontSize: 14,
+    color: '#73af17',
+    textDecorationLine: 'underline',
+  },
+  footerLinkSeparator: {
+    fontSize: 14,
+    color: '#9CA3AF',
   },
 });
 

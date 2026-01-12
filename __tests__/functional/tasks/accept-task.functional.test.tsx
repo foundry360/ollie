@@ -27,6 +27,9 @@ jest.mock('expo-router', () => ({
   }),
   useLocalSearchParams: () => ({ id: 'task-123' }),
 }));
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
 
 const TaskDetailScreen = require('@/app/tasks/[id]').default;
 

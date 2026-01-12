@@ -11,10 +11,7 @@ if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_A
   console.warn('⚠️ Supabase credentials not found. Please add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to your .env.local file');
 }
 
-// Create Supabase client with error handling
-let supabaseClient;
-try {
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
@@ -26,21 +23,7 @@ try {
       eventsPerSecond: 10
     }
   }
-  });
-} catch (error) {
-  console.error('Failed to create Supabase client:', error);
-  // Create a minimal client that won't crash but will fail gracefully
-  supabaseClient = createClient('https://placeholder.supabase.co', 'placeholder-key', {
-    auth: {
-      storage: AsyncStorage,
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
-    }
-  });
-}
-
-export const supabase = supabaseClient;
+});
 
 export async function getCurrentUser() {
   const { data: { user }, error } = await supabase.auth.getUser();

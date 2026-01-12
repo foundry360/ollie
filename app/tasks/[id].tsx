@@ -379,12 +379,17 @@ export default function TaskDetailScreen() {
                   <Ionicons name="calendar-outline" size={20} color="#73af17" />
                   <View style={styles.scheduleDateRow}>
                     <Text style={[styles.scheduleText, textStyle]}>
-                      {new Date(task.scheduled_date).toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}
+                      {(() => {
+                        if (!task.scheduled_date) return '';
+                        const [year, month, day] = task.scheduled_date.split('-').map(Number);
+                        const date = new Date(year, month - 1, day); // month is 0-indexed
+                        return date.toLocaleDateString('en-US', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long',
+                          day: 'numeric' 
+                        });
+                      })()}
                     </Text>
                     {task.schedule_confirmed && (
                       <View style={styles.confirmedBadge}>

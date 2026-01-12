@@ -469,6 +469,49 @@ serve(async (req: Request) => {
     // Using Payment Methods API instead of deprecated /sources endpoint
     console.log('Creating Stripe bank account payment method for customer:', customerId)
     
+    // First, check for existing us_bank_account payment methods and detach them to prevent duplicates
+    try {
+      const listPaymentMethodsResponse = await fetch(
+        `https://api.stripe.com/v1/payment_methods?customer=${customerId}&type=us_bank_account`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+          },
+        }
+      )
+      
+      if (listPaymentMethodsResponse.ok) {
+        const paymentMethodsList = await listPaymentMethodsResponse.json()
+        if (paymentMethodsList.data && paymentMethodsList.data.length > 0) {
+          console.log(`Found ${paymentMethodsList.data.length} existing us_bank_account payment method(s), detaching...`)
+          // Detach all existing us_bank_account payment methods
+          for (const pm of paymentMethodsList.data) {
+            try {
+              const detachResponse = await fetch(
+                `https://api.stripe.com/v1/payment_methods/${pm.id}/detach`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${stripeSecretKey}`,
+                  },
+                }
+              )
+              if (detachResponse.ok) {
+                console.log(`Detached existing payment method: ${pm.id}`)
+              }
+            } catch (detachError) {
+              console.warn(`Failed to detach payment method ${pm.id}:`, detachError)
+              // Continue anyway
+            }
+          }
+        }
+      }
+    } catch (listError) {
+      console.warn('Failed to list existing payment methods, continuing anyway:', listError)
+      // Continue with creation even if listing fails
+    }
+    
     // Step 1: Create a Payment Method with type us_bank_account
     // For us_bank_account, we must create it WITHOUT customer, then attach it separately
     const paymentMethodParams = new URLSearchParams()

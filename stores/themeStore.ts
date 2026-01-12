@@ -16,31 +16,19 @@ const getSystemColorScheme = (): 'light' | 'dark' => {
 };
 
 export const useThemeStore = create<ThemeState>((set, get) => {
-  // Load theme from storage on initialization - wrapped in try-catch for safety
-  try {
-    AsyncStorage.getItem('theme-storage')
-      .then((stored) => {
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            const theme = parsed.theme || 'system';
-            const colorScheme = theme === 'system' ? getSystemColorScheme() : theme;
-            set({ theme, colorScheme });
-          } catch (error) {
-            console.error('Error parsing theme:', error);
-            // Use defaults if parsing fails
-            set({ theme: 'system', colorScheme: getSystemColorScheme() });
-          }
-        }
-      })
-      .catch((error) => {
-        console.error('Error loading theme from storage:', error);
-        // Use defaults if storage access fails
-        set({ theme: 'system', colorScheme: getSystemColorScheme() });
-      });
-  } catch (error) {
-    console.error('Error initializing theme store:', error);
-  }
+  // Load theme from storage on initialization
+  AsyncStorage.getItem('theme-storage').then((stored) => {
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        const theme = parsed.theme || 'system';
+        const colorScheme = theme === 'system' ? getSystemColorScheme() : theme;
+        set({ theme, colorScheme });
+      } catch (error) {
+        console.error('Error loading theme:', error);
+      }
+    }
+  });
 
   return {
     theme: 'system',

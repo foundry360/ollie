@@ -329,3 +329,17 @@ export function getRandomCompletionMessage(): string {
   return messages[Math.floor(Math.random() * messages.length)];
 }
 
+// Parse a date string (YYYY-MM-DD) as a local date to avoid timezone issues
+// This prevents dates from shifting by one day when parsed as UTC
+export function parseLocalDate(dateString: string | null | undefined): Date | null {
+  if (!dateString) return null;
+  try {
+    // Parse date string as local date to avoid timezone issues
+    // dateString format: "YYYY-MM-DD"
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day); // month is 0-indexed
+  } catch {
+    return null;
+  }
+}
+

@@ -1,11 +1,7 @@
 import { uploadVerificationPhoto, submitVerificationRequest } from '../verification';
 import { supabase } from '@/lib/supabase';
-import { trackApiError } from '@/lib/sentry';
 
 jest.mock('@/lib/supabase');
-jest.mock('@/lib/sentry', () => ({
-  trackApiError: jest.fn(),
-}));
 
 describe('Verification API', () => {
   const mockUser = { id: 'user-123' };
@@ -78,7 +74,7 @@ describe('Verification API', () => {
       expect(mockStorage.createSignedUrl).toHaveBeenCalled();
     });
 
-    it('should track API error on upload failure', async () => {
+    it('should throw error on upload failure', async () => {
       global.fetch = jest.fn(() =>
         Promise.resolve({
           arrayBuffer: () => Promise.resolve(new ArrayBuffer(1000)),
@@ -93,8 +89,6 @@ describe('Verification API', () => {
       await expect(
         uploadVerificationPhoto('file://test.jpg', 'front')
       ).rejects.toThrow();
-
-      expect(trackApiError).toHaveBeenCalled();
     });
   });
 

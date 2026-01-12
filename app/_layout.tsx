@@ -62,13 +62,7 @@ export default function RootLayout() {
   useEffect(() => {
     // Register for push notifications
     if (user) {
-      try {
-        registerForPushNotifications().catch((error) => {
-          console.error('Error registering for push notifications:', error);
-        });
-      } catch (error) {
-        console.error('Error in push notification registration:', error);
-      }
+      registerForPushNotifications();
     }
   }, [user]);
 
@@ -162,24 +156,12 @@ export default function RootLayout() {
     // Check if Supabase is configured
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
-      console.warn('⚠️ Supabase URL not configured, skipping auth check');
       setLoading(false);
       setUser(null);
       return;
     }
 
-    // Wrap in try-catch to prevent crashes
-    let authSubscription: any = null;
-    try {
-      // Check if supabase client is valid
-      if (!supabase || !supabase.auth) {
-        console.warn('⚠️ Supabase client not available, skipping auth check');
-        setLoading(false);
-        setUser(null);
-        return;
-      }
-
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         // Email confirmation is disabled - proceed with user session
         try {
@@ -212,124 +194,104 @@ export default function RootLayout() {
         setUser(null);
         setLoading(false);
       }
-    }).catch((error) => {
-      console.error('Error getting session:', error);
+    }).catch(() => {
       setUser(null);
       setLoading(false);
     });
 
-      // Set up auth state change listener
-      try {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-          // Skip updating auth store if we're suppressing navigation (e.g., during OTP verification)
-          const { suppressingNavigation } = useAuthStore.getState();
-          if (suppressingNavigation) {
-            console.log('Skipping auth state change update due to navigation suppression');
-            return;
-          }
-          
-          if (session?.user) {
-            try {
-              let profile;
-              try {
-                profile = await getUserProfile(session.user.id);
-              } catch (error: any) {
-                // Profile doesn't exist - this is normal for:
-                // 1. New signups (neighbor signup flow creates pending application, not profile)
-                // 2. Users who haven't completed their signup flow
-                // Only create profile for OAuth users (not email/password)
-                
-                // Check if this is an OAuth sign-in by looking at the auth provider
-                const isOAuthUser = session.user.app_metadata?.provider !== 'email' && 
-                                   session.user.app_metadata?.provider !== undefined;
-                
-                // Only create profile for OAuth users on SIGNED_IN event
-                // Email/password users go through neighbor signup flow (pending application)
-                if (isOAuthUser && event === 'SIGNED_IN') {
-                  console.log('Profile not found for OAuth user, creating new profile');
-                  
-                  const user = session.user;
-                  const userMetadata = user.user_metadata || {};
-                  const fullName = userMetadata.full_name || 
-                                  userMetadata.name || 
-                                  `${userMetadata.first_name || ''} ${userMetadata.last_name || ''}`.trim() ||
-                                  user.email?.split('@')[0] ||
-                                  'User';
-                  
-                  const email = user.email || userMetadata.email;
-                  
-                  if (!email) {
-                    console.warn('OAuth user missing email, skipping profile creation');
-                    setUser(null);
-                    return;
-                  }
-
-                  // Determine role - default to 'poster' for OAuth signups (neighbors)
-                  const role = 'poster';
-
-                  // Create user profile (with retry logic built in)
-                  try {
-                    await createUserProfile(user.id, {
-                      email,
-                      full_name: fullName,
-                      role,
-                    });
-
-                    // Fetch the newly created profile
-                    profile = await getUserProfile(user.id);
-                  } catch (profileError: any) {
-                    // If profile creation fails, log but don't crash
-                    console.warn('Failed to create user profile for OAuth user:', profileError.message);
-                    setUser(null);
-                    return;
-                  }
-                } else {
-                  // For email/password users or other events:
-                  // - During neighbor signup, profile doesn't exist yet (pending application instead)
-                  // - This is expected and not an error
-                  // - User will complete signup flow and profile will be created after approval
-                  if (error.code === 'PGRST116') {
-                    // Profile doesn't exist - this is expected for new signups
-                    // Silently set user to null, let the signup flow handle it
-                    setUser(null);
-                    return;
-                  }
-                  // For other errors, still set user to null
-                  setUser(null);
-                  return;
-                }
-              }
-              setUser(profile);
-            } catch (error: any) {
-              // Only log unexpected errors (not PGRST116 which is expected)
-              if (error.code !== 'PGRST116' && !error.message?.includes('User does not exist') && !error.code?.includes('23503')) {
-                console.error('Error handling auth state change:', error);
-              }
-              setUser(null);
-            }
-          } else {
-            setUser(null);
-          }
-        });
-        authSubscription = subscription;
-      } catch (subscriptionError) {
-        console.error('Error setting up auth state change listener:', subscriptionError);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Skip updating auth store if we're suppressing navigation (e.g., during OTP verification)
+      const { suppressingNavigation } = useAuthStore.getState();
+      if (suppressingNavigation) {
+        console.log('Skipping auth state change update due to navigation suppression');
+        return;
       }
-    } catch (error) {
-      console.error('Error in auth initialization:', error);
-      setUser(null);
-      setLoading(false);
-    }
-
-    return () => {
-      if (authSubscription) {
+      
+      if (session?.user) {
         try {
-          authSubscription.unsubscribe();
-        } catch (error) {
-          console.error('Error unsubscribing from auth state changes:', error);
+          let profile;
+          try {
+            profile = await getUserProfile(session.user.id);
+          } catch (error: any) {
+            // Profile doesn't exist - this is normal for:
+            // 1. New signups (neighbor signup flow creates pending application, not profile)
+            // 2. Users who haven't completed their signup flow
+            // Only create profile for OAuth users (not email/password)
+            
+            // Check if this is an OAuth sign-in by looking at the auth provider
+            const isOAuthUser = session.user.app_metadata?.provider !== 'email' && 
+                               session.user.app_metadata?.provider !== undefined;
+            
+            // Only create profile for OAuth users on SIGNED_IN event
+            // Email/password users go through neighbor signup flow (pending application)
+            if (isOAuthUser && event === 'SIGNED_IN') {
+              console.log('Profile not found for OAuth user, creating new profile');
+              
+              const user = session.user;
+              const userMetadata = user.user_metadata || {};
+              const fullName = userMetadata.full_name || 
+                              userMetadata.name || 
+                              `${userMetadata.first_name || ''} ${userMetadata.last_name || ''}`.trim() ||
+                              user.email?.split('@')[0] ||
+                              'User';
+              
+              const email = user.email || userMetadata.email;
+              
+              if (!email) {
+                console.warn('OAuth user missing email, skipping profile creation');
+                setUser(null);
+                return;
+              }
+
+              // Determine role - default to 'poster' for OAuth signups (neighbors)
+              const role = 'poster';
+
+              // Create user profile (with retry logic built in)
+              try {
+                await createUserProfile(user.id, {
+                  email,
+                  full_name: fullName,
+                  role,
+                });
+
+                // Fetch the newly created profile
+                profile = await getUserProfile(user.id);
+              } catch (profileError: any) {
+                // If profile creation fails, log but don't crash
+                console.warn('Failed to create user profile for OAuth user:', profileError.message);
+                setUser(null);
+                return;
+              }
+            } else {
+              // For email/password users or other events:
+              // - During neighbor signup, profile doesn't exist yet (pending application instead)
+              // - This is expected and not an error
+              // - User will complete signup flow and profile will be created after approval
+              if (error.code === 'PGRST116') {
+                // Profile doesn't exist - this is expected for new signups
+                // Silently set user to null, let the signup flow handle it
+                setUser(null);
+                return;
+              }
+              // For other errors, still set user to null
+              setUser(null);
+              return;
+            }
+          }
+          setUser(profile);
+        } catch (error: any) {
+          // Only log unexpected errors (not PGRST116 which is expected)
+          if (error.code !== 'PGRST116' && !error.message?.includes('User does not exist') && !error.code?.includes('23503')) {
+            console.error('Error handling auth state change:', error);
+          }
+          setUser(null);
         }
+      } else {
+        setUser(null);
       }
-    };
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {

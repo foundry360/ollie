@@ -7,3 +7,11 @@ ALTER TABLE public.earnings
 CREATE INDEX IF NOT EXISTS idx_earnings_stripe_fee_amount ON public.earnings(stripe_fee_amount);
 
 
+
+
+
+
+
+
+
+

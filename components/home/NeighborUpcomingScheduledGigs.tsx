@@ -9,6 +9,7 @@ import { GigDetailModal } from '@/components/tasks/GigDetailModal';
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getPublicUserProfile } from '@/lib/api/users';
+import { parseLocalDate } from '@/lib/utils';
 
 // Helper to convert 24-hour time to 12-hour format
 const formatTime12Hour = (time24: string): string => {
@@ -44,13 +45,16 @@ export function NeighborUpcomingScheduledGigs() {
       // Must be confirmed (schedule_confirmed is true)
       if (!gig.schedule_confirmed) return false;
       // Must be in the future
-      const scheduledDate = new Date(gig.scheduled_date);
+      const scheduledDate = parseLocalDate(gig.scheduled_date);
+      if (!scheduledDate) return false;
       scheduledDate.setHours(0, 0, 0, 0);
       return scheduledDate >= today;
     })
     .sort((a, b) => {
-      if (!a.scheduled_date || !b.scheduled_date) return 0;
-      return new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime();
+      const dateA = parseLocalDate(a.scheduled_date);
+      const dateB = parseLocalDate(b.scheduled_date);
+      if (!dateA || !dateB) return 0;
+      return dateA.getTime() - dateB.getTime();
     })
     .slice(0, 5);
 
@@ -139,7 +143,7 @@ export function NeighborUpcomingScheduledGigs() {
         ) : (
           <View style={styles.gigsList}>
             {scheduledGigs.map((item) => {
-            const scheduledDate = item.scheduled_date ? new Date(item.scheduled_date) : null;
+            const scheduledDate = parseLocalDate(item.scheduled_date);
             const dateStr = scheduledDate ? format(scheduledDate, 'MMM d') : '';
             const timeStr = item.scheduled_start_time && item.scheduled_end_time
               ? `${formatTime12Hour(item.scheduled_start_time)} - ${formatTime12Hour(item.scheduled_end_time)}`

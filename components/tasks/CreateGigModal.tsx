@@ -9,7 +9,7 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useCreateTask, useUpdateTask, useTask } from '@/hooks/useTasks';
 import { Task } from '@/types';
-import { normalizeAddress } from '@/lib/utils';
+import { normalizeAddress, parseLocalDate } from '@/lib/utils';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { TimeRangePicker } from '@/components/ui/TimeRangePicker';
@@ -295,9 +295,14 @@ export function CreateGigModal({ visible, onClose, taskId }: CreateGigModalProps
         setPhotos(existingTask.photos || []);
         
         if (existingTask.scheduled_date) {
-          const date = new Date(existingTask.scheduled_date);
-          setScheduledDate(date);
-          setValue('scheduled_date', date);
+          const date = parseLocalDate(existingTask.scheduled_date);
+          if (date) {
+            setScheduledDate(date);
+            setValue('scheduled_date', date);
+          } else {
+            setScheduledDate(null);
+            setValue('scheduled_date', undefined);
+          }
         } else {
           setScheduledDate(null);
           setValue('scheduled_date', undefined);

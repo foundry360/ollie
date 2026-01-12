@@ -403,6 +403,22 @@ export default function CommunityGuidelinesScreen() {
             By using Ollie, you acknowledge that you have read, understood, and agree to follow these Community Guidelines. These guidelines work in conjunction with our Terms of Use and Privacy Policy to create a safe and positive experience for everyone.
           </Text>
         </View>
+
+        <View style={[styles.footerLinks, cardStyle]}>
+          <Pressable
+            style={styles.footerLinkItem}
+            onPress={() => router.push('/legal/terms')}
+          >
+            <Text style={[styles.footerLinkText, textStyle]}>Terms of Use</Text>
+          </Pressable>
+          <Text style={[styles.footerLinkSeparator, textStyle]}>•</Text>
+          <Pressable
+            style={styles.footerLinkItem}
+            onPress={() => router.push('/legal/privacy')}
+          >
+            <Text style={[styles.footerLinkText, textStyle]}>Privacy Policy</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -528,6 +544,28 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontStyle: 'italic',
     flexShrink: 1,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    marginTop: 16,
+    gap: 12,
+  },
+  footerLinkItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  footerLinkText: {
+    fontSize: 14,
+    color: '#73af17',
+    textDecorationLine: 'underline',
+  },
+  footerLinkSeparator: {
+    fontSize: 14,
+    color: '#9CA3AF',
   },
 });
 

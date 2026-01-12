@@ -86,6 +86,29 @@ export default function TermsOfUseScreen() {
             If you have questions about these Terms, please contact us through the app's Help Center or support channels.
           </Text>
         </View>
+
+        <View style={[styles.footerLinks, cardStyle]}>
+          <Pressable
+            style={styles.footerLinkItem}
+            onPress={() => router.push('/(tabs)/home')}
+          >
+            <Text style={[styles.footerLinkText, textStyle]}>Home</Text>
+          </Pressable>
+          <Text style={[styles.footerLinkSeparator, textStyle]}>•</Text>
+          <Pressable
+            style={styles.footerLinkItem}
+            onPress={() => router.push('/legal/community-guidelines')}
+          >
+            <Text style={[styles.footerLinkText, textStyle]}>Community Guidelines</Text>
+          </Pressable>
+          <Text style={[styles.footerLinkSeparator, textStyle]}>•</Text>
+          <Pressable
+            style={styles.footerLinkItem}
+            onPress={() => router.push('/legal/privacy')}
+          >
+            <Text style={[styles.footerLinkText, textStyle]}>Privacy Policy</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -171,6 +194,28 @@ const styles = StyleSheet.create({
   },
   textLight: {
     color: '#374151',
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    marginTop: 16,
+    gap: 12,
+  },
+  footerLinkItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  footerLinkText: {
+    fontSize: 14,
+    color: '#73af17',
+    textDecorationLine: 'underline',
+  },
+  footerLinkSeparator: {
+    fontSize: 14,
+    color: '#9CA3AF',
   },
 });
 

@@ -28,7 +28,5 @@ module.exports = {
     '/__tests__/utils/',
   ],
   testEnvironment: 'node',
-  testTimeout: 10000, // 10 second timeout for tests
-  maxWorkers: '50%', // Use half of available CPUs to avoid memory issues
 };
 

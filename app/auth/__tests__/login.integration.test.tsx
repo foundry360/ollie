@@ -8,6 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 jest.mock('@/stores/authStore');
 jest.mock('@/lib/supabase');
 jest.mock('@react-native-async-storage/async-storage');
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: jest.fn(),

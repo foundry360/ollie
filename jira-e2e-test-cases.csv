@@ -1,0 +1,992 @@
+Summary,Issue Type,Description,Priority,Components,Labels,Acceptance Criteria
+"E2E: User Authentication - Teen Signup (Under 18)","Test","PRECONDITIONS: None
+STEPS:
+1. Open app and tap 'Sign Up'
+2. Select 'I am a Teen' option
+3. Enter age (under 18) on age gate
+4. Enter email, password, full name, birthdate, and parent email
+5. Submit signup form
+6. Check email for parent approval link
+7. Parent clicks approval link and approves
+8. Teen completes account setup
+EXPECTED RESULTS:
+- Age gate validates age correctly
+- Signup form validates all fields
+- Parent approval email is sent
+- Parent can approve via email link
+- Teen can complete account after approval
+- User profile is created with correct role (teen)",High,"Authentication,Onboarding","e2e,authentication,teen-signup,parent-approval","✅ Teen can sign up
+✅ Parent receives approval email
+✅ Parent can approve via link
+✅ Teen account is created after approval"
+"E2E: User Authentication - Teen Signup (18-19 years old)","Test","PRECONDITIONS: None
+STEPS:
+1. Open app and tap 'Sign Up'
+2. Select 'I am a Teen' option
+3. Enter age (18-19) on age gate
+4. Enter email, password, full name, and birthdate (no parent email required)
+5. Submit signup form
+6. Complete profile setup
+EXPECTED RESULTS:
+- Age gate allows 18-19 year olds to proceed
+- Parent email is not required
+- Account is created immediately
+- User profile is created with correct role (teen)",High,"Authentication,Onboarding","e2e,authentication,teen-signup","✅ Teen 18-19 can sign up without parent approval
+✅ Account is created immediately
+✅ Profile is set up correctly"
+"E2E: User Authentication - Adult/Neighbor Signup","Test","PRECONDITIONS: None
+STEPS:
+1. Open app and tap 'Sign Up'
+2. Select 'I am a Neighbor' option
+3. Enter email, password, full name, and phone number
+4. Submit signup form
+5. Complete neighbor application
+6. Wait for admin approval
+EXPECTED RESULTS:
+- Signup form validates all fields
+- Phone number is formatted correctly
+- Application is submitted for review
+- User sees pending approval status
+- Admin can approve/reject application",High,"Authentication,Onboarding","e2e,authentication,neighbor-signup,admin-approval","✅ Neighbor can sign up
+✅ Application is submitted
+✅ Admin approval flow works
+✅ User sees correct status"
+"E2E: User Authentication - Login with Email/Password","Test","PRECONDITIONS: User account exists
+STEPS:
+1. Open app
+2. Tap 'Log In'
+3. Enter email and password
+4. Submit login form
+EXPECTED RESULTS:
+- Email field validates format
+- Password field is secure
+- Successful login redirects to home
+- Failed login shows error message
+- Session persists on app restart",High,Authentication,"e2e,authentication,login","✅ Valid credentials log in successfully
+✅ Invalid credentials show error
+✅ Session persists correctly"
+"E2E: User Authentication - Social Login (Google)","Test","PRECONDITIONS: Google account exists
+STEPS:
+1. Open app
+2. Tap 'Log In'
+3. Tap 'Continue with Google'
+4. Complete Google OAuth flow
+5. Grant permissions if needed
+EXPECTED RESULTS:
+- Google OAuth screen appears
+- User can authenticate with Google
+- Account is linked or created
+- User is redirected to home
+- Profile is created with Google info",Medium,Authentication,"e2e,authentication,oauth,google","✅ Google login works
+✅ Account is created/linked
+✅ User can access app"
+"E2E: User Authentication - Social Login (Apple)","Test","PRECONDITIONS: Apple ID exists
+STEPS:
+1. Open app (iOS)
+2. Tap 'Log In'
+3. Tap 'Continue with Apple'
+4. Complete Apple Sign In flow
+5. Grant permissions if needed
+EXPECTED RESULTS:
+- Apple Sign In screen appears
+- User can authenticate with Apple
+- Account is linked or created
+- User is redirected to home
+- Profile is created with Apple info",Medium,Authentication,"e2e,authentication,oauth,apple,ios","✅ Apple login works on iOS
+✅ Account is created/linked
+✅ User can access app"
+"E2E: User Authentication - Password Reset","Test","PRECONDITIONS: User account exists
+STEPS:
+1. Open app
+2. Tap 'Log In'
+3. Tap 'Forgot Password'
+4. Enter email address
+5. Check email for reset link
+6. Click reset link
+7. Enter new password
+8. Confirm password
+9. Submit form
+EXPECTED RESULTS:
+- Reset email is sent to valid email
+- Reset link opens app or web page
+- Password can be changed
+- New password works for login
+- Invalid/expired link shows error",High,Authentication,"e2e,authentication,password-reset","✅ Reset email is sent
+✅ Password can be reset
+✅ New password works"
+"E2E: User Authentication - Email Verification","Test","PRECONDITIONS: User signed up
+STEPS:
+1. Check email for verification link
+2. Click verification link
+3. Email is verified
+EXPECTED RESULTS:
+- Verification email is sent
+- Link verifies email correctly
+- User sees confirmation
+- Verified status is updated in profile",Medium,Authentication,"e2e,authentication,email-verification","✅ Verification email is sent
+✅ Email is verified via link
+✅ Status is updated"
+"E2E: User Authentication - Phone Verification","Test","PRECONDITIONS: User has phone number in profile
+STEPS:
+1. Navigate to phone verification screen
+2. Enter phone number
+3. Receive SMS code
+4. Enter verification code
+5. Submit form
+EXPECTED RESULTS:
+- Phone number is validated
+- SMS code is received
+- Code verification works
+- Phone number is verified and saved
+- Invalid code shows error",Medium,Authentication,"e2e,authentication,phone-verification,twilio","✅ SMS code is sent
+✅ Code verification works
+✅ Phone is verified"
+"E2E: User Authentication - ID Verification Upload","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to verification screen
+2. Tap 'Upload ID'
+3. Select ID from camera or gallery
+4. Upload ID document
+5. Wait for verification
+EXPECTED RESULTS:
+- Camera/gallery permissions are requested
+- ID can be uploaded from camera or gallery
+- File uploads successfully
+- Verification status is updated
+- User sees pending/approved/rejected status",Medium,Verification,"e2e,verification,id-upload","✅ ID can be uploaded
+✅ Upload is successful
+✅ Status is tracked"
+"E2E: Task Management - Create Task/Gig (Neighbor)","Test","PRECONDITIONS: User is logged in as Neighbor
+STEPS:
+1. Navigate to 'Create Gig' screen
+2. Enter task title
+3. Enter task description
+4. Set payment amount
+5. Select location (or enter address)
+6. Add required skills
+7. Set estimated hours (optional)
+8. Upload photos (optional)
+9. Submit task
+EXPECTED RESULTS:
+- All required fields are validated
+- Location picker works correctly
+- Photos upload successfully
+- Task is created and appears in marketplace
+- Task status is 'open'
+- Task creator can see it in their tasks",High,"Tasks,Gigs","e2e,tasks,create-gig,marketplace","✅ All fields are validated
+✅ Task is created successfully
+✅ Task appears in marketplace
+✅ Creator can view their task"
+"E2E: Task Management - Browse Marketplace (Teen)","Test","PRECONDITIONS: User is logged in as Teen, Multiple tasks exist
+STEPS:
+1. Navigate to Home/Marketplace
+2. View list of available tasks
+3. Filter by location/radius
+4. Filter by pay amount
+5. Filter by skills
+6. Tap on a task to view details
+EXPECTED RESULTS:
+- Tasks are displayed in list
+- Task details show all information
+- Filters work correctly
+- Location-based filtering works
+- Tasks are sorted appropriately
+- Pagination/infinite scroll works",High,"Tasks,Marketplace","e2e,tasks,marketplace,browse,filters","✅ Tasks are displayed
+✅ Filters work correctly
+✅ Task details are shown
+✅ Location filtering works"
+"E2E: Task Management - Accept Task (Teen)","Test","PRECONDITIONS: User is logged in as Teen, Open task exists, Teen is under 18
+STEPS:
+1. Browse marketplace and find open task
+2. Tap on task to view details
+3. Tap 'Accept' button
+4. Confirm acceptance
+5. If under 18, wait for parent approval
+6. Parent approves task
+EXPECTED RESULTS:
+- Teen can accept open tasks
+- Acceptance confirmation dialog appears
+- Task status changes to 'assigned' or 'accepted'
+- If under 18, parent approval is required
+- Parent receives notification
+- Parent can approve/reject
+- After approval, task is accepted
+- Task appears in teen's accepted tasks",High,"Tasks,Parent-Approval","e2e,tasks,accept,parent-approval","✅ Teen can accept task
+✅ Parent approval flow works for under 18
+✅ Task status updates correctly
+✅ Notifications are sent"
+"E2E: Task Management - Accept Task (Teen 18+)","Test","PRECONDITIONS: User is logged in as Teen (18+), Open task exists
+STEPS:
+1. Browse marketplace and find open task
+2. Tap on task to view details
+3. Tap 'Accept' button
+4. Confirm acceptance
+EXPECTED RESULTS:
+- Teen can accept open tasks
+- Acceptance is immediate (no parent approval)
+- Task status changes to 'assigned' or 'accepted'
+- Task appears in teen's accepted tasks
+- Neighbor is notified",High,Tasks,"e2e,tasks,accept,no-parent-approval","✅ Teen can accept task immediately
+✅ No parent approval needed for 18+
+✅ Task status updates correctly"
+"E2E: Task Management - Start Task (Teen)","Test","PRECONDITIONS: User is logged in as Teen, Task is accepted
+STEPS:
+1. Navigate to 'My Tasks'
+2. Find accepted task
+3. Tap 'Start' button
+4. Confirm start
+EXPECTED RESULTS:
+- Teen can start accepted tasks
+- Task status changes to 'in_progress'
+- Neighbor is notified
+- Task appears in in-progress section
+- Timer/work tracking starts (if applicable)",High,Tasks,"e2e,tasks,start,in-progress","✅ Teen can start task
+✅ Status updates to in_progress
+✅ Notifications are sent"
+"E2E: Task Management - Complete Task (Teen)","Test","PRECONDITIONS: User is logged in as Teen, Task is in progress
+STEPS:
+1. Navigate to 'My Tasks'
+2. Find in-progress task
+3. Tap 'Complete' button
+4. Confirm completion
+EXPECTED RESULTS:
+- Teen can complete in-progress tasks
+- Task status changes to 'completed'
+- Neighbor is notified
+- Payment processing is initiated
+- Earnings are recorded
+- Task appears in completed section",High,"Tasks,Payments","e2e,tasks,complete,payment","✅ Teen can complete task
+✅ Status updates to completed
+✅ Payment is initiated
+✅ Earnings are recorded"
+"E2E: Task Management - Cancel Task (Neighbor)","Test","PRECONDITIONS: User is logged in as Neighbor, Task is open/assigned
+STEPS:
+1. Navigate to 'My Tasks' (Neighbor view)
+2. Find task
+3. Tap 'Cancel' button
+4. Confirm cancellation
+EXPECTED RESULTS:
+- Neighbor can cancel their tasks
+- Task status changes to 'cancelled'
+- If assigned, teen is notified
+- Task is removed from marketplace
+- Refunds are processed if payment was made
+- Task appears in cancelled section",High,Tasks,"e2e,tasks,cancel,refund","✅ Neighbor can cancel task
+✅ Status updates correctly
+✅ Notifications are sent
+✅ Refunds are processed"
+"E2E: Task Management - Cancel Task (Teen)","Test","PRECONDITIONS: User is logged in as Teen, Task is accepted/in-progress
+STEPS:
+1. Navigate to 'My Tasks'
+2. Find accepted/in-progress task
+3. Tap 'Cancel' button
+4. Confirm cancellation
+EXPECTED RESULTS:
+- Teen can cancel their accepted tasks
+- Task status changes to 'cancelled'
+- Neighbor is notified
+- Task becomes available again
+- Task appears in cancelled section",Medium,Tasks,"e2e,tasks,cancel","✅ Teen can cancel task
+✅ Status updates correctly
+✅ Notifications are sent"
+"E2E: Task Management - View Task Details","Test","PRECONDITIONS: Task exists
+STEPS:
+1. Browse marketplace or navigate to task
+2. Tap on task card
+3. View task details screen
+EXPECTED RESULTS:
+- All task information is displayed
+- Photos are shown correctly
+- Location is shown on map (if applicable)
+- Poster information is visible
+- Accept/Start/Complete buttons show based on status
+- Navigation works correctly",Medium,Tasks,"e2e,tasks,view-details","✅ All details are displayed
+✅ Photos load correctly
+✅ Actions are available based on role/status"
+"E2E: Messaging - Send Message in Task Chat","Test","PRECONDITIONS: User is logged in, Task is accepted
+STEPS:
+1. Navigate to task details
+2. Tap 'Message' or 'Chat' button
+3. Enter message text
+4. Send message
+EXPECTED RESULTS:
+- Chat screen opens
+- Message is sent successfully
+- Message appears in chat
+- Recipient receives notification
+- Message is saved in database
+- Real-time updates work (if applicable)",High,Messaging,"e2e,messaging,chat,send-message","✅ Messages can be sent
+✅ Recipient receives notification
+✅ Real-time updates work"
+"E2E: Messaging - Receive Message in Task Chat","Test","PRECONDITIONS: User is logged in, Task is accepted, Another user sends message
+STEPS:
+1. Wait for message notification
+2. Tap notification or navigate to chat
+3. View received message
+4. Message is marked as read
+EXPECTED RESULTS:
+- Push notification is received
+- Notification opens correct chat
+- Message appears in chat
+- Message is marked as read
+- Unread indicator updates
+- Message persists after app restart",High,Messaging,"e2e,messaging,chat,receive-message,notifications","✅ Push notification is received
+✅ Chat opens correctly
+✅ Message is marked as read"
+"E2E: Messaging - Delete Message","Test","PRECONDITIONS: User is logged in, Messages exist in chat
+STEPS:
+1. Navigate to chat
+2. Long press on a message
+3. Select 'Delete'
+4. Confirm deletion
+EXPECTED RESULTS:
+- Message can be deleted
+- Message is removed from chat
+- Deletion is synced
+- Message doesn't reappear after sync",Medium,Messaging,"e2e,messaging,delete","✅ Message can be deleted
+✅ Deletion persists
+✅ Sync doesn't restore deleted message"
+"E2E: Messaging - View Conversation List","Test","PRECONDITIONS: User is logged in, Multiple conversations exist
+STEPS:
+1. Navigate to 'Messages' tab
+2. View list of conversations
+3. Tap on a conversation
+4. Navigate back
+EXPECTED RESULTS:
+- All conversations are listed
+- Conversations are sorted by last message
+- Unread indicators show correctly
+- Tapping conversation opens chat
+- Back navigation works",Medium,Messaging,"e2e,messaging,conversations","✅ Conversations are listed
+✅ Unread indicators work
+✅ Navigation works correctly"
+"E2E: Profile Management - Edit Profile Information","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to Profile screen
+2. Tap 'Edit' on Account Info section
+3. Update full name
+4. Update phone number
+5. Save changes
+EXPECTED RESULTS:
+- Profile information can be edited
+- Fields are validated
+- Changes are saved successfully
+- Updated information is displayed
+- Changes persist after app restart",Medium,Profile,"e2e,profile,edit-info","✅ Profile can be edited
+✅ Changes are saved
+✅ Information persists"
+"E2E: Profile Management - Upload Profile Photo","Test","PRECONDITIONS: User is logged in, Camera/gallery access granted
+STEPS:
+1. Navigate to Profile screen
+2. Tap on profile photo
+3. Select 'Take Photo' or 'Choose from Library'
+4. Select/capture photo
+5. Crop photo if needed
+6. Save photo
+EXPECTED RESULTS:
+- Camera permission is requested
+- Gallery permission is requested
+- Photo can be captured or selected
+- Photo is uploaded successfully
+- Photo appears in profile
+- Photo is displayed throughout app",Medium,Profile,"e2e,profile,photo-upload,permissions","✅ Photo can be uploaded
+✅ Permissions are requested
+✅ Photo is displayed correctly"
+"E2E: Profile Management - Edit Bio","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to Profile screen
+2. Tap 'Edit' on Bio section
+3. Enter or update bio text
+4. Save changes
+EXPECTED RESULTS:
+- Bio can be edited
+- Text is saved correctly
+- Bio is displayed in profile
+- Changes persist",Low,Profile,"e2e,profile,bio","✅ Bio can be edited
+✅ Changes are saved
+✅ Bio is displayed"
+"E2E: Profile Management - Edit Location","Test","PRECONDITIONS: User is logged in, Location permissions granted
+STEPS:
+1. Navigate to Profile screen
+2. Tap 'Edit' on Location section
+3. Enter address, city, state, zip code
+4. Save changes
+EXPECTED RESULTS:
+- Location can be edited
+- Address fields are validated
+- Location is saved
+- Location is used for task filtering
+- Changes persist",Medium,Profile,"e2e,profile,location","✅ Location can be edited
+✅ Address is validated
+✅ Location is saved"
+"E2E: Profile Management - Manage Skills (Teen)","Test","PRECONDITIONS: User is logged in as Teen
+STEPS:
+1. Navigate to Profile screen
+2. Tap 'Edit' on Skills section
+3. Select/deselect skills
+4. Save changes
+EXPECTED RESULTS:
+- Skills can be selected/deselected
+- Selected skills are displayed
+- Skills are saved
+- Skills appear in profile
+- Skills are used for task matching",Medium,Profile,"e2e,profile,skills","✅ Skills can be managed
+✅ Changes are saved
+✅ Skills are displayed correctly"
+"E2E: Profile Management - Set Availability (Teen)","Test","PRECONDITIONS: User is logged in as Teen
+STEPS:
+1. Navigate to Profile screen
+2. Tap 'Edit' on Availability section
+3. Set hours for each day
+4. Or use 'same hours for all days' toggle
+5. Save changes
+EXPECTED RESULTS:
+- Availability can be set per day
+- Same hours toggle works
+- Time picker works correctly
+- Availability is saved
+- Availability is displayed correctly
+- Changes persist",Medium,Profile,"e2e,profile,availability","✅ Availability can be set
+✅ Toggle works correctly
+✅ Changes are saved"
+"E2E: Profile Management - View Other User Profile","Test","PRECONDITIONS: User is logged in, Another user exists
+STEPS:
+1. Navigate to task details or chat
+2. Tap on user's name or photo
+3. View user profile
+EXPECTED RESULTS:
+- User profile opens
+- Public information is displayed
+- Skills are shown (for teens)
+- Rating/reviews are shown (if applicable)
+- Profile photo is displayed
+- Navigation works correctly",Low,Profile,"e2e,profile,view-other","✅ Other user profiles can be viewed
+✅ Public information is shown
+✅ Navigation works"
+"E2E: Payment Setup - Add Bank Account (Teen with Parent Approval)","Test","PRECONDITIONS: User is logged in as Teen (under 18), Parent approval required
+STEPS:
+1. Navigate to Payment Setup
+2. Tap 'Add Bank Account'
+3. Request parent approval
+4. Parent receives email
+5. Parent clicks link and sets up bank account
+6. Parent completes setup
+EXPECTED RESULTS:
+- Parent approval is requested
+- Email is sent to parent
+- Parent can access setup via link
+- Parent can enter bank account details
+- Setup is completed
+- Teen sees approval status
+- Bank account is linked to teen account",High,Payments,"e2e,payments,bank-account,parent-approval,stripe","✅ Parent approval flow works
+✅ Bank account is set up
+✅ Account is linked correctly"
+"E2E: Payment Setup - Add Bank Account (Teen 18+)","Test","PRECONDITIONS: User is logged in as Teen (18+)
+STEPS:
+1. Navigate to Payment Setup
+2. Tap 'Add Bank Account'
+3. Enter bank account details
+4. Complete verification
+5. Submit form
+EXPECTED RESULTS:
+- Bank account can be added directly
+- No parent approval required
+- Stripe integration works
+- Account is verified
+- Bank account is saved
+- Payment setup is complete",High,Payments,"e2e,payments,bank-account,stripe","✅ Bank account can be added
+✅ Stripe integration works
+✅ Account is verified"
+"E2E: Payment Setup - Add Payment Method (Neighbor)","Test","PRECONDITIONS: User is logged in as Neighbor
+STEPS:
+1. Navigate to Payment Setup or Payment Methods
+2. Tap 'Add Payment Method'
+3. Enter card details (or use Stripe Element)
+4. Complete card verification
+5. Save payment method
+EXPECTED RESULTS:
+- Payment method can be added
+- Stripe integration works
+- Card is validated
+- Payment method is saved
+- Payment method appears in list
+- Default payment method can be set",High,Payments,"e2e,payments,payment-method,stripe","✅ Payment method can be added
+✅ Stripe integration works
+✅ Card is validated and saved"
+"E2E: Payments - Complete Task Payment Flow","Test","PRECONDITIONS: Task is completed, Neighbor has payment method, Teen has bank account
+STEPS:
+1. Teen completes task
+2. Task status changes to completed
+3. Payment is processed automatically
+4. Neighbor's card is charged
+5. Platform fee is deducted
+6. Payment is sent to teen's bank account
+7. Earnings are recorded
+EXPECTED RESULTS:
+- Payment is processed automatically
+- Neighbor's card is charged correctly
+- Platform fee is calculated and deducted
+- Payment is sent to teen's bank account
+- Earnings record is created
+- Status updates to 'paid' after payout
+- Both users see updated status
+- Notifications are sent",High,Payments,"e2e,payments,payment-flow,stripe,payout","✅ Payment is processed
+✅ Funds are transferred correctly
+✅ Earnings are recorded
+✅ Status updates correctly"
+"E2E: Payments - View Earnings (Teen)","Test","PRECONDITIONS: User is logged in as Teen, Earnings exist
+STEPS:
+1. Navigate to Earnings/Wallet tab
+2. View earnings summary
+3. Filter by date range
+4. Filter by status (pending/paid)
+5. Tap on an earning to view details
+EXPECTED RESULTS:
+- Earnings summary is displayed
+- Total earnings, pending, and paid amounts are shown
+- Date filters work correctly
+- Status filters work correctly
+- Individual earning details can be viewed
+- Payment status is accurate
+- Refresh updates data",High,Payments,"e2e,payments,earnings,wallet","✅ Earnings are displayed correctly
+✅ Filters work
+✅ Details can be viewed"
+"E2E: Payments - View Spending (Neighbor)","Test","PRECONDITIONS: User is logged in as Neighbor, Payments made exist
+STEPS:
+1. Navigate to Earnings/Wallet tab (shows as Spending for neighbors)
+2. View spending summary
+3. Filter by date range
+4. Filter by status (pending/paid)
+5. Tap on a payment to view details
+EXPECTED RESULTS:
+- Spending summary is displayed
+- Total spent, pending, and paid amounts are shown
+- Date filters work correctly
+- Status filters work correctly
+- Individual payment details can be viewed
+- Payment status is accurate
+- Refresh updates data",High,Payments,"e2e,payments,spending,wallet","✅ Spending is displayed correctly
+✅ Filters work
+✅ Details can be viewed"
+"E2E: Parent Features - Approve Teen Signup","Test","PRECONDITIONS: Teen submitted signup request, Parent email received
+STEPS:
+1. Parent receives approval email
+2. Parent clicks approval link
+3. Link opens app or web page
+4. Parent reviews teen information
+5. Parent approves signup
+6. Teen is notified
+EXPECTED RESULTS:
+- Approval email is received
+- Link works correctly
+- Parent can approve signup
+- Teen account is created
+- Teen is notified
+- Teen can complete account setup",High,"Parent-Approval,Onboarding","e2e,parent-approval,signup","✅ Approval email is sent
+✅ Link works correctly
+✅ Teen account is created after approval"
+"E2E: Parent Features - Approve Gig Application","Test","PRECONDITIONS: Teen accepted gig, Teen is under 18, Parent is registered
+STEPS:
+1. Teen accepts a gig
+2. Parent approval is required
+3. Parent receives notification
+4. Parent navigates to Parent Dashboard
+5. Parent views pending approval
+6. Parent approves gig application
+7. Gig is assigned to teen
+EXPECTED RESULTS:
+- Parent receives notification
+- Parent Dashboard shows pending approval
+- Parent can view gig details
+- Parent can approve application
+- Gig status updates to accepted
+- Teen is notified
+- Gig appears in teen's accepted tasks",High,"Parent-Approval,Tasks","e2e,parent-approval,gig-application","✅ Parent receives notification
+✅ Parent can approve gig
+✅ Gig is assigned after approval"
+"E2E: Parent Features - Reject Gig Application","Test","PRECONDITIONS: Teen accepted gig, Teen is under 18, Parent is registered
+STEPS:
+1. Teen accepts a gig
+2. Parent approval is required
+3. Parent receives notification
+4. Parent navigates to Parent Dashboard
+5. Parent views pending approval
+6. Parent rejects gig application (with optional reason)
+7. Gig is rejected
+EXPECTED RESULTS:
+- Parent can reject application
+- Optional reason can be entered
+- Gig status updates appropriately
+- Teen is notified of rejection
+- Gig becomes available again (or stays in original state)
+- Rejection reason is shown to teen (if provided)",High,"Parent-Approval,Tasks","e2e,parent-approval,reject","✅ Parent can reject gig
+✅ Reason can be provided
+✅ Teen is notified"
+"E2E: Parent Features - Set Up Bank Account for Teen","Test","PRECONDITIONS: Teen requested bank account setup, Parent is registered
+STEPS:
+1. Teen requests bank account setup
+2. Parent receives email
+3. Parent clicks link
+4. Parent enters bank account details
+5. Parent completes Stripe verification
+6. Bank account is linked to teen
+EXPECTED RESULTS:
+- Parent receives email
+- Link works correctly
+- Parent can enter bank details
+- Stripe verification works
+- Bank account is linked to teen
+- Teen sees approval status
+- Teen can receive payments",High,"Parent-Approval,Payments","e2e,parent-approval,bank-setup,stripe","✅ Email is sent to parent
+✅ Bank account can be set up
+✅ Account is linked to teen"
+"E2E: Notifications - Push Notification Registration","Test","PRECONDITIONS: User is logged in, App has notification permissions
+STEPS:
+1. App requests notification permissions on first launch
+2. User grants permissions
+3. App registers for push notifications
+4. Push token is saved to user profile
+EXPECTED RESULTS:
+- Permission is requested appropriately
+- Token is generated
+- Token is saved to user profile
+- Token is used for sending notifications",Medium,Notifications,"e2e,notifications,registration,permissions","✅ Permissions are requested
+✅ Token is generated and saved
+✅ Notifications can be received"
+"E2E: Notifications - Receive New Message Notification","Test","PRECONDITIONS: User is logged in, Push notifications enabled, Another user sends message
+STEPS:
+1. Another user sends message in task chat
+2. Push notification is sent
+3. User receives notification
+4. User taps notification
+5. App opens to chat screen
+EXPECTED RESULTS:
+- Push notification is received
+- Notification content is correct
+- Tapping notification opens correct chat
+- Message is displayed
+- Notification is cleared
+- Badge count updates",High,Notifications,"e2e,notifications,push-message","✅ Notification is received
+✅ Tapping opens correct screen
+✅ Badge updates correctly"
+"E2E: Notifications - Receive Gig Accepted Notification","Test","PRECONDITIONS: User is logged in as Neighbor, Push notifications enabled, Teen accepts gig
+STEPS:
+1. Teen accepts neighbor's gig
+2. Push notification is sent to neighbor
+3. Neighbor receives notification
+4. Neighbor taps notification
+5. App opens to task details
+EXPECTED RESULTS:
+- Push notification is received
+- Notification content is correct
+- Tapping notification opens task details
+- Task status is updated
+- Badge count updates",High,Notifications,"e2e,notifications,gig-accepted","✅ Notification is received
+✅ Tapping opens task details
+✅ Status is correct"
+"E2E: Notifications - View Notifications List","Test","PRECONDITIONS: User is logged in, Multiple notifications exist
+STEPS:
+1. Navigate to Notifications screen
+2. View list of notifications
+3. Tap on a notification
+4. Mark notification as read
+5. Mark all as read
+EXPECTED RESULTS:
+- All notifications are listed
+- Unread notifications are highlighted
+- Tapping notification navigates correctly
+- Notification is marked as read
+- 'Mark all as read' works
+- Refresh updates list",Medium,Notifications,"e2e,notifications,list,mark-read","✅ Notifications are listed
+✅ Read/unread status works
+✅ Navigation works correctly"
+"E2E: Settings - Change Password","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to Settings
+2. Tap 'Change Password'
+3. Enter current password
+4. Enter new password
+5. Confirm new password
+6. Save changes
+EXPECTED RESULTS:
+- Current password is validated
+- New password meets requirements
+- Password confirmation matches
+- Password is changed successfully
+- User must log in with new password
+- Old password no longer works",Medium,Settings,"e2e,settings,change-password","✅ Password can be changed
+✅ Validation works correctly
+✅ New password works"
+"E2E: Settings - Toggle Dark Mode","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to Settings
+2. Find theme toggle
+3. Toggle dark mode on
+4. Verify app appearance
+5. Toggle dark mode off
+6. Verify app appearance
+EXPECTED RESULTS:
+- Theme toggle is available
+- Dark mode applies correctly
+- Light mode applies correctly
+- Preference persists after app restart
+- All screens respect theme",Low,Settings,"e2e,settings,theme,dark-mode","✅ Theme can be toggled
+✅ Preference persists
+✅ All screens respect theme"
+"E2E: Settings - Logout","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to Settings
+2. Tap 'Logout'
+3. Confirm logout
+EXPECTED RESULTS:
+- Logout button is available
+- Confirmation dialog appears
+- User is logged out
+- Session is cleared
+- User is redirected to login/splash screen
+- User data is cleared from app
+- User must log in again to access app",Medium,Settings,"e2e,settings,logout","✅ User can log out
+✅ Session is cleared
+✅ User is redirected correctly"
+"E2E: Settings - Delete Account","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to Settings
+2. Find 'Delete Account' option
+3. Tap delete account
+4. Enter password or confirm deletion
+5. Confirm deletion
+EXPECTED RESULTS:
+- Delete account option is available
+- Confirmation is required
+- Account is deleted
+- User data is removed
+- User is logged out
+- Account cannot be accessed
+- Related data is handled appropriately",High,Settings,"e2e,settings,delete-account","✅ Account can be deleted
+✅ Confirmation is required
+✅ Data is removed"
+"E2E: Settings - View Payment Methods","Test","PRECONDITIONS: User is logged in as Neighbor, Payment methods exist
+STEPS:
+1. Navigate to Settings or Payment Methods
+2. View list of payment methods
+3. Set default payment method
+4. Remove payment method (if allowed)
+EXPECTED RESULTS:
+- Payment methods are listed
+- Default can be set
+- Payment methods can be managed
+- Changes are saved
+- Default is used for payments",Medium,Settings,"e2e,settings,payment-methods","✅ Payment methods are listed
+✅ Default can be set
+✅ Management works correctly"
+"E2E: Help & Support - View Help Center","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to Help Center
+2. Browse FAQ categories
+3. Tap on a question
+4. View answer
+5. Search for help topics
+EXPECTED RESULTS:
+- Help Center is accessible
+- FAQs are organized by category
+- Questions can be expanded to show answers
+- Search works correctly
+- Navigation works",Low,"Help,Support","e2e,help,faq","✅ Help Center is accessible
+✅ FAQs are organized
+✅ Search works"
+"E2E: Help & Support - View Legal Pages","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate to Legal section
+2. View Terms of Service
+3. View Privacy Policy
+4. View Community Guidelines
+EXPECTED RESULTS:
+- Legal pages are accessible
+- Content is displayed correctly
+- Pages are readable
+- Navigation works",Low,"Legal,Help","e2e,legal,terms,privacy,guidelines","✅ Legal pages are accessible
+✅ Content is displayed correctly"
+"E2E: Neighbor Application - Submit Application","Test","PRECONDITIONS: User completed adult signup
+STEPS:
+1. Complete neighbor application form
+2. Enter required information
+3. Upload verification documents (if required)
+4. Submit application
+EXPECTED RESULTS:
+- Application form validates all fields
+- Application is submitted successfully
+- User sees pending approval status
+- Admin receives application
+- Application appears in admin queue",High,"Neighbor-Application,Admin","e2e,neighbor-application,admin-approval","✅ Application can be submitted
+✅ Status is shown correctly
+✅ Admin can review"
+"E2E: Neighbor Application - View Pending Status","Test","PRECONDITIONS: User submitted neighbor application
+STEPS:
+1. Navigate to account status screen
+2. View pending approval message
+3. Check status updates
+EXPECTED RESULTS:
+- Pending status is displayed
+- User cannot access neighbor features yet
+- Status updates when approved/rejected
+- User is notified of status change",Medium,"Neighbor-Application","e2e,neighbor-application,status","✅ Status is shown correctly
+✅ User is notified of changes"
+"E2E: Navigation - Tab Navigation","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Navigate between tabs (Home, Messages, Tasks, Earnings, Profile)
+2. Verify each tab loads correctly
+3. Navigate back and forth
+EXPECTED RESULTS:
+- All tabs are accessible
+- Tab icons show correctly
+- Badge counts show on tabs (if applicable)
+- Tab state is maintained
+- Navigation is smooth
+- Selected tab is highlighted",Medium,Navigation,"e2e,navigation,tabs","✅ All tabs work correctly
+✅ Badge counts update
+✅ Navigation is smooth"
+"E2E: Navigation - Deep Linking","Test","PRECONDITIONS: User has notification or link
+STEPS:
+1. Receive push notification with deep link
+2. Tap notification
+3. App opens to specific screen
+4. Or open app via deep link URL
+EXPECTED RESULTS:
+- Deep links work correctly
+- App opens to correct screen
+- Navigation stack is correct
+- Data is loaded correctly
+- Links work from notifications and external sources",Medium,Navigation,"e2e,navigation,deep-linking","✅ Deep links work correctly
+✅ Correct screens are opened
+✅ Navigation stack is correct"
+"E2E: App Initialization - First Launch","Test","PRECONDITIONS: App is not installed, User is new
+STEPS:
+1. Install app
+2. Launch app for first time
+3. View splash screen
+4. View onboarding (if applicable)
+5. Navigate to signup/login
+EXPECTED RESULTS:
+- Splash screen displays correctly
+- Animations work (if any)
+- App loads successfully
+- Onboarding is shown (if applicable)
+- Navigation to auth works
+- No crashes occur",High,"App-Initialization","e2e,initialization,splash,onboarding","✅ App launches successfully
+✅ Splash screen works
+✅ Onboarding shows correctly"
+"E2E: App Initialization - Returning User","Test","PRECONDITIONS: User previously logged in, Session exists
+STEPS:
+1. Launch app
+2. App checks for existing session
+3. User is automatically logged in
+4. App navigates to home screen
+EXPECTED RESULTS:
+- Session is detected
+- User is automatically logged in
+- Home screen loads
+- User data is loaded
+- Navigation works correctly
+- No login screen is shown",High,"App-Initialization","e2e,initialization,session-persistence","✅ Session persists correctly
+✅ User is auto-logged in
+✅ Data loads correctly"
+"E2E: Error Handling - Network Error","Test","PRECONDITIONS: User is logged in, Network connection is available
+STEPS:
+1. Disable network connection
+2. Attempt to perform action (create task, send message, etc.)
+3. View error message
+4. Re-enable network
+5. Retry action
+EXPECTED RESULTS:
+- Network errors are detected
+- Appropriate error message is shown
+- User can retry action
+- Action succeeds after network restored
+- App doesn't crash
+- Error state is handled gracefully",Medium,"Error-Handling","e2e,error-handling,network","✅ Network errors are handled
+✅ Error messages are shown
+✅ Retry works correctly"
+"E2E: Error Handling - Invalid Input","Test","PRECONDITIONS: User is logged in
+STEPS:
+1. Attempt to submit form with invalid data
+2. View validation errors
+3. Correct errors
+4. Submit again
+EXPECTED RESULTS:
+- Validation errors are shown
+- Error messages are clear
+- Form cannot be submitted with invalid data
+- After correction, form submits successfully
+- Validation works for all fields",Medium,"Error-Handling","e2e,error-handling,validation","✅ Validation works correctly
+✅ Error messages are clear
+✅ Forms validate properly"
+"E2E: Performance - Load Time","Test","PRECONDITIONS: App is installed
+STEPS:
+1. Measure app launch time
+2. Measure screen load times
+3. Measure data fetch times
+4. Monitor app performance
+EXPECTED RESULTS:
+- App launches in reasonable time (< 3 seconds)
+- Screens load quickly (< 1 second)
+- Data fetches complete in reasonable time
+- No significant lag or freezing
+- Animations are smooth
+- App is responsive to user input",Medium,Performance,"e2e,performance,load-time","✅ App launches quickly
+✅ Screens load fast
+✅ App is responsive"
+"E2E: Performance - Large Data Sets","Test","PRECONDITIONS: Large number of tasks/messages exist
+STEPS:
+1. Browse marketplace with 100+ tasks
+2. View messages list with 100+ conversations
+3. Scroll through lists
+4. Filter and search
+EXPECTED RESULTS:
+- Lists load efficiently
+- Pagination/infinite scroll works
+- Scrolling is smooth
+- Filters work quickly
+- Search is responsive
+- No memory issues
+- App doesn't crash",Medium,Performance,"e2e,performance,large-datasets,pagination","✅ Large lists load efficiently
+✅ Scrolling is smooth
+✅ Filters/search work quickly"
+"E2E: Accessibility - Screen Reader Support","Test","PRECONDITIONS: Screen reader enabled (VoiceOver/TalkBack)
+STEPS:
+1. Enable screen reader
+2. Navigate through app
+3. Verify all elements are readable
+4. Test forms and buttons
+5. Test navigation
+EXPECTED RESULTS:
+- All UI elements have labels
+- Screen reader reads content correctly
+- Forms are navigable
+- Buttons are accessible
+- Navigation works with screen reader
+- App is usable with screen reader",Medium,Accessibility,"e2e,accessibility,screen-reader","✅ Screen reader works correctly
+✅ All elements are accessible
+✅ Navigation works"
+"E2E: Multi-User - Full Task Lifecycle","Test","PRECONDITIONS: Two users (Neighbor and Teen) are logged in on different devices
+STEPS:
+1. Neighbor creates a task
+2. Teen browses and finds task
+3. Teen accepts task
+4. Neighbor is notified
+5. Both users exchange messages
+6. Teen starts task
+7. Teen completes task
+8. Payment is processed
+9. Both users verify earnings/spending
+EXPECTED RESULTS:
+- Task is created and visible to teen
+- Acceptance notifies neighbor
+- Messaging works between users
+- Task status updates for both users
+- Payment processes correctly
+- Both users see correct amounts
+- Notifications work for both users
+- Real-time updates work (if applicable)",High,"Multi-User,Integration","e2e,multi-user,full-lifecycle,integration","✅ All interactions work correctly
+✅ Real-time updates work
+✅ Payment processes correctly"
+

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { TimeRangePicker } from '@/components/ui/TimeRangePicker';
 import { Task } from '@/types';
 import { useConfirmSchedule, useProposeSchedule } from '@/hooks/useTasks';
+import { parseLocalDate } from '@/lib/utils';
 
 interface ScheduleConfirmationModalProps {
   visible: boolean;
@@ -53,7 +54,8 @@ export function ScheduleConfirmationModal({
 
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+    const date = parseLocalDate(dateStr);
+    if (!date) return '';
     return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
 

@@ -25,25 +25,8 @@ import { Input } from '@/components/ui/Input';
 import { Loading } from '@/components/ui/Loading';
 
 const verificationSchema = z.object({
-  amount1: z.string()
-    .regex(/^\d+\.?\d{0,2}$/, 'Enter a valid amount (e.g., 0.32)')
-    .refine((val) => {
-      const num = parseFloat(val);
-      return !isNaN(num) && num > 0 && num < 1;
-    }, 'Amount must be between $0.01 and $0.99'),
-  amount2: z.string()
-    .regex(/^\d+\.?\d{0,2}$/, 'Enter a valid amount (e.g., 0.45)')
-    .refine((val) => {
-      const num = parseFloat(val);
-      return !isNaN(num) && num > 0 && num < 1;
-    }, 'Amount must be between $0.01 and $0.99'),
-}).refine((data) => {
-  const amount1 = parseFloat(data.amount1);
-  const amount2 = parseFloat(data.amount2);
-  return amount1 !== amount2;
-}, {
-  message: 'Amounts must be different',
-  path: ['amount2'],
+  descriptorCode: z.string()
+    .regex(/^\d{4}$/, 'Enter the 4-digit code from your bank statement (e.g., 1234)')
 });
 
 type VerificationFormData = z.infer<typeof verificationSchema>;
@@ -65,8 +48,7 @@ export default function PaymentSetupScreen() {
   const { control, handleSubmit, formState: { errors }, reset } = useForm<VerificationFormData>({
     resolver: zodResolver(verificationSchema),
     defaultValues: {
-      amount1: '',
-      amount2: '',
+      descriptorCode: '',
     },
   });
 
@@ -134,7 +116,7 @@ export default function PaymentSetupScreen() {
   const handleVerifyAccount = async (data: VerificationFormData) => {
     setIsVerifying(true);
     try {
-      await verifyBankAccount(data.amount1, data.amount2);
+      await verifyBankAccount(data.descriptorCode);
       Alert.alert(
         'Account Verified!',
         'Your bank account has been verified successfully. You can now receive payments.',
@@ -149,7 +131,7 @@ export default function PaymentSetupScreen() {
         ]
       );
     } catch (error: any) {
-      Alert.alert('Verification Failed', error.message || 'The amounts you entered do not match. Please try again.');
+      Alert.alert('Verification Failed', error.message || 'The code you entered is incorrect. Please try again.');
     } finally {
       setIsVerifying(false);
     }
@@ -442,77 +424,40 @@ export default function PaymentSetupScreen() {
                     <View style={[styles.infoBox, { backgroundColor: '#F3F4F6' }, isDark && { backgroundColor: '#374151' }]}>
                       <Ionicons name="information-circle" size={20} color="#73af17" />
                       <Text style={[styles.infoBoxText, { color: '#374151' }, isDark && { color: '#D1D5DB' }]}>
-                        We've sent two small deposits to your bank account. Check your bank statement and enter the amounts below to verify.
+                        We've sent a small deposit to your bank account. Check your bank statement for a code starting with "SM" followed by 4 digits (e.g., SM1234). Enter the 4 digits below.
                       </Text>
                     </View>
 
                     <View style={styles.verificationForm}>
-                      <Text style={[styles.formTitle, titleStyle]}>Enter Deposit Amounts</Text>
+                      <Text style={[styles.formTitle, titleStyle]}>Enter Verification Code</Text>
                       
-                      <View style={styles.amountInputsRow}>
-                        {/* First Deposit Amount */}
-                        <View style={styles.amountInputContainer}>
-                          <Text style={[styles.label, textStyle]}>First Amount *</Text>
-                          <View style={[styles.amountInputWrapper, isDark ? styles.amountInputWrapperDark : styles.amountInputWrapperLight]}>
-                            <Text style={[styles.dollarSign, textStyle]}>$</Text>
-                            <Controller
-                              control={control}
-                              name="amount1"
-                              render={({ field: { onChange, onBlur, value } }) => (
-                                <TextInput
-                                  value={value}
-                                  onChangeText={(text) => {
-                                    const cleaned = text
-                                      .replace(/[^\d.]/g, '')
-                                      .replace(/\.+/g, '.')
-                                      .replace(/(\.\d{2})\d+/, '$1');
-                                    onChange(cleaned);
-                                  }}
-                                  onBlur={onBlur}
-                                  placeholder="0.32"
-                                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
-                                  keyboardType="decimal-pad"
-                                  style={[styles.amountTextInput, textStyle]}
-                                />
-                              )}
-                            />
-                          </View>
-                          {errors.amount1 && (
-                            <Text style={styles.errorText}>{errors.amount1.message}</Text>
-                          )}
+                      <View style={styles.codeInputContainer}>
+                        <Text style={[styles.label, textStyle]}>SM Code *</Text>
+                        <View style={[styles.codeInputWrapper, isDark ? styles.codeInputWrapperDark : styles.codeInputWrapperLight]}>
+                          <Text style={[styles.codePrefix, isDark ? styles.codePrefixDark : styles.codePrefixLight]}>SM</Text>
+                          <Controller
+                            control={control}
+                            name="descriptorCode"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                              <TextInput
+                                value={value}
+                                onChangeText={(text) => {
+                                  const cleaned = text.replace(/\D/g, '').slice(0, 4);
+                                  onChange(cleaned);
+                                }}
+                                onBlur={onBlur}
+                                placeholder="1234"
+                                placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+                                keyboardType="number-pad"
+                                maxLength={4}
+                                style={[styles.codeTextInput, isDark ? styles.codeTextInputDark : styles.codeTextInputLight]}
+                              />
+                            )}
+                          />
                         </View>
-
-                        {/* Second Deposit Amount */}
-                        <View style={styles.amountInputContainer}>
-                          <Text style={[styles.label, textStyle]}>Second Amount *</Text>
-                          <View style={[styles.amountInputWrapper, isDark ? styles.amountInputWrapperDark : styles.amountInputWrapperLight]}>
-                            <Text style={[styles.dollarSign, textStyle]}>$</Text>
-                            <Controller
-                              control={control}
-                              name="amount2"
-                              render={({ field: { onChange, onBlur, value } }) => (
-                                <TextInput
-                                  value={value}
-                                  onChangeText={(text) => {
-                                    const cleaned = text
-                                      .replace(/[^\d.]/g, '')
-                                      .replace(/\.+/g, '.')
-                                      .replace(/(\.\d{2})\d+/, '$1');
-                                    onChange(cleaned);
-                                  }}
-                                  onBlur={onBlur}
-                                  placeholder="0.45"
-                                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
-                                  keyboardType="decimal-pad"
-                                  style={[styles.amountTextInput, textStyle]}
-                                />
-                              )}
-                            />
-                          </View>
-                          {errors.amount2 && (
-                            <Text style={styles.errorText}>{errors.amount2.message}</Text>
-                          )}
-                        </View>
+                        {errors.descriptorCode && (
+                          <Text style={styles.errorText}>{errors.descriptorCode.message}</Text>
+                        )}
                       </View>
 
                       <Button
@@ -767,47 +712,49 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 8,
   },
-  amountInputsRow: {
-    flexDirection: 'row',
-    gap: 12,
+  codeInputContainer: {
     marginBottom: 16,
   },
-  amountInputContainer: {
-    flex: 1,
-    marginBottom: 0,
-  },
-  amountInputWrapper: {
+  codeInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'transparent',
-    minHeight: 40,
-  },
-  amountInputWrapperLight: {
+    paddingVertical: 12,
     borderColor: '#D1D5DB',
-    backgroundColor: 'transparent',
+    minHeight: 48,
   },
-  amountInputWrapperDark: {
+  codeInputWrapperLight: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D1D5DB',
+  },
+  codeInputWrapperDark: {
+    backgroundColor: '#1F2937',
     borderColor: '#4B5563',
-    backgroundColor: 'transparent',
   },
-  dollarSign: {
+  codePrefix: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     marginRight: 8,
   },
-  amountTextInput: {
+  codePrefixDark: {
+    color: '#D1D5DB',
+  },
+  codePrefixLight: {
+    color: '#374151',
+  },
+  codeTextInput: {
     flex: 1,
-    borderWidth: 0,
-    padding: 0,
-    margin: 0,
     fontSize: 16,
+    padding: 0,
     minHeight: 24,
-    textAlignVertical: 'center',
+  },
+  codeTextInputLight: {
+    color: '#111827',
+  },
+  codeTextInputDark: {
+    color: '#F9FAFB',
   },
   errorText: {
     color: '#DC2626',

@@ -28,39 +28,20 @@ serve(async (req: Request) => {
     }
 
     // Get request body
-    const { amount1, amount2 } = await req.json()
+    const { descriptorCode } = await req.json()
 
     // Validate required fields
-    if (!amount1 || !amount2) {
+    if (!descriptorCode) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: amount1 and amount2' }),
+        JSON.stringify({ error: 'Missing required field: descriptorCode' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Validate and parse amounts
-    const parsedAmount1 = parseFloat(amount1)
-    const parsedAmount2 = parseFloat(amount2)
-
-    if (isNaN(parsedAmount1) || isNaN(parsedAmount2)) {
+    // Validate code format (4 digits)
+    if (!/^\d{4}$/.test(descriptorCode)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid amount format. Please enter valid numbers (e.g., 0.32)' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Validate amounts are between $0.01 and $0.99
-    if (parsedAmount1 <= 0 || parsedAmount1 >= 1 || parsedAmount2 <= 0 || parsedAmount2 >= 1) {
-      return new Response(
-        JSON.stringify({ error: 'Amounts must be between $0.01 and $0.99' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Validate amounts are different
-    if (parsedAmount1 === parsedAmount2) {
-      return new Response(
-        JSON.stringify({ error: 'Amounts must be different' }),
+        JSON.stringify({ error: 'Invalid code format. Please enter the 4-digit code (e.g., 1234)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -150,11 +131,6 @@ serve(async (req: Request) => {
       )
     }
 
-    // Verify micro-deposits with Stripe using Payment Methods API
-    // Convert amounts to cents (Stripe uses cents)
-    const amount1Cents = Math.round(parsedAmount1 * 100)
-    const amount2Cents = Math.round(parsedAmount2 * 100)
-
     // The stripe_external_account_id stores the Payment Method ID (pm_xxxxx)
     const paymentMethodId = bankAccount.stripe_external_account_id
 
@@ -166,12 +142,11 @@ serve(async (req: Request) => {
     }
 
     // Verify the bank account using Payment Methods API
-    // For us_bank_account payment methods, use verify_microdeposits endpoint
+    // For us_bank_account payment methods, use verify_microdeposits endpoint with descriptor_code
     const verifyParams = new URLSearchParams()
-    verifyParams.append('amounts[0]', amount1Cents.toString())
-    verifyParams.append('amounts[1]', amount2Cents.toString())
+    verifyParams.append('descriptor_code', descriptorCode)
 
-    console.log('Verifying micro-deposits for payment method:', paymentMethodId)
+    console.log('Verifying micro-deposits with descriptor code for payment method:', paymentMethodId)
 
     const verifyResponse = await fetch(
       `https://api.stripe.com/v1/payment_methods/${paymentMethodId}/verify_microdeposits`,
@@ -201,8 +176,8 @@ serve(async (req: Request) => {
 
       return new Response(
         JSON.stringify({ 
-          error: 'Verification failed. The amounts you entered do not match. Please try again.',
-          details: verifyResult.error?.message || 'Invalid verification amounts'
+          error: 'Verification failed. The code you entered is incorrect. Please try again.',
+          details: verifyResult.error?.message || 'Invalid verification code'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -240,7 +215,7 @@ serve(async (req: Request) => {
       if (newStatus === 'failed') {
         return new Response(
           JSON.stringify({ 
-            error: 'Verification failed. The amounts you entered do not match. Please add a new bank account.',
+            error: 'Verification failed. The code you entered is incorrect. Please add a new bank account.',
             verification_status: 'failed'
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -249,7 +224,7 @@ serve(async (req: Request) => {
 
       return new Response(
         JSON.stringify({ 
-          error: 'Verification is still pending. Please check the amounts and try again.',
+          error: 'Verification is still pending. Please check the code and try again.',
           verification_status: 'pending'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

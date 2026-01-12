@@ -25,6 +25,7 @@ import { FeaturedTeenlancers } from '@/components/home/FeaturedTeenlancers';
 import { TipsCarousel } from '@/components/home/TipsCarousel';
 import { TeenUpcomingScheduledGigs } from '@/components/home/TeenUpcomingScheduledGigs';
 import { Loading } from '@/components/ui/Loading';
+import { parseLocalDate } from '@/lib/utils';
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
@@ -58,7 +59,8 @@ export default function HomeScreen() {
       if (!gig.scheduled_date) return false;
       if (!['assigned', 'accepted', 'in_progress'].includes(gig.status)) return false;
       if (!gig.schedule_confirmed) return false;
-      const scheduledDate = new Date(gig.scheduled_date);
+      const scheduledDate = parseLocalDate(gig.scheduled_date);
+      if (!scheduledDate) return false;
       scheduledDate.setHours(0, 0, 0, 0);
       return scheduledDate >= today;
     });

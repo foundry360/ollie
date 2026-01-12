@@ -160,23 +160,32 @@ serve(async (req: Request) => {
       }
     }
 
-    // Delete the old external account from Stripe
-    const deleteResponse = await fetch(
-      `https://api.stripe.com/v1/customers/${stripeCustomerId}/sources/${bankAccount.stripe_external_account_id}`,
-      {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${stripeSecretKey}`,
-        },
-      }
-    )
+    // Detach the old payment method from Stripe customer
+    // We're using Payment Methods API, so we need to detach, not delete as a source
+    const paymentMethodId = bankAccount.stripe_external_account_id
+    
+    if (paymentMethodId) {
+      // First, check if it's attached to the customer and detach it
+      const detachResponse = await fetch(
+        `https://api.stripe.com/v1/payment_methods/${paymentMethodId}/detach`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+          },
+        }
+      )
 
-    if (!deleteResponse.ok) {
-      const deleteError = await deleteResponse.json()
-      // If account doesn't exist in Stripe, that's okay - continue to delete from our DB
-      if (deleteError.error?.code !== 'resource_missing') {
-        console.error('Failed to delete old Stripe external account:', deleteError)
-        // Still try to delete from our database
+      if (!detachResponse.ok) {
+        const detachError = await detachResponse.json()
+        // If payment method doesn't exist or is already detached, that's okay
+        if (detachError.error?.code !== 'resource_missing' && 
+            detachError.error?.code !== 'payment_method_not_attached') {
+          console.error('Failed to detach old Stripe payment method:', detachError)
+          // Still try to delete from our database
+        }
+      } else {
+        console.log('Successfully detached payment method:', paymentMethodId)
       }
     }
 

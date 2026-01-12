@@ -25,7 +25,6 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console
     console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
@@ -58,7 +57,7 @@ function ErrorFallback({ error, onReset }: { error: Error | null; onReset: () =>
           Something went wrong
         </Text>
         <Text style={[styles.message, isDark && styles.messageDark]}>
-          We're sorry, but something unexpected happened. The error has been reported and we'll look into it.
+          We're sorry, but something unexpected happened. Please try again.
         </Text>
         {__DEV__ && error && (
           <View style={[styles.errorDetails, isDark && styles.errorDetailsDark]}>
