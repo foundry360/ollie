@@ -27,23 +27,54 @@ serve(async (req: Request) => {
       )
     }
 
-    // Get request body
-    const { descriptorCode } = await req.json()
+    // Get request body - support both verification methods
+    const { descriptorCode, amount1, amount2 } = await req.json()
 
-    // Validate required fields
-    if (!descriptorCode) {
+    // Determine which verification method to use
+    const useDescriptorCode = !!descriptorCode
+    const useAmounts = !!(amount1 && amount2)
+
+    // Validate that at least one method is provided
+    if (!useDescriptorCode && !useAmounts) {
       return new Response(
-        JSON.stringify({ error: 'Missing required field: descriptorCode' }),
+        JSON.stringify({ error: 'Missing required fields. Please provide either descriptorCode or both amount1 and amount2' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Validate code format (4 digits)
-    if (!/^\d{4}$/.test(descriptorCode)) {
+    // Validate descriptor code format if provided (4 digits)
+    if (useDescriptorCode && !/^\d{4}$/.test(descriptorCode)) {
       return new Response(
         JSON.stringify({ error: 'Invalid code format. Please enter the 4-digit code (e.g., 1234)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Validate amounts if provided
+    if (useAmounts) {
+      const amount1Num = parseFloat(amount1)
+      const amount2Num = parseFloat(amount2)
+      
+      if (isNaN(amount1Num) || isNaN(amount2Num)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid amount format. Please enter valid numbers (e.g., 0.32)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (amount1Num <= 0 || amount2Num <= 0) {
+        return new Response(
+          JSON.stringify({ error: 'Amounts must be greater than 0' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (amount1Num === amount2Num) {
+        return new Response(
+          JSON.stringify({ error: 'Amounts must be different' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     // Initialize Supabase client
@@ -142,11 +173,23 @@ serve(async (req: Request) => {
     }
 
     // Verify the bank account using Payment Methods API
-    // For us_bank_account payment methods, use verify_microdeposits endpoint with descriptor_code
+    // Support both descriptor code and two-amount verification methods
     const verifyParams = new URLSearchParams()
-    verifyParams.append('descriptor_code', descriptorCode)
-
-    console.log('Verifying micro-deposits with descriptor code for payment method:', paymentMethodId)
+    
+    if (useDescriptorCode) {
+      verifyParams.append('descriptor_code', descriptorCode)
+      console.log('Verifying micro-deposits with descriptor code for payment method:', paymentMethodId)
+    } else {
+      // Convert amounts to cents
+      const amount1Cents = Math.round(parseFloat(amount1) * 100)
+      const amount2Cents = Math.round(parseFloat(amount2) * 100)
+      verifyParams.append('amounts[0]', amount1Cents.toString())
+      verifyParams.append('amounts[1]', amount2Cents.toString())
+      console.log('Verifying micro-deposits with two amounts for payment method:', paymentMethodId, {
+        amount1: amount1Cents,
+        amount2: amount2Cents
+      })
+    }
 
     const verifyResponse = await fetch(
       `https://api.stripe.com/v1/payment_methods/${paymentMethodId}/verify_microdeposits`,
@@ -174,10 +217,14 @@ serve(async (req: Request) => {
         })
         .eq('id', bankAccount.id)
 
+      const errorMessage = useDescriptorCode
+        ? 'Verification failed. The code you entered is incorrect. Please try again.'
+        : 'Verification failed. The amounts you entered are incorrect. Please check your bank statement and try again.'
+      
       return new Response(
         JSON.stringify({ 
-          error: 'Verification failed. The code you entered is incorrect. Please try again.',
-          details: verifyResult.error?.message || 'Invalid verification code'
+          error: errorMessage,
+          details: verifyResult.error?.message || 'Invalid verification data'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -213,18 +260,26 @@ serve(async (req: Request) => {
         .eq('id', bankAccount.id)
 
       if (newStatus === 'failed') {
+        const errorMessage = useDescriptorCode
+          ? 'Verification failed. The code you entered is incorrect. Please add a new bank account.'
+          : 'Verification failed. The amounts you entered are incorrect. Please add a new bank account.'
+        
         return new Response(
           JSON.stringify({ 
-            error: 'Verification failed. The code you entered is incorrect. Please add a new bank account.',
+            error: errorMessage,
             verification_status: 'failed'
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
+      const pendingMessage = useDescriptorCode
+        ? 'Verification is still pending. Please check the code and try again.'
+        : 'Verification is still pending. Please check the amounts and try again.'
+
       return new Response(
         JSON.stringify({ 
-          error: 'Verification is still pending. Please check the code and try again.',
+          error: pendingMessage,
           verification_status: 'pending'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

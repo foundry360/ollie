@@ -25,8 +25,21 @@ import { Input } from '@/components/ui/Input';
 import { Loading } from '@/components/ui/Loading';
 
 const verificationSchema = z.object({
-  descriptorCode: z.string()
-    .regex(/^\d{4}$/, 'Enter the 4-digit code from your bank statement (e.g., 1234)')
+  verificationMethod: z.enum(['code', 'amounts']),
+  descriptorCode: z.string().optional(),
+  amount1: z.string().optional(),
+  amount2: z.string().optional(),
+}).refine((data) => {
+  if (data.verificationMethod === 'code') {
+    return !!data.descriptorCode && /^\d{4}$/.test(data.descriptorCode);
+  } else {
+    const amount1Num = data.amount1 ? parseFloat(data.amount1) : NaN;
+    const amount2Num = data.amount2 ? parseFloat(data.amount2) : NaN;
+    return !isNaN(amount1Num) && !isNaN(amount2Num) && amount1Num > 0 && amount2Num > 0 && amount1Num !== amount2Num;
+  }
+}, {
+  message: 'Please provide valid verification data',
+  path: ['verificationMethod']
 });
 
 type VerificationFormData = z.infer<typeof verificationSchema>;
@@ -45,12 +58,17 @@ export default function PaymentSetupScreen() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  const { control, handleSubmit, formState: { errors }, reset } = useForm<VerificationFormData>({
+  const { control, handleSubmit, formState: { errors }, reset, watch } = useForm<VerificationFormData>({
     resolver: zodResolver(verificationSchema),
     defaultValues: {
+      verificationMethod: 'code',
       descriptorCode: '',
+      amount1: '',
+      amount2: '',
     },
   });
+
+  const verificationMethod = watch('verificationMethod');
 
   // Load approval status and bank account on mount
   useEffect(() => {
@@ -116,7 +134,17 @@ export default function PaymentSetupScreen() {
   const handleVerifyAccount = async (data: VerificationFormData) => {
     setIsVerifying(true);
     try {
-      await verifyBankAccount(data.descriptorCode);
+      if (data.verificationMethod === 'code') {
+        if (!data.descriptorCode) {
+          throw new Error('Please enter the 4-digit code');
+        }
+        await verifyBankAccount({ descriptorCode: data.descriptorCode });
+      } else {
+        if (!data.amount1 || !data.amount2) {
+          throw new Error('Please enter both deposit amounts');
+        }
+        await verifyBankAccount({ amount1: data.amount1, amount2: data.amount2 });
+      }
       Alert.alert(
         'Account Verified!',
         'Your bank account has been verified successfully. You can now receive payments.',
@@ -131,7 +159,7 @@ export default function PaymentSetupScreen() {
         ]
       );
     } catch (error: any) {
-      Alert.alert('Verification Failed', error.message || 'The code you entered is incorrect. Please try again.');
+      Alert.alert('Verification Failed', error.message || 'The verification information you entered is incorrect. Please try again.');
     } finally {
       setIsVerifying(false);
     }
@@ -424,41 +452,181 @@ export default function PaymentSetupScreen() {
                     <View style={[styles.infoBox, { backgroundColor: '#F3F4F6' }, isDark && { backgroundColor: '#374151' }]}>
                       <Ionicons name="information-circle" size={20} color="#73af17" />
                       <Text style={[styles.infoBoxText, { color: '#374151' }, isDark && { color: '#D1D5DB' }]}>
-                        We've sent a small deposit to your bank account. Check your bank statement for a code starting with "SM" followed by 4 digits (e.g., SM1234). Enter the 4 digits below.
+                        We've sent micro-deposits to your bank account. Choose how you'd like to verify:
                       </Text>
                     </View>
 
                     <View style={styles.verificationForm}>
-                      <Text style={[styles.formTitle, titleStyle]}>Enter Verification Code</Text>
+                      <Text style={[styles.formTitle, titleStyle]}>Verification Method</Text>
                       
-                      <View style={styles.codeInputContainer}>
-                        <Text style={[styles.label, textStyle]}>SM Code *</Text>
-                        <View style={[styles.codeInputWrapper, isDark ? styles.codeInputWrapperDark : styles.codeInputWrapperLight]}>
-                          <Text style={[styles.codePrefix, isDark ? styles.codePrefixDark : styles.codePrefixLight]}>SM</Text>
-                          <Controller
-                            control={control}
-                            name="descriptorCode"
-                            render={({ field: { onChange, onBlur, value } }) => (
-                              <TextInput
-                                value={value}
-                                onChangeText={(text) => {
-                                  const cleaned = text.replace(/\D/g, '').slice(0, 4);
-                                  onChange(cleaned);
-                                }}
-                                onBlur={onBlur}
-                                placeholder="1234"
-                                placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
-                                keyboardType="number-pad"
-                                maxLength={4}
-                                style={[styles.codeTextInput, isDark ? styles.codeTextInputDark : styles.codeTextInputLight]}
-                              />
-                            )}
+                      {/* Method Selection */}
+                      <View style={styles.methodSelector}>
+                        <Pressable
+                          style={[
+                            styles.methodOption,
+                            verificationMethod === 'code' && styles.methodOptionActive,
+                            isDark && verificationMethod === 'code' && styles.methodOptionActiveDark
+                          ]}
+                          onPress={() => {
+                            reset({
+                              verificationMethod: 'code',
+                              descriptorCode: '',
+                              amount1: '',
+                              amount2: '',
+                            });
+                          }}
+                        >
+                          <Ionicons 
+                            name={verificationMethod === 'code' ? 'radio-button-on' : 'radio-button-off'} 
+                            size={20} 
+                            color={verificationMethod === 'code' ? '#73af17' : '#9CA3AF'} 
                           />
-                        </View>
-                        {errors.descriptorCode && (
-                          <Text style={styles.errorText}>{errors.descriptorCode.message}</Text>
-                        )}
+                          <Text style={[styles.methodOptionText, textStyle]}>Code (SM1234)</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[
+                            styles.methodOption,
+                            verificationMethod === 'amounts' && styles.methodOptionActive,
+                            isDark && verificationMethod === 'amounts' && styles.methodOptionActiveDark
+                          ]}
+                          onPress={() => {
+                            reset({
+                              verificationMethod: 'amounts',
+                              descriptorCode: '',
+                              amount1: '',
+                              amount2: '',
+                            });
+                          }}
+                        >
+                          <Ionicons 
+                            name={verificationMethod === 'amounts' ? 'radio-button-on' : 'radio-button-off'} 
+                            size={20} 
+                            color={verificationMethod === 'amounts' ? '#73af17' : '#9CA3AF'} 
+                          />
+                          <Text style={[styles.methodOptionText, textStyle]}>Two Amounts</Text>
+                        </Pressable>
                       </View>
+
+                      <Controller
+                        control={control}
+                        name="verificationMethod"
+                        render={({ field: { value } }) => null}
+                      />
+
+                      {/* Code Input */}
+                      {verificationMethod === 'code' && (
+                        <>
+                          <View style={[styles.infoBox, { backgroundColor: '#EFF6FF' }, isDark && { backgroundColor: '#1E3A8A' }]}>
+                            <Ionicons name="information-circle" size={16} color="#3B82F6" />
+                            <Text style={[styles.infoBoxText, { color: '#1E40AF', fontSize: 12 }, isDark && { color: '#93C5FD' }]}>
+                              Check your bank statement for a code starting with "SM" followed by 4 digits (e.g., SM1234). If you don't see a code, use the "Two Amounts" method instead.
+                            </Text>
+                          </View>
+                          <View style={styles.codeInputContainer}>
+                            <Text style={[styles.label, textStyle]}>SM Code *</Text>
+                            <View style={[styles.codeInputWrapper, isDark ? styles.codeInputWrapperDark : styles.codeInputWrapperLight]}>
+                              <Text style={[styles.codePrefix, isDark ? styles.codePrefixDark : styles.codePrefixLight]}>SM</Text>
+                              <Controller
+                                control={control}
+                                name="descriptorCode"
+                                render={({ field: { onChange, onBlur, value } }) => (
+                                  <TextInput
+                                    value={value || ''}
+                                    onChangeText={(text) => {
+                                      const cleaned = text.replace(/\D/g, '').slice(0, 4);
+                                      onChange(cleaned);
+                                    }}
+                                    onBlur={onBlur}
+                                    placeholder="1234"
+                                    placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+                                    keyboardType="number-pad"
+                                    maxLength={4}
+                                    style={[styles.codeTextInput, isDark ? styles.codeTextInputDark : styles.codeTextInputLight]}
+                                  />
+                                )}
+                              />
+                            </View>
+                            {errors.descriptorCode && (
+                              <Text style={styles.errorText}>{errors.descriptorCode.message}</Text>
+                            )}
+                          </View>
+                        </>
+                      )}
+
+                      {/* Amounts Input */}
+                      {verificationMethod === 'amounts' && (
+                        <>
+                          <View style={[styles.infoBox, { backgroundColor: '#EFF6FF' }, isDark && { backgroundColor: '#1E3A8A' }]}>
+                            <Ionicons name="information-circle" size={16} color="#3B82F6" />
+                            <Text style={[styles.infoBoxText, { color: '#1E40AF', fontSize: 12 }, isDark && { color: '#93C5FD' }]}>
+                              Check your bank statement for two small deposits (e.g., $0.32 and $0.45). Enter the exact amounts below.
+                            </Text>
+                          </View>
+                          <View style={styles.amountInputContainer}>
+                            <Controller
+                              control={control}
+                              name="amount1"
+                              render={({ field: { onChange, onBlur, value } }) => (
+                                <View style={styles.inputWrapper}>
+                                  <Text style={[styles.label, textStyle]}>First Amount *</Text>
+                                  <Input
+                                    value={value || ''}
+                                    onChangeText={(text) => {
+                                      // Allow decimal numbers
+                                      const cleaned = text.replace(/[^0-9.]/g, '');
+                                      // Ensure only one decimal point
+                                      const parts = cleaned.split('.');
+                                      const formatted = parts.length > 2 
+                                        ? parts[0] + '.' + parts.slice(1).join('')
+                                        : cleaned;
+                                      onChange(formatted);
+                                    }}
+                                    onBlur={onBlur}
+                                    placeholder="0.32"
+                                    keyboardType="decimal-pad"
+                                    style={isDark ? styles.inputDark : styles.inputLight}
+                                  />
+                                  {errors.amount1 && (
+                                    <Text style={styles.errorText}>{errors.amount1.message}</Text>
+                                  )}
+                                </View>
+                              )}
+                            />
+                            <Controller
+                              control={control}
+                              name="amount2"
+                              render={({ field: { onChange, onBlur, value } }) => (
+                                <View style={styles.inputWrapper}>
+                                  <Text style={[styles.label, textStyle]}>Second Amount *</Text>
+                                  <Input
+                                    value={value || ''}
+                                    onChangeText={(text) => {
+                                      // Allow decimal numbers
+                                      const cleaned = text.replace(/[^0-9.]/g, '');
+                                      // Ensure only one decimal point
+                                      const parts = cleaned.split('.');
+                                      const formatted = parts.length > 2 
+                                        ? parts[0] + '.' + parts.slice(1).join('')
+                                        : cleaned;
+                                      onChange(formatted);
+                                    }}
+                                    onBlur={onBlur}
+                                    placeholder="0.45"
+                                    keyboardType="decimal-pad"
+                                    style={isDark ? styles.inputDark : styles.inputLight}
+                                  />
+                                  {errors.amount2 && (
+                                    <Text style={styles.errorText}>{errors.amount2.message}</Text>
+                                  )}
+                                </View>
+                              )}
+                            />
+                          </View>
+                          {errors.verificationMethod && (
+                            <Text style={styles.errorText}>{errors.verificationMethod.message}</Text>
+                          )}
+                        </>
+                      )}
 
                       <Button
                         title="Verify Account"
@@ -760,6 +928,51 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 12,
     marginTop: 4,
+  },
+  methodSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  methodOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
+  },
+  methodOptionActive: {
+    borderColor: '#73af17',
+    backgroundColor: '#F0FDF4',
+  },
+  methodOptionActiveDark: {
+    borderColor: '#73af17',
+    backgroundColor: '#1F2937',
+  },
+  methodOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  amountInputContainer: {
+    gap: 16,
+    marginBottom: 16,
+  },
+  inputWrapper: {
+    marginBottom: 0,
+  },
+  inputLight: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D1D5DB',
+    color: '#111827',
+  },
+  inputDark: {
+    backgroundColor: '#1F2937',
+    borderColor: '#4B5563',
+    color: '#F9FAFB',
   },
   resendButton: {
     marginTop: 16,

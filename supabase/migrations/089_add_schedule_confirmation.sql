@@ -35,3 +35,4 @@ COMMENT ON COLUMN public.gigs.proposed_scheduled_end_time IS 'Alternative end ti
 
 
 
+

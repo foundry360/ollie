@@ -660,10 +660,12 @@ export async function createBankAccount(data: CreateBankAccountData): Promise<Cr
 }
 
 /**
- * Verify bank account with micro-deposit code
- * @param descriptorCode - The 4-digit verification code from bank statement (e.g., "1234")
+ * Verify bank account with micro-deposit code or amounts
+ * @param options - Either { descriptorCode: string } or { amount1: string, amount2: string }
  */
-export async function verifyBankAccount(descriptorCode: string): Promise<{
+export async function verifyBankAccount(
+  options: { descriptorCode: string } | { amount1: string; amount2: string }
+): Promise<{
   verified: boolean;
   verified_at: string;
   bank_account: {
@@ -679,9 +681,7 @@ export async function verifyBankAccount(descriptorCode: string): Promise<{
 
   // Explicitly pass Authorization header
   const { data, error } = await supabase.functions.invoke('verify-bank-account', {
-    body: {
-      descriptorCode: descriptorCode,
-    },
+    body: options,
     headers: {
       Authorization: `Bearer ${session.access_token}`,
     },
