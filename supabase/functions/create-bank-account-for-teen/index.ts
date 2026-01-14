@@ -585,22 +585,90 @@ serve(async (req: Request) => {
       } : null
     })
 
-    // Step 2: For us_bank_account, Stripe requires verification before attaching
-    // This is a limitation of the Payment Methods API for ACH
-    // We'll store the payment method without attaching it
-    // Verification and attachment will be handled in a separate flow
-    // (e.g., via Financial Connections API or a separate verification endpoint)
-    
-    console.log('Payment method created (not attached yet - requires verification first):', {
-      id: paymentMethod.id,
-      status: paymentMethod.us_bank_account?.status,
-      supportedMethods: paymentMethod.us_bank_account?.supported_verification_methods
+    // For US bank accounts, we need to create a SetupIntent for verification
+    // US bank accounts must be verified (via micro-deposits) before they can be attached to a customer
+    console.log('Creating SetupIntent for bank account verification:', {
+      payment_method_id: paymentMethod.id,
+      customer_id: customerId,
     })
 
-    // Payment method is NOT attached to customer yet
-    // It needs to be verified before it can be attached
-    // We'll store it in the database and handle verification/attachment separately
-    const attachedPaymentMethod = paymentMethod
+    const setupIntentParams = new URLSearchParams()
+    setupIntentParams.append('customer', customerId)
+    setupIntentParams.append('payment_method', paymentMethod.id)
+    setupIntentParams.append('payment_method_types[]', 'us_bank_account')
+    setupIntentParams.append('usage', 'off_session')
+    setupIntentParams.append('metadata[user_id]', teenUser.id)
+    setupIntentParams.append('metadata[account_type]', account_type)
+
+    const setupIntentResponse = await fetch('https://api.stripe.com/v1/setup_intents', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: setupIntentParams,
+    })
+
+    let setupIntent = await setupIntentResponse.json()
+
+    if (!setupIntentResponse.ok) {
+      console.error('=== CREATE SETUP INTENT ERROR ===')
+      console.error('Status:', setupIntentResponse.status)
+      console.error('Full error response:', JSON.stringify(setupIntent, null, 2))
+      
+      const stripeError = setupIntent.error
+      const errorMessage = stripeError?.message || stripeError?.code || 'Unknown Stripe error'
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to create setup intent for bank account verification',
+          details: errorMessage
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('SetupIntent created successfully:', {
+      id: setupIntent.id,
+      status: setupIntent.status,
+      payment_method: setupIntent.payment_method,
+    })
+
+    // Confirm the SetupIntent to trigger micro-deposits
+    if (setupIntent.status === 'requires_confirmation') {
+      console.log('Confirming SetupIntent to trigger micro-deposits...')
+      
+      const confirmParams = new URLSearchParams()
+      confirmParams.append('payment_method', paymentMethod.id)
+      // For US bank accounts, mandate_data is required when confirming
+      confirmParams.append('mandate_data[customer_acceptance][type]', 'online')
+      confirmParams.append('mandate_data[customer_acceptance][online][ip_address]', '0.0.0.0') // Server-side, no real IP
+      confirmParams.append('mandate_data[customer_acceptance][online][user_agent]', 'Ollie-App/1.0')
+      
+      const confirmResponse = await fetch(`https://api.stripe.com/v1/setup_intents/${setupIntent.id}/confirm`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: confirmParams,
+      })
+      
+      const confirmedIntent = await confirmResponse.json()
+      
+      if (confirmResponse.ok) {
+        console.log('SetupIntent confirmed successfully:', {
+          id: confirmedIntent.id,
+          status: confirmedIntent.status,
+        })
+        setupIntent = confirmedIntent
+      } else {
+        console.error('=== FAILED TO CONFIRM SETUP INTENT ===')
+        console.error('Status:', confirmResponse.status)
+        console.error('Full error response:', JSON.stringify(confirmedIntent, null, 2))
+        console.warn('WARNING: SetupIntent was not confirmed. Micro-deposits may not be triggered automatically.')
+      }
+    }
 
     // Extract external account ID from the payment method
     // For us_bank_account payment methods, we use the payment method ID
@@ -633,6 +701,7 @@ serve(async (req: Request) => {
         user_id: teenUser.id,
         stripe_external_account_id: externalAccountId, // Now stores payment method ID
         stripe_customer_id: customerId,
+        stripe_setup_intent_id: setupIntent.id, // Store SetupIntent ID for verification
         account_type: account_type,
         account_holder_name: account_holder_name,
         bank_name: bankName,
@@ -709,14 +778,10 @@ serve(async (req: Request) => {
       teen_id: teenUser.id,
       external_account_id: externalAccountId,
       payment_method_id: paymentMethod.id,
+      setup_intent_id: setupIntent.id,
       verification_status: verificationStatus,
       stripe_status: bankAccountData.status,
-      attached: false, // Not attached yet - will be attached after verification
     })
-    
-    // Note: Payment method is NOT attached to customer yet
-    // It needs to be verified first (via micro-deposits)
-    // After verification, it should be attached to the customer
 
     // Return success response
     return new Response(

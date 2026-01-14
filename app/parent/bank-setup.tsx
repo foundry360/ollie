@@ -472,7 +472,7 @@ export default function ParentBankSetupScreen() {
       Alert.alert(
         'Bank Account Setup Complete',
         'The bank account has been added successfully.\n\n' +
-        'We\'ll send two small deposits to verify the account (usually within 1-2 business days). Your child needs to verify these deposits in the Ollie app. Once verified, they can receive payments.\n\n' +
+        'We\'ll send a verification deposit to the account (usually within 1-2 business days). Your child needs to check their bank statement for a 6-character verification code and enter it in the Ollie app. Once verified, they can receive payments.\n\n' +
         'You\'ll receive an email when verification is complete.',
         [
           {
@@ -1554,7 +1554,7 @@ export default function ParentBankSetupScreen() {
                 <View style={styles.infoBox}>
                   <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
                   <Text style={[styles.infoText, textStyle]}>
-                    After submitting, we'll send two small test deposits to verify the account. This usually takes 1-2 business days.
+                    After submitting, we'll send a verification deposit to the account. Your child will need to check their bank statement for a 6-character verification code (e.g., SMPXDQ) and enter it in the Ollie app. This usually takes 1-2 business days.
                   </Text>
                 </View>
               </View>

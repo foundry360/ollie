@@ -27,54 +27,24 @@ serve(async (req: Request) => {
       )
     }
 
-    // Get request body - support both verification methods
-    const { descriptorCode, amount1, amount2 } = await req.json()
+    // Get request body - descriptor code is required
+    const { descriptorCode } = await req.json()
 
-    // Determine which verification method to use
-    const useDescriptorCode = !!descriptorCode
-    const useAmounts = !!(amount1 && amount2)
-
-    // Validate that at least one method is provided
-    if (!useDescriptorCode && !useAmounts) {
+    // Validate that descriptor code is provided
+    if (!descriptorCode) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields. Please provide either descriptorCode or both amount1 and amount2' }),
+        JSON.stringify({ error: 'Missing required field: descriptorCode' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Validate descriptor code format if provided (4 digits)
-    if (useDescriptorCode && !/^\d{4}$/.test(descriptorCode)) {
+    // Validate descriptor code format (6-character alphanumeric)
+    const codeUpper = descriptorCode.toUpperCase().trim()
+    if (!/^[A-Z0-9]{6}$/.test(codeUpper)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid code format. Please enter the 4-digit code (e.g., 1234)' }),
+        JSON.stringify({ error: 'Invalid code format. Please enter the 6-character code from your bank statement (e.g., SMPXDQ)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
-    }
-
-    // Validate amounts if provided
-    if (useAmounts) {
-      const amount1Num = parseFloat(amount1)
-      const amount2Num = parseFloat(amount2)
-      
-      if (isNaN(amount1Num) || isNaN(amount2Num)) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid amount format. Please enter valid numbers (e.g., 0.32)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      if (amount1Num <= 0 || amount2Num <= 0) {
-        return new Response(
-          JSON.stringify({ error: 'Amounts must be greater than 0' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      if (amount1Num === amount2Num) {
-        return new Response(
-          JSON.stringify({ error: 'Amounts must be different' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
     }
 
     // Initialize Supabase client
@@ -162,37 +132,23 @@ serve(async (req: Request) => {
       )
     }
 
-    // The stripe_external_account_id stores the Payment Method ID (pm_xxxxx)
-    const paymentMethodId = bankAccount.stripe_external_account_id
+    // Get the SetupIntent ID (required for verification)
+    const setupIntentId = bankAccount.stripe_setup_intent_id
 
-    if (!paymentMethodId) {
+    if (!setupIntentId) {
       return new Response(
-        JSON.stringify({ error: 'Payment method ID not found. Please add a bank account again.' }),
+        JSON.stringify({ error: 'SetupIntent ID not found. Please add a bank account again.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Verify the bank account using Payment Methods API
-    // Support both descriptor code and two-amount verification methods
+    // Verify the bank account using SetupIntent API with descriptor code
     const verifyParams = new URLSearchParams()
-    
-    if (useDescriptorCode) {
-      verifyParams.append('descriptor_code', descriptorCode)
-      console.log('Verifying micro-deposits with descriptor code for payment method:', paymentMethodId)
-    } else {
-      // Convert amounts to cents
-      const amount1Cents = Math.round(parseFloat(amount1) * 100)
-      const amount2Cents = Math.round(parseFloat(amount2) * 100)
-      verifyParams.append('amounts[0]', amount1Cents.toString())
-      verifyParams.append('amounts[1]', amount2Cents.toString())
-      console.log('Verifying micro-deposits with two amounts for payment method:', paymentMethodId, {
-        amount1: amount1Cents,
-        amount2: amount2Cents
-      })
-    }
+    verifyParams.append('descriptor_code', codeUpper)
+    console.log('Verifying micro-deposits with descriptor code for SetupIntent:', setupIntentId)
 
     const verifyResponse = await fetch(
-      `https://api.stripe.com/v1/payment_methods/${paymentMethodId}/verify_microdeposits`,
+      `https://api.stripe.com/v1/setup_intents/${setupIntentId}/verify_microdeposits`,
       {
         method: 'POST',
         headers: {
@@ -217,9 +173,7 @@ serve(async (req: Request) => {
         })
         .eq('id', bankAccount.id)
 
-      const errorMessage = useDescriptorCode
-        ? 'Verification failed. The code you entered is incorrect. Please try again.'
-        : 'Verification failed. The amounts you entered are incorrect. Please check your bank statement and try again.'
+      const errorMessage = 'Verification failed. The code you entered is incorrect. Please try again.'
       
       return new Response(
         JSON.stringify({ 
@@ -230,24 +184,37 @@ serve(async (req: Request) => {
       )
     }
 
-    // After verification, check the payment method status to confirm verification
-    // The verify_microdeposits endpoint returns the payment method object
-    // Check the us_bank_account.status field
-    const usBankAccountStatus = verifyResult.us_bank_account?.status
+    // After verification, check the SetupIntent status to confirm verification
+    // The verify_microdeposits endpoint returns the SetupIntent object
+    // Check the SetupIntent status and the payment_method's us_bank_account status
+    const setupIntentStatus = verifyResult.status
+    const paymentMethod = verifyResult.payment_method
+    // Payment method can be a string ID or an expanded object
+    const paymentMethodId = typeof paymentMethod === 'string' ? paymentMethod : paymentMethod?.id || bankAccount.stripe_external_account_id
+    
+    // If payment_method is expanded, check its us_bank_account status
+    // Otherwise, we'll check the SetupIntent status
+    let usBankAccountStatus: string | undefined
+    if (typeof paymentMethod === 'object' && paymentMethod?.us_bank_account) {
+      usBankAccountStatus = paymentMethod.us_bank_account.status
+    }
 
-    console.log('Payment method verification response:', {
-      payment_method_id: verifyResult.id,
+    console.log('SetupIntent verification response:', {
+      setup_intent_id: verifyResult.id,
+      setup_intent_status: setupIntentStatus,
+      payment_method_id: paymentMethodId,
       us_bank_account_status: usBankAccountStatus,
-      verified: verifyResult.us_bank_account?.verified
     })
 
     // Check if verification was successful
-    // Status can be 'new', 'verified', 'verification_failed', or 'errored'
-    const isVerified = usBankAccountStatus === 'verified' || verifyResult.us_bank_account?.verified === true
+    // SetupIntent status should be 'succeeded' when verification is complete
+    // Also check payment method's us_bank_account status if available
+    const isVerified = setupIntentStatus === 'succeeded' || 
+      (usBankAccountStatus === 'verified')
 
     if (!isVerified) {
       // Still pending or failed verification
-      const newStatus = usBankAccountStatus === 'verification_failed' || usBankAccountStatus === 'errored' 
+      const newStatus = setupIntentStatus === 'canceled' || usBankAccountStatus === 'verification_failed' || usBankAccountStatus === 'errored'
         ? 'failed' 
         : 'pending'
       
@@ -260,9 +227,7 @@ serve(async (req: Request) => {
         .eq('id', bankAccount.id)
 
       if (newStatus === 'failed') {
-        const errorMessage = useDescriptorCode
-          ? 'Verification failed. The code you entered is incorrect. Please add a new bank account.'
-          : 'Verification failed. The amounts you entered are incorrect. Please add a new bank account.'
+        const errorMessage = 'Verification failed. The code you entered is incorrect. Please add a new bank account.'
         
         return new Response(
           JSON.stringify({ 
@@ -273,9 +238,7 @@ serve(async (req: Request) => {
         )
       }
 
-      const pendingMessage = useDescriptorCode
-        ? 'Verification is still pending. Please check the code and try again.'
-        : 'Verification is still pending. Please check the amounts and try again.'
+      const pendingMessage = 'Verification is still pending. Please check the code and try again.'
 
       return new Response(
         JSON.stringify({ 
@@ -287,35 +250,12 @@ serve(async (req: Request) => {
     }
 
     // Verification successful!
-    // Now attach the payment method to the customer so it can be used for payouts
-    console.log('Attaching verified payment method to customer:', {
+    // The payment method should already be attached to the customer via the SetupIntent
+    // But let's verify it's attached
+    console.log('Verification successful. Payment method should already be attached via SetupIntent:', {
       payment_method_id: paymentMethodId,
       customer_id: bankAccount.stripe_customer_id
     })
-
-    const attachParams = new URLSearchParams()
-    attachParams.append('customer', bankAccount.stripe_customer_id)
-
-    const attachResponse = await fetch(
-      `https://api.stripe.com/v1/payment_methods/${paymentMethodId}/attach`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${stripeSecretKey}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: attachParams,
-      }
-    )
-
-    if (!attachResponse.ok) {
-      const attachError = await attachResponse.json()
-      console.error('Failed to attach payment method to customer:', attachError)
-      // Don't fail the verification, but log the error
-      // The payment method is verified, attachment can be retried if needed
-    } else {
-      console.log('Payment method attached to customer successfully')
-    }
 
     const verifiedAt = new Date().toISOString()
 
