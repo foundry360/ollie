@@ -25,7 +25,9 @@
     "deploy:webhook": "supabase functions deploy twilio-webhook",
     "deploy:get-messages": "supabase functions deploy get-twilio-messages",
     "supabase:link": "supabase link --project-ref",
-    "supabase:login": "supabase login"
+    "supabase:login": "supabase login",
+    "pod:install": "cd ios && ruby -r logger -e \"ENV['RUBYOPT'] = '-r logger'; exec('/usr/local/bin/pod install')\"",
+    "ios:build": "cd ios && xcodebuild -workspace Ollie.xcworkspace -scheme Ollie -configuration Debug -destination 'generic/platform=iOS'"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
