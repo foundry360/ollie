@@ -339,7 +339,7 @@ export default function SignupTeenScreen() {
 
           <View style={styles.logoContainer}>
             <Image 
-              source={require('@/assets/logo.png')} 
+              source={isDark ? require('@/assets/logo.png') : require('@/assets/logo-dark.png')} 
               style={styles.logo}
               resizeMode="contain"
             />
@@ -415,7 +415,7 @@ export default function SignupTeenScreen() {
 
         <View style={styles.logoContainer}>
           <Image 
-            source={require('@/assets/logo.png')} 
+            source={isDark ? require('@/assets/logo.png') : require('@/assets/logo-dark.png')} 
             style={styles.logo}
             resizeMode="contain"
           />

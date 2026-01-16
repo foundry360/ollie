@@ -503,9 +503,8 @@ export default function ParentBankSetupScreen() {
 
       Alert.alert(
         'Bank Account Setup Complete',
-        'The bank account has been added successfully.\n\n' +
-        'We\'ll send a verification deposit to the account (usually within 1-2 business days). Your child needs to check their bank statement for a 6-character verification code and enter it in the Ollie app. Once verified, they can receive payments.\n\n' +
-        'You\'ll receive an email when verification is complete.',
+        'The bank account has been connected successfully. Your child can now receive payments immediately.\n\n' +
+        'The account is verified instantly through our secure connection process.',
         [
           {
             text: 'OK',
@@ -685,77 +684,29 @@ export default function ParentBankSetupScreen() {
       console.log('Session keys:', Object.keys(data.session));
 
       // Step 2: Present Financial Connections UI
+      // 
+      // Web: Uses Stripe.js collectFinancialConnectionsAccounts() which EMBEDS the UI inline on the page
+      //      This opens a modal/overlay with the bank connection form - not a redirect
+      // Native: Uses presentFinancialConnectionsSheet() which shows a native bottom sheet
+      //
       if (Platform.OS === 'web') {
-        // Web: Use Stripe.js to collect Financial Connections or redirect to hosted page
+        // Web: Use Stripe.js collectFinancialConnectionsAccounts - embeds inline (not a redirect)
         if (typeof window !== 'undefined') {
-          // Store session info for when they return
+          // Store session info for when they return (if needed)
           sessionStorage.setItem('financial_connections_session_id', data.session.id);
           sessionStorage.setItem('financial_connections_customer_id', data.customer_id);
           
-          // Check if session has a URL from Stripe (hosted_url or url)
-          const sessionUrl = (data.session as any).url || 
-                            (data.session as any).hosted_url || 
-                            (data.session as any).redirect_url ||
-                            (data.session as any).hosted_redirect_url;
-          
-          let redirectUrl: string;
-          
-          if (sessionUrl) {
-            // Use the URL provided by Stripe
-            redirectUrl = sessionUrl;
-            console.log('Using session URL from Stripe:', redirectUrl);
-          } else if (stripe) {
-            // Try using Stripe.js to collect Financial Connections
-            // Note: This method might not exist - if it fails, fall back to redirect
-            console.log('Attempting to use Stripe.js to collect Financial Connections');
-            try {
-              // Check if collectFinancialConnections method exists
-              if (typeof (stripe as any).collectFinancialConnections === 'function') {
-                (stripe as any).collectFinancialConnections({
-                  clientSecret: data.session.client_secret,
-                }).then((result: any) => {
-                  if (result.error) {
-                    console.error('Financial Connections error:', result.error);
-                    Alert.alert('Error', result.error.message || 'Failed to connect bank account');
-                    setIsConnecting(false);
-                  } else {
-                    console.log('Financial Connections completed:', result);
-                    // Handle success
-                    Alert.alert('Success', 'Bank account connected successfully!');
-                    setIsConnecting(false);
-                  }
-                });
-                return; // Don't redirect if using Stripe.js
-              }
-            } catch (error) {
-              console.warn('Stripe.js collectFinancialConnections not available, using redirect:', error);
-            }
-            
-            // Fallback: construct redirect URL
-            // Try different possible URL formats for Financial Connections
-            // Format 1: Standard Financial Connections redirect
-            redirectUrl = `https://connect.stripe.com/financial_connections/start?client_secret=${encodeURIComponent(data.session.client_secret)}`;
-            console.log('Using constructed redirect URL (format 1):', redirectUrl);
-            console.warn('If this redirects to dashboard, the URL format may be incorrect. Financial Connections might require embedded component or different URL format.');
-          } else {
-            // No Stripe.js instance, use redirect
-            // Try the standard Financial Connections redirect URL
-            redirectUrl = `https://connect.stripe.com/financial_connections/start?client_secret=${encodeURIComponent(data.session.client_secret)}`;
-            console.log('Using constructed redirect URL (no Stripe.js):', redirectUrl);
-          }
-          
-          console.log('Final redirect URL:', redirectUrl);
-          
-          // Show a message for localhost users since there's no return_url
-          if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
+          // Check if Stripe.js is loaded
+          if (!stripe) {
+            console.error('Stripe.js not loaded - cannot proceed with Financial Connections');
             Alert.alert(
-              'Connecting Bank Account',
-              'You will be redirected to Stripe to connect your bank account. After completing the connection, please return to this page manually.',
+              'Stripe Not Loaded',
+              'Unable to connect bank account. Stripe.js failed to load. Please refresh the page and try again.',
               [
                 {
-                  text: 'Continue',
+                  text: 'Refresh Page',
                   onPress: () => {
-                    window.location.href = redirectUrl;
+                    window.location.reload();
                   }
                 },
                 {
@@ -767,16 +718,108 @@ export default function ParentBankSetupScreen() {
                 }
               ]
             );
+            return;
+          }
+          
+          // Try using Stripe.js collectFinancialConnectionsAccounts (embeds inline on web)
+          // This method opens a modal overlay with the bank connection form embedded in the page
+          console.log('Checking for collectFinancialConnectionsAccounts method on Stripe instance...');
+          console.log('Stripe object keys:', Object.keys(stripe));
+          console.log('Stripe.financialConnections:', (stripe as any).financialConnections);
+          
+          // The method is available directly on the stripe instance in Stripe.js
+          // Format: stripe.collectFinancialConnectionsAccounts({ clientSecret: '...' })
+          const collectMethod = (stripe as any).collectFinancialConnectionsAccounts;
+          
+          if (collectMethod && typeof collectMethod === 'function') {
+            console.log('Using Stripe.js collectFinancialConnectionsAccounts');
+            try {
+              const result = await collectMethod({
+                clientSecret: data.session.client_secret,
+              });
+              
+              if (result.error) {
+                console.error('Financial Connections error:', result.error);
+                Alert.alert('Error', result.error.message || 'Failed to connect bank account');
+                setIsConnecting(false);
+                return;
+              }
+              
+              console.log('Financial Connections completed via Stripe.js:', result);
+              
+              // Call save function to store the bank account
+              const { data: saveData, error: saveError } = await supabase.functions.invoke(
+                'save-financial-connections-account',
+                {
+                  body: {
+                    session_id: data.session.id,
+                    teen_user_id: approvalData.teen_id,
+                    approval_token: params.token,
+                  }
+                }
+              );
+
+              if (saveError || !saveData?.success) {
+                console.error('Failed to save bank account:', saveError || saveData);
+                Alert.alert(
+                  'Error',
+                  'Bank account was connected but failed to save. Please contact support.'
+                );
+                setIsConnecting(false);
+              } else {
+                console.log('Bank account saved successfully:', saveData);
+                Alert.alert(
+                  'Success',
+                  'Bank account connected successfully! Your child can now receive payments.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        if (Platform.OS === 'web') {
+                          window.close();
+                        } else {
+                          router.back();
+                        }
+                      }
+                    }
+                  ]
+                );
+                setIsConnecting(false);
+              }
+              return; // Successfully used Stripe.js, don't redirect
+            } catch (error: any) {
+              console.error('Stripe.js collectFinancialConnectionsAccounts failed:', error);
+              Alert.alert(
+                'Connection Failed',
+                `Failed to connect bank account: ${error?.message || 'Unknown error'}. Please try again.`
+              );
+              setIsConnecting(false);
+              return;
+            }
           } else {
-            // HTTPS - redirect directly (return_url will bring them back)
-            window.location.href = redirectUrl;
+            // Method not found on Stripe instance
+            console.error('collectFinancialConnectionsAccounts method not found on Stripe instance');
+            console.error('Available Stripe methods:', Object.keys(stripe));
+            Alert.alert(
+              'Stripe Method Not Available',
+              'The Financial Connections method is not available in this version of Stripe.js. Please contact support.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    setIsConnecting(false);
+                  }
+                }
+              ]
+            );
+            return;
           }
         }
         
         // Note: We don't set isConnecting to false here if redirecting
-        // The page will reload when they return via return_url
+        // Web implementation complete - collectFinancialConnectionsAccounts embeds inline
       } else {
-        // Native: Use the sheet
+        // Native: Use presentFinancialConnectionsSheet - shows native bottom sheet
         if (!presentFinancialConnectionsSheet) {
           Alert.alert('Error', 'Financial Connections is not available on this platform.');
           setIsConnecting(false);
@@ -965,7 +1008,7 @@ export default function ParentBankSetupScreen() {
               </View>
             )}
 
-            {/* Financial Connections Option - Primary method for all platforms */}
+            {/* Financial Connections Option - Primary option for all platforms */}
             <View style={[styles.section, cardStyle, { marginBottom: 16 }]}>
               <View style={{ marginBottom: 12 }}>
                 <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 8 }]}>
@@ -982,7 +1025,7 @@ export default function ParentBankSetupScreen() {
                 <View style={{ marginBottom: 12 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
                     <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
-                    <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Instant verification</Text>
+                    <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Instant verification - no waiting for test deposits</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
                     <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
@@ -1004,8 +1047,8 @@ export default function ParentBankSetupScreen() {
               />
             </View>
 
-            {/* Manual form option - Hidden by default, can be shown if needed */}
-            {false && (
+            {/* Manual form option - Removed as we now use Financial Connections only */}
+            {false && Platform.OS === 'web' && (
               <>
                 {/* Divider */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 24 }}>
@@ -1283,12 +1326,6 @@ export default function ParentBankSetupScreen() {
                   </View>
                 </View>
 
-                <View style={styles.infoBox}>
-                  <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
-                  <Text style={[styles.infoText, textStyle]}>
-                    After submitting, we'll send two small test deposits to verify the account. This usually takes 1-2 business days.
-                  </Text>
-                </View>
                 </View>
 
                 <View style={[styles.section, cardStyle]}>
@@ -1394,7 +1431,7 @@ export default function ParentBankSetupScreen() {
                 </View>
               )}
 
-              {/* Financial Connections Option - Available on all platforms */}
+              {/* Financial Connections Option - Primary option for all platforms */}
               <View style={[styles.section, cardStyle, { marginBottom: 16 }]}>
                 <View style={{ marginBottom: 12 }}>
                   <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 8 }]}>
@@ -1433,8 +1470,8 @@ export default function ParentBankSetupScreen() {
                 />
               </View>
 
-              {/* Manual form option - Hidden by default, can be shown if needed */}
-              {false && (
+              {/* Manual form option - Removed as we now use Financial Connections only */}
+              {false && Platform.OS === 'web' && (
                 <>
                   {/* Divider */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 24 }}>
@@ -1707,12 +1744,6 @@ export default function ParentBankSetupScreen() {
                   </View>
                 </View>
 
-                <View style={styles.infoBox}>
-                  <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
-                  <Text style={[styles.infoText, textStyle]}>
-                    After submitting, we'll send a verification deposit to the account. Your child will need to check their bank statement for a 6-character verification code (e.g., SMPXDQ) and enter it in the Ollie app. This usually takes 1-2 business days.
-                  </Text>
-                </View>
               </View>
 
               <View style={[styles.section, cardStyle]}>
