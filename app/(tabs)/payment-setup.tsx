@@ -23,6 +23,20 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Loading } from '@/components/ui/Loading';
+import { supabase } from '@/lib/supabase';
+
+// Conditionally import Stripe hooks for native platforms only
+let useStripe: any = null;
+let useFinancialConnectionsSheet: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    const stripeModule = require('@stripe/stripe-react-native');
+    useStripe = stripeModule.useStripe;
+    useFinancialConnectionsSheet = stripeModule.useFinancialConnectionsSheet;
+  } catch (e) {
+    console.warn('Stripe React Native not available:', e);
+  }
+}
 
 const verificationSchema = z.object({
   descriptorCode: z.string().refine((val) => {
@@ -47,6 +61,16 @@ export default function PaymentSetupScreen() {
   const [deleting, setDeleting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [hasProcessedFinancialConnectionsReturn, setHasProcessedFinancialConnectionsReturn] = useState(false);
+
+  // Initialize Stripe and Financial Connections for native
+  const stripe = useStripe?.();
+  const financialConnectionsHook = useFinancialConnectionsSheet 
+    ? useFinancialConnectionsSheet() 
+    : null;
+  // The hook returns collectFinancialConnectionsAccounts, not presentFinancialConnectionsSheet
+  const collectFinancialConnectionsAccounts = financialConnectionsHook?.collectFinancialConnectionsAccounts;
 
   const { control, handleSubmit, formState: { errors }, reset } = useForm<VerificationFormData>({
     resolver: zodResolver(verificationSchema),
@@ -67,6 +91,9 @@ export default function PaymentSetupScreen() {
 
   const loadData = async () => {
     setLoading(true);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payment-setup.tsx:91',message:'loadData called',data:{user_role:user?.role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     
     // Load approval status first (for teens)
     if (user?.role === 'teen') {
@@ -82,14 +109,25 @@ export default function PaymentSetupScreen() {
     
     // Load bank account (this can fail independently)
     try {
+      console.log('Loading bank account for user:', user?.id);
       const account = await getBankAccount();
+      console.log('Bank account loaded:', account ? { id: account.id, status: account.verification_status, bank: account.bank_name } : 'null');
       setBankAccount(account);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payment-setup.tsx:110',message:'Bank account loaded',data:{has_account:!!account,account_id:account?.id,verification_status:account?.verification_status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
     } catch (error: any) {
       console.error('Error loading bank account:', error);
       // If no bank account exists, that's fine
       setBankAccount(null);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payment-setup.tsx:115',message:'Error loading bank account',data:{error_message:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
     } finally {
       setLoading(false);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'payment-setup.tsx:119',message:'loadData completed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
     }
   };
 
@@ -216,6 +254,277 @@ export default function PaymentSetupScreen() {
     );
   };
 
+  const handleConnectWithFinancialConnections = async () => {
+    console.log('handleConnectWithFinancialConnections called', {
+      hasUser: !!user,
+      userId: user?.id,
+      isConnecting,
+      hasBankAccount: !!bankAccount,
+      bankAccountStatus: bankAccount?.verification_status
+    });
+
+    if (!user) {
+      console.error('No user found');
+      Alert.alert('Error', 'You must be logged in to add a bank account.');
+      return;
+    }
+
+    // Prevent multiple simultaneous connection attempts
+    if (isConnecting) {
+      console.log('Connection already in progress, ignoring duplicate request');
+      return;
+    }
+
+    // Check if user already has a verified bank account
+    if (bankAccount && bankAccount.verification_status === 'verified') {
+      console.log('Bank account already verified, blocking connection');
+      Alert.alert(
+        'Bank Account Already Connected',
+        'You already have a verified bank account connected. If you need to update it, please contact support.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    console.log('Starting Financial Connections flow...');
+    setIsConnecting(true);
+    
+    try {
+      // Step 1: Create the Financial Connections session via your backend
+      const { data, error } = await supabase.functions.invoke(
+        'create-financial-connections-session',
+        {
+          body: { teen_user_id: user.id }
+        }
+      );
+      
+      if (error || !data?.session?.client_secret) {
+        // Check if user already has verified account (from backend check)
+        if (data?.already_verified) {
+          // Reload data to show the verified account
+          await loadData();
+          Alert.alert(
+            'Bank Account Already Connected',
+            'You already have a verified bank account connected.',
+            [{ text: 'OK' }]
+          );
+          setIsConnecting(false);
+          return;
+        }
+        
+        // Check for rate limit errors
+        const isRateLimit = data?.is_rate_limit || 
+                           data?.stripe_error_code === 'rate_limit' ||
+                           error?.message?.toLowerCase().includes('rate limit') ||
+                           data?.error?.toLowerCase().includes('rate limit');
+        
+        if (isRateLimit) {
+          Alert.alert(
+            'Too Many Requests',
+            'Stripe is temporarily limiting requests. This can happen if multiple users are connecting accounts at the same time. Please wait a few minutes before trying again.',
+            [{ text: 'OK' }]
+          );
+          setIsConnecting(false);
+          return;
+        }
+        
+        const errorMessage = data?.error || data?.details || error?.message || 'Failed to create Financial Connections session';
+        console.error('Failed to create session:', { error, data, errorMessage });
+        Alert.alert('Error', errorMessage);
+        setIsConnecting(false);
+        return;
+      }
+      
+      const sessionId = data.session.id;
+      const clientSecret = data.session.client_secret;
+      
+      // Handle web platform
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('financial_connections_session_id', sessionId);
+          const redirectUrl = `https://connect.stripe.com/financial_connections/start?client_secret=${encodeURIComponent(clientSecret)}`;
+          window.location.href = redirectUrl;
+        } else {
+          Alert.alert('Error', 'Web browser window is not available.');
+          setIsConnecting(false);
+        }
+        return; // Exit early for web
+      }
+
+      // Handle native platforms
+      if (!collectFinancialConnectionsAccounts) {
+        console.error('Financial Connections not available. Platform:', Platform.OS);
+        Alert.alert(
+          'Financial Connections Not Available',
+          'The Financial Connections feature is not available. This may require:\n\n1. Rebuilding your development build\n2. Ensuring Stripe SDK is properly linked',
+          [{ text: 'OK' }]
+        );
+        setIsConnecting(false);
+        return;
+      }
+      
+      // Step 2: Present Financial Connections to user
+      const result = await collectFinancialConnectionsAccounts(clientSecret);
+      
+      console.log('Financial Connections result:', result);
+      
+      if (result.error) {
+        if (result.error.code === 'Canceled') {
+          console.log('User canceled');
+          setIsConnecting(false);
+          return;
+        }
+        throw new Error(result.error.message || 'Failed to connect bank account');
+      }
+      
+      // Step 3: Wait a moment for Stripe to finalize the session
+      // This gives Stripe time to attach the payment method
+      console.log('Waiting for Stripe to finalize session...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+      
+      // Step 4: Save to your database with retry logic
+      let saveAttempt = 0;
+      const maxAttempts = 3;
+      let saveSuccess = false;
+      
+      while (saveAttempt < maxAttempts && !saveSuccess) {
+        saveAttempt++;
+        console.log(`Saving account (attempt ${saveAttempt}/${maxAttempts})...`);
+        
+        try {
+          const { data: saveData, error: saveError } = await supabase.functions.invoke(
+            'save-financial-connections-account',
+            {
+              body: {
+                session_id: sessionId,
+                teen_user_id: user.id,
+              }
+            }
+          );
+          
+          if (saveError) {
+            console.error('Save error:', saveError);
+            
+            // If it's a "session still processing" error, retry
+            if (saveError.message?.includes('still processing') && saveAttempt < maxAttempts) {
+              console.log('Session still processing, retrying in 1 second...');
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+            
+            throw saveError;
+          }
+          
+          if (saveData?.success) {
+            saveSuccess = true;
+            console.log('Account saved successfully!', saveData);
+            
+            // Reload data to show the new bank account
+            await loadData();
+            Alert.alert(
+              'Success',
+              'Bank account connected successfully! You can now receive payments.',
+              [{ text: 'OK' }]
+            );
+          } else {
+            throw new Error(saveData?.error || 'Failed to save account');
+          }
+          
+        } catch (err: any) {
+          if (saveAttempt >= maxAttempts) {
+            throw err;
+          }
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      if (!saveSuccess) {
+        throw new Error('Failed to save account after multiple attempts');
+      }
+      
+    } catch (error: any) {
+      console.error('Error connecting bank account:', error);
+      Alert.alert(
+        'Connection Failed',
+        'We couldn\'t connect your bank account. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Handle Financial Connections return from redirect (web only)
+  useEffect(() => {
+    // Only process Financial Connections return once per session
+    if (hasProcessedFinancialConnectionsReturn) {
+      return;
+    }
+    
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && user) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const financialConnectionsComplete = urlParams.get('financial_connections_complete');
+      const sessionId = urlParams.get('session_id') || sessionStorage.getItem('financial_connections_session_id');
+      
+      // Clear session storage and URL params immediately to prevent re-triggering on refresh
+      if (sessionId) {
+        sessionStorage.removeItem('financial_connections_session_id');
+      }
+      if (financialConnectionsComplete || sessionId) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      
+      if (financialConnectionsComplete === 'true' && sessionId) {
+        setHasProcessedFinancialConnectionsReturn(true); // Mark as processed
+        console.log('Financial Connections completed on web, saving bank account...');
+        setIsConnecting(true);
+        
+        (async () => {
+          try {
+            const { data: saveData, error: saveError } = await supabase.functions.invoke(
+              'save-financial-connections-account',
+              {
+                body: {
+                  session_id: sessionId,
+                  teen_user_id: user.id,
+                }
+              }
+            );
+
+            if (saveError || !saveData?.success) {
+              console.error('Failed to save bank account:', saveError || saveData);
+              Alert.alert(
+                'Error',
+                'Bank account was connected but failed to save. Please contact support.'
+              );
+              setIsConnecting(false);
+            } else {
+              console.log('Bank account saved successfully:', saveData);
+              Alert.alert(
+                'Success',
+                'Bank account connected successfully! You can now receive payments.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      loadData();
+                    }
+                  }
+                ]
+              );
+              setIsConnecting(false);
+            }
+          } catch (error: any) {
+            console.error('Error saving bank account:', error);
+            Alert.alert('Error', 'Failed to save bank account. Please try again.');
+            setIsConnecting(false);
+          }
+        })();
+      }
+    }
+  }, [user]);
+
   // Reload data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
@@ -279,8 +588,8 @@ export default function PaymentSetupScreen() {
           <Text style={[styles.screenTitle, titleStyle]}>Payment Setup</Text>
         </View>
 
-        {/* Parent Approval Section */}
-        {needsParentApproval && (
+        {/* Parent Approval Section - Hide when bank account is verified */}
+        {needsParentApproval && !(bankAccount?.verification_status === 'verified') && (
           <View style={[styles.section, cardStyle]}>
             <View style={styles.statusHeader}>
               <Ionicons 
@@ -295,18 +604,45 @@ export default function PaymentSetupScreen() {
 
             {approvalStatus?.status === 'approved' ? (
               <>
-                <Text style={[styles.description, textStyle]}>
-                  Your parent has completed the bank account setup.
-                </Text>
-                {/* Show option to add bank account if it doesn't exist (e.g., after resend) */}
-                {!bankAccount && (
+                {/* Show Financial Connections UI directly if no bank account exists */}
+                {!bankAccount ? (
                   <View style={{ marginTop: 16 }}>
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={[styles.description, textStyle, { fontSize: 14, marginBottom: 12 }]}>
+                        Set up payouts so <Text style={{ fontWeight: '700' }}>{user?.full_name ? user.full_name.split(' ')[0] : 'you'}</Text> can receive earnings instantly after completing gigs.
+                      </Text>
+                      <Text style={[styles.description, textStyle, { fontSize: 14, marginBottom: 12 }]}>
+                        Connect your bank account securely using our payment partner, Stripe. You'll log in through your bank's secure portal - we never see or store your banking credentials.
+                      </Text>
+                      <View style={{ marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                          <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                          <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Instant verification</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                          <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                          <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Bank-level security and encryption</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                          <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                          <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Used by millions of businesses worldwide</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.description, textStyle, { fontSize: 14, marginBottom: 16, fontStyle: 'italic', color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                        Note: During the connection process, you may see "Foundry360" - this is Ollie's parent company that securely processes payments.
+                      </Text>
+                    </View>
                     <Button
-                      title="Add Bank Account"
-                      onPress={() => router.push('/payments/bank-account-setup')}
+                      title={isConnecting ? 'Connecting...' : 'Connect Bank Account'}
+                      onPress={handleConnectWithFinancialConnections}
+                      disabled={isConnecting}
                       fullWidth
                     />
                   </View>
+                ) : (
+                  <Text style={[styles.description, textStyle]}>
+                    Your parent has completed the bank account setup.
+                  </Text>
                 )}
               </>
             ) : approvalStatus?.status === 'pending' ? (
@@ -406,7 +742,7 @@ export default function PaymentSetupScreen() {
                         }
                         size={16}
                         color={
-                          bankAccount.verification_status === 'verified' ? '#10B981' :
+                          bankAccount.verification_status === 'verified' ? '#73af17' :
                           bankAccount.verification_status === 'pending' ? '#F59E0B' :
                           '#EF4444'
                         }
@@ -495,23 +831,15 @@ export default function PaymentSetupScreen() {
                 )}
 
                 {bankAccount.verification_status === 'verified' && (
-                  <>
-                    <View style={[styles.infoBox, { backgroundColor: '#D1FAE5' }, isDark && { backgroundColor: '#064E3B' }]}>
-                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                      <Text style={[styles.infoBoxText, { color: '#065F46' }, isDark && { color: '#6EE7B7' }]}>
-                        Your bank account is verified and ready to receive payments!
-                      </Text>
-                    </View>
-                    <View style={{ marginTop: 12 }}>
-                      <Button
-                        title="Delete Bank Account"
-                        onPress={handleDeleteBankAccount}
-                        loading={deleting}
-                        fullWidth
-                        variant="secondary"
-                      />
-                    </View>
-                  </>
+                  <View style={{ marginTop: 12 }}>
+                    <Button
+                      title="Delete Bank Account"
+                      onPress={handleDeleteBankAccount}
+                      loading={deleting}
+                      fullWidth
+                      variant="secondary"
+                    />
+                  </View>
                 )}
 
                 {bankAccount.verification_status === 'failed' && (
@@ -694,7 +1022,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusVerified: {
-    color: '#10B981',
+    color: '#73af17',
   },
   statusPending: {
     color: '#F59E0B',
@@ -820,15 +1148,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#1F2937',
     borderColor: '#4B5563',
     color: '#F9FAFB',
-  },
-  resendButton: {
-    marginTop: 16,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  resendText: {
-    fontSize: 14,
-    color: '#73af17',
-    textDecorationLine: 'underline',
   },
 });

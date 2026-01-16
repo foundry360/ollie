@@ -3,59 +3,79 @@ import { View, Text, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Pl
 import { Alert } from '@/components/ui/Alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
-import { createBankAccount, getBankAccountApprovalStatus, type BankAccountApprovalStatus } from '@/lib/api/payments';
+import { getBankAccountApprovalStatus, type BankAccountApprovalStatus } from '@/lib/api/payments';
 import { Loading } from '@/components/ui/Loading';
+import { supabase } from '@/lib/supabase';
 
-const bankAccountSchema = z.object({
-  account_type: z.enum(['checking', 'savings']),
-  routing_number: z.string()
-    .min(9, 'Routing number must be 9 digits')
-    .max(9, 'Routing number must be 9 digits')
-    .regex(/^\d+$/, 'Routing number must contain only numbers'),
-  account_number: z.string()
-    .min(4, 'Account number must be at least 4 digits')
-    .max(17, 'Account number must be less than 18 digits')
-    .regex(/^\d+$/, 'Account number must contain only numbers'),
-  confirm_account_number: z.string(),
-  account_holder_name: z.string()
-    .min(2, 'Account holder name must be at least 2 characters')
-    .max(100, 'Account holder name is too long'),
-}).refine((data) => data.account_number === data.confirm_account_number, {
-  message: 'Account numbers do not match',
-  path: ['confirm_account_number'],
-});
-
-type BankAccountFormData = z.infer<typeof bankAccountSchema>;
+// Conditionally import Financial Connections hook for native platforms only
+let useFinancialConnectionsSheet: any = null;
+let useStripe: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    const stripeModule = require('@stripe/stripe-react-native');
+    useFinancialConnectionsSheet = stripeModule.useFinancialConnectionsSheet;
+    useStripe = stripeModule.useStripe;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/payments/bank-account-setup.tsx:20',message:'Stripe module import success',data:{platform:Platform.OS,hasHook:!!useFinancialConnectionsSheet,hasUseStripe:!!useStripe},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+  } catch (e) {
+    console.warn('Stripe React Native not available:', e);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/payments/bank-account-setup.tsx:24',message:'Stripe module import failed',data:{platform:Platform.OS,error:String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+  }
+}
 
 export default function BankAccountSetupScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { colorScheme } = useThemeStore();
   const isDark = colorScheme === 'dark';
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [checkingApproval, setCheckingApproval] = useState(true);
   const [approvalStatus, setApprovalStatus] = useState<BankAccountApprovalStatus | null>(null);
 
-  const { control, handleSubmit, formState: { errors }, setValue, watch } = useForm<BankAccountFormData>({
-    resolver: zodResolver(bankAccountSchema),
-    defaultValues: {
-      account_type: 'checking',
-      routing_number: '',
-      account_number: '',
-      confirm_account_number: '',
-      account_holder_name: user?.full_name || '',
-    },
-  });
-
-  const accountType = watch('account_type');
+  // Initialize Stripe and Financial Connections sheet for native
+  // #region agent log
+  const logData1 = {location:'app/payments/bank-account-setup.tsx:42',message:'Before hook calls',data:{platform:Platform.OS,hasHookFunction:!!useFinancialConnectionsSheet,hasUseStripe:!!useStripe},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+  console.log('[DEBUG]', logData1);
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData1)}).catch(()=>{});
+  // #endregion
+  
+  // CRITICAL: Hooks must be called unconditionally. Always call useStripe if available.
+  const stripe = useStripe ? useStripe() : null;
+  // #region agent log
+  const logData2 = {location:'app/payments/bank-account-setup.tsx:47',message:'After useStripe call',data:{hasStripe:!!stripe,isStripeInitialized:stripe?.isInitialized},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
+  console.log('[DEBUG]', logData2);
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData2)}).catch(()=>{});
+  // #endregion
+  
+  // CRITICAL FIX: Hooks must be called unconditionally. 
+  // The issue: conditional hook calls violate React's Rules of Hooks and cause Stripe initialization errors.
+  // Solution: Always call the hook if the function exists (matches payment-setup.tsx pattern)
+  let financialConnectionsHook: any = null;
+  try {
+    if (useFinancialConnectionsSheet) {
+      financialConnectionsHook = useFinancialConnectionsSheet();
+    }
+  } catch (error: any) {
+    // #region agent log
+    const logError = {location:'app/payments/bank-account-setup.tsx:56',message:'useFinancialConnectionsSheet hook error',data:{error:String(error),hasStripe:!!stripe},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+    console.error('[DEBUG ERROR]', logError);
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logError)}).catch(()=>{});
+    // #endregion
+  }
+  // #region agent log
+  const logData3 = {location:'app/payments/bank-account-setup.tsx:52',message:'After useFinancialConnectionsSheet call',data:{hasHookResult:!!financialConnectionsHook,hasCollectMethod:!!financialConnectionsHook?.collectFinancialConnectionsAccounts,stripeInitialized:stripe?.isInitialized},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+  console.log('[DEBUG]', logData3);
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData3)}).catch(()=>{});
+  // #endregion
+  // The hook returns collectFinancialConnectionsAccounts, not presentFinancialConnectionsSheet
+  const collectFinancialConnectionsAccounts = financialConnectionsHook?.collectFinancialConnectionsAccounts;
 
   // Check parent approval on mount
   useEffect(() => {
@@ -78,8 +98,69 @@ export default function BankAccountSetupScreen() {
   const needsParentApproval = user?.parent_id != null;
   const hasApproval = !needsParentApproval || approvalStatus?.status === 'approved';
 
-  const onSubmit = async (data: BankAccountFormData) => {
-    // Double-check parent approval before submission
+  // Handle Financial Connections return from redirect (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && user) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const financialConnectionsComplete = urlParams.get('financial_connections_complete');
+      const sessionId = urlParams.get('session_id') || sessionStorage.getItem('financial_connections_session_id');
+      
+      if (financialConnectionsComplete === 'true' && sessionId) {
+        console.log('Financial Connections completed on web, saving bank account...');
+        setIsConnecting(true);
+        
+        (async () => {
+          try {
+            const { data: saveData, error: saveError } = await supabase.functions.invoke(
+              'save-financial-connections-account',
+              {
+                body: {
+                  session_id: sessionId,
+                  teen_user_id: user.id,
+                }
+              }
+            );
+
+            if (saveError || !saveData?.success) {
+              console.error('Failed to save bank account:', saveError || saveData);
+              Alert.alert(
+                'Error',
+                'Bank account was connected but failed to save. Please contact support.'
+              );
+              setIsConnecting(false);
+            } else {
+              console.log('Bank account saved successfully:', saveData);
+              Alert.alert(
+                'Success',
+                'Bank account connected successfully! You can now receive payments.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      window.history.replaceState({}, document.title, window.location.pathname);
+                      sessionStorage.removeItem('financial_connections_session_id');
+                      router.replace('/(tabs)/payment-setup');
+                    }
+                  }
+                ]
+              );
+              setIsConnecting(false);
+            }
+          } catch (error: any) {
+            console.error('Error saving bank account:', error);
+            Alert.alert('Error', 'Failed to save bank account. Please try again.');
+            setIsConnecting(false);
+          }
+        })();
+      }
+    }
+  }, [user]);
+
+  const handleConnectWithFinancialConnections = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/payments/bank-account-setup.tsx:handleConnect',message:'handleConnect called',data:{platform:Platform.OS,hasCollectMethod:!!collectFinancialConnectionsAccounts},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    // Double-check parent approval before connecting
     if (needsParentApproval && !hasApproval) {
       Alert.alert(
         'Parent Approval Required',
@@ -93,85 +174,192 @@ export default function BankAccountSetupScreen() {
       );
       return;
     }
-    setIsSubmitting(true);
-    try {
-      const result = await createBankAccount({
-        routing_number: data.routing_number,
-        account_number: data.account_number,
-        account_type: data.account_type,
-        account_holder_name: data.account_holder_name,
-      });
 
-      if (result.bank_account.requires_verification) {
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to add a bank account.');
+      return;
+    }
+
+    setIsConnecting(true);
+    try {
+      console.log('Creating Financial Connections session for teen:', user.id);
+      
+      // Set return URL for both web and native
+      // For native, use the app's deep link scheme
+      // For web, use the current page URL
+      let returnUrl: string | undefined = undefined;
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const currentUrl = window.location.href.split('?')[0];
+        if (currentUrl.startsWith('https://')) {
+          returnUrl = `${currentUrl}?financial_connections_complete=true`;
+        }
+      } else {
+        // Native: For native apps, return_url is optional
+        // The collectFinancialConnectionsAccounts handles the flow in-app
+        // Setting return_url might cause issues, so we'll leave it undefined for native
+        returnUrl = undefined;
+      }
+      
+      console.log('Return URL for Financial Connections:', returnUrl);
+      
+      let data: any = null;
+      let error: any = null;
+      
+      try {
+        const result = await supabase.functions.invoke(
+          'create-financial-connections-session',
+          {
+            body: {
+              teen_user_id: user.id,
+              return_url: returnUrl,
+            }
+          }
+        );
+        data = result.data;
+        error = result.error;
+      } catch (invokeError: any) {
+        console.error('Function invoke threw error:', invokeError);
+        error = invokeError;
+        if (invokeError?.context instanceof Response) {
+          try {
+            const errorBody = await invokeError.context.clone().json();
+            data = errorBody;
+            console.error('Extracted error body from context:', errorBody);
+          } catch (e) {
+            console.error('Could not extract error body:', e);
+          }
+        }
+      }
+
+      if (error || !data?.session?.client_secret) {
+        console.error('Failed to create Financial Connections session:', error || data);
+        let errorMessage = 'Failed to create connection session. Please try again.';
+        if (data?.error) errorMessage = data.error;
+        if (data?.details) errorMessage = data.details;
+        if (data?.stripe_error?.message) errorMessage = data.stripe_error.message;
+        Alert.alert('Error', errorMessage);
+        setIsConnecting(false);
+        return;
+      }
+
+      console.log('Financial Connections session created:', data.session.id);
+
+      // Step 2: Present Financial Connections UI
+      if (Platform.OS === 'web') {
+        // Web: Redirect to Stripe
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('financial_connections_session_id', data.session.id);
+          const redirectUrl = `https://connect.stripe.com/financial_connections/start?client_secret=${encodeURIComponent(data.session.client_secret)}`;
+          window.location.href = redirectUrl;
+        }
+      } else {
+        // Native: Use collectFinancialConnectionsAccounts
+        if (!collectFinancialConnectionsAccounts) {
+          console.error('Financial Connections not available. Platform:', Platform.OS);
+          console.error('Financial Connections hook result:', financialConnectionsHook);
+          Alert.alert(
+            'Financial Connections Not Available',
+            'The Financial Connections feature is not available. This may require:\n\n1. Rebuilding your development build\n2. Ensuring Stripe SDK is properly linked',
+            [{ text: 'OK' }]
+          );
+          setIsConnecting(false);
+          return;
+        }
+
+        // Use collectFinancialConnectionsAccounts with the client secret
+        // This will present the Financial Connections UI and collect accounts
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/payments/bank-account-setup.tsx:235',message:'Before collectFinancialConnectionsAccounts call',data:{hasClientSecret:!!data.session.client_secret,hasCollectMethod:!!collectFinancialConnectionsAccounts},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        const result = await collectFinancialConnectionsAccounts(data.session.client_secret);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/payments/bank-account-setup.tsx:237',message:'After collectFinancialConnectionsAccounts call',data:{hasResult:!!result,hasError:!!result?.error,errorMessage:result?.error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+
+        if (result.error) {
+          // Handle user cancellation gracefully
+          if (result.error.code === 'Canceled') {
+            console.log('Financial Connections canceled by user');
+            setIsConnecting(false);
+            return;
+          }
+          
+          // Show error for actual errors
+          console.error('Financial Connections error:', result.error);
+          Alert.alert('Error', result.error.message || 'Failed to connect bank account');
+          setIsConnecting(false);
+          return;
+        }
+
+        // IMPORTANT: Even if result.financialConnectionsAccounts is empty, the account may still be in Stripe
+        // The save function will retrieve accounts from Stripe using the session_id
+        // So we should always call the save function if there's no error
+        
+        if (result.financialConnectionsAccounts && result.financialConnectionsAccounts.length > 0) {
+          console.log('Financial Connections completed, accounts returned in result:', {
+            accountId: result.financialConnectionsAccounts[0].id
+          });
+        } else {
+          console.log('No accounts in result, but session completed successfully. Will retrieve from Stripe using session_id.');
+        }
+        
+        // Call edge function to save the bank account using session_id
+        // The save function will retrieve the accounts from Stripe
+        console.log('Calling save-financial-connections-account with:', {
+          session_id: data.session.id,
+          teen_user_id: user.id,
+        });
+        
+        const { data: saveData, error: saveError } = await supabase.functions.invoke(
+          'save-financial-connections-account',
+          {
+            body: {
+              session_id: data.session.id,
+              teen_user_id: user.id,
+            }
+          }
+        );
+
+        console.log('Save function response:', { saveData, saveError });
+
+        if (saveError || !saveData?.success) {
+          console.error('Failed to save bank account:', saveError || saveData);
+          const errorMessage = saveError?.message || saveData?.error || saveData?.details || 'Something went wrong. Please try again later.';
+          Alert.alert(
+            'Error',
+            errorMessage,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  router.replace('/(tabs)/payment-setup');
+                }
+              }
+            ]
+          );
+          setIsConnecting(false);
+          return;
+        }
+
+        console.log('Bank account saved successfully:', saveData);
         Alert.alert(
           'Success',
-          'Bank account added successfully. Please verify it with the micro-deposits we\'ll send to your account.',
+          'Bank account connected successfully! You can now receive payments.',
           [
             {
               text: 'OK',
               onPress: () => {
                 router.replace('/(tabs)/payment-setup');
-              },
-            },
+              }
+            }
           ]
         );
-      } else {
-        // Account was verified immediately (unlikely but possible)
-        Alert.alert(
-          'Success',
-          'Bank account added and verified successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.back();
-              },
-            },
-          ]
-        );
+        setIsConnecting(false);
       }
     } catch (error: any) {
-      const errorMessage = error.message || 'Failed to add bank account';
-      console.error('Error creating bank account:', error);
-      console.error('Error stack:', error.stack);
-      console.error('Full error object:', JSON.stringify(error, null, 2));
-      
-      // If error is about parent approval, show helpful message
-      if (errorMessage.toLowerCase().includes('parent approval')) {
-        Alert.alert(
-          'Parent Approval Required',
-          'You need your parent\'s approval before you can add a bank account. Please go back to Payment Setup to request approval.',
-          [
-            {
-              text: 'Go Back',
-              onPress: () => router.back(),
-            },
-          ]
-        );
-      } else {
-        // Show detailed error message
-        Alert.alert(
-          'Error Adding Bank Account',
-          errorMessage,
-          [
-            {
-              text: 'OK',
-            },
-            {
-              text: 'View Logs',
-              onPress: () => {
-                Alert.alert(
-                  'View Logs',
-                  'To see detailed error logs:\n\n1. Go to Supabase Dashboard\n2. Navigate to Edge Functions\n3. Click on "create-bank-account"\n4. Check the Logs tab\n\nOr check the console for detailed error information.',
-                  [{ text: 'OK' }]
-                );
-              },
-            },
-          ]
-        );
-      }
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error connecting bank account:', error);
+      Alert.alert('Error', error.message || 'Failed to connect bank account. Please try again.');
+      setIsConnecting(false);
     }
   };
 
@@ -235,152 +423,38 @@ export default function BankAccountSetupScreen() {
           </View>
 
           <View style={[styles.section, cardStyle]}>
-            <Text style={[styles.sectionTitle, titleStyle]}>Account Information</Text>
-            <Text style={[styles.sectionDescription, textStyle]}>
-              Your bank account information is encrypted and secure. We use Stripe to process payments.
-            </Text>
-
-            {/* Account Type Selector */}
-            <View style={styles.accountTypeContainer}>
-              <Text style={[styles.label, textStyle]}>Account Type *</Text>
-              <View style={styles.accountTypeButtons}>
-                <Pressable
-                  style={[
-                    styles.accountTypeButton,
-                    cardStyle,
-                    accountType === 'checking' && styles.accountTypeButtonActive,
-                  ]}
-                  onPress={() => setValue('account_type', 'checking', { shouldValidate: true })}
-                >
-                  <Ionicons
-                    name={accountType === 'checking' ? 'radio-button-on' : 'radio-button-off'}
-                    size={24}
-                    color={accountType === 'checking' ? '#FFFFFF' : (isDark ? '#9CA3AF' : '#6B7280')}
-                  />
-                  <Text style={[styles.accountTypeText, textStyle, accountType === 'checking' && styles.accountTypeTextActive]}>Checking</Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.accountTypeButton,
-                    cardStyle,
-                    accountType === 'savings' && styles.accountTypeButtonActive,
-                  ]}
-                  onPress={() => setValue('account_type', 'savings', { shouldValidate: true })}
-                >
-                  <Ionicons
-                    name={accountType === 'savings' ? 'radio-button-on' : 'radio-button-off'}
-                    size={24}
-                    color={accountType === 'savings' ? '#FFFFFF' : (isDark ? '#9CA3AF' : '#6B7280')}
-                  />
-                  <Text style={[styles.accountTypeText, textStyle, accountType === 'savings' && styles.accountTypeTextActive]}>Savings</Text>
-                </Pressable>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 8 }]}>
+                Connect Your Bank Account
+              </Text>
+              <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 12 }]}>
+                Set up payouts so <Text style={{ fontWeight: '700' }}>{user?.full_name ? user.full_name.split(' ')[0] : 'you'}</Text> can receive earnings instantly after completing gigs.
+              </Text>
+              <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 12 }]}>
+                Connect your bank account securely using our payment partner, Stripe. You'll log in through your bank's secure portal - we never see or store your banking credentials.
+              </Text>
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                  <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Instant verification</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                  <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Bank-level security and encryption</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                  <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Used by millions of businesses worldwide</Text>
+                </View>
               </View>
-              {errors.account_type && (
-                <Text style={styles.errorText}>{errors.account_type.message}</Text>
-              )}
-            </View>
-
-            {/* Routing Number */}
-            <Controller
-              control={control}
-              name="routing_number"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <Input
-                  label="Routing Number"
-                  value={value}
-                  onChangeText={(text) => {
-                    // Only allow digits, max 9
-                    const cleaned = text.replace(/\D/g, '').slice(0, 9);
-                    onChange(cleaned);
-                  }}
-                  onBlur={onBlur}
-                  error={errors.routing_number?.message}
-                  required
-                  placeholder="123456789"
-                  keyboardType="number-pad"
-                  maxLength={9}
-                />
-              )}
-            />
-
-            {/* Account Number */}
-            <Controller
-              control={control}
-              name="account_number"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <Input
-                  label="Account Number"
-                  value={value}
-                  onChangeText={(text) => {
-                    // Only allow digits, max 17
-                    const cleaned = text.replace(/\D/g, '').slice(0, 17);
-                    onChange(cleaned);
-                  }}
-                  onBlur={onBlur}
-                  error={errors.account_number?.message}
-                  required
-                  placeholder="Enter your account number"
-                  keyboardType="number-pad"
-                  secureTextEntry={true}
-                  maxLength={17}
-                />
-              )}
-            />
-
-            {/* Confirm Account Number */}
-            <Controller
-              control={control}
-              name="confirm_account_number"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <Input
-                  label="Confirm Account Number"
-                  value={value}
-                  onChangeText={(text) => {
-                    // Only allow digits, max 17
-                    const cleaned = text.replace(/\D/g, '').slice(0, 17);
-                    onChange(cleaned);
-                  }}
-                  onBlur={onBlur}
-                  error={errors.confirm_account_number?.message}
-                  required
-                  placeholder="Re-enter your account number"
-                  keyboardType="number-pad"
-                  secureTextEntry={true}
-                  maxLength={17}
-                />
-              )}
-            />
-
-            {/* Account Holder Name */}
-            <Controller
-              control={control}
-              name="account_holder_name"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <Input
-                  label="Account Holder Name"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  error={errors.account_holder_name?.message}
-                  required
-                  placeholder="John Doe"
-                  autoCapitalize="words"
-                />
-              )}
-            />
-
-            <View style={styles.infoBox}>
-              <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
-              <Text style={[styles.infoText, textStyle]}>
-                After submitting, we'll send two small test deposits to verify your account. This usually takes 1-2 business days.
+              <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 16, fontStyle: 'italic', color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                Note: During the connection process, you may see "Foundry360" - this is Ollie's parent company that securely processes payments.
               </Text>
             </View>
-
             <Button
-              title="Add Bank Account"
-              onPress={handleSubmit(onSubmit)}
-              loading={isSubmitting}
-              disabled={isSubmitting}
+              title={isConnecting ? 'Connecting...' : 'Connect Bank Account'}
+              onPress={handleConnectWithFinancialConnections}
+              disabled={isConnecting}
               fullWidth
             />
           </View>
@@ -538,4 +612,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

@@ -128,34 +128,66 @@ export default function ParentBankSetupScreen() {
 
   // Handle Financial Connections return from redirect (web only)
   useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && approvalData && params.token) {
       const urlParams = new URLSearchParams(window.location.search);
       const financialConnectionsComplete = urlParams.get('financial_connections_complete');
-      const sessionId = urlParams.get('session_id');
+      const sessionId = urlParams.get('session_id') || sessionStorage.getItem('financial_connections_session_id');
       
       if (financialConnectionsComplete === 'true' && sessionId) {
-        // User returned from Financial Connections
-        // Show success message
-        Alert.alert(
-          'Success',
-          'Bank account connected successfully! Your child can now receive payments.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Clean up URL params
-                window.history.replaceState({}, document.title, window.location.pathname);
-                // Optionally close the window if it was opened in a popup
-                if (window.opener) {
-                  window.close();
+        // User returned from Financial Connections - save the bank account
+        console.log('Financial Connections completed on web, saving bank account...');
+        setIsConnecting(true);
+        
+        (async () => {
+          try {
+            // Call save function to store the bank account
+            const { data: saveData, error: saveError } = await supabase.functions.invoke(
+              'save-financial-connections-account',
+              {
+                body: {
+                  session_id: sessionId,
+                  teen_user_id: approvalData.teen_id,
+                  approval_token: params.token,
                 }
               }
+            );
+
+            if (saveError || !saveData?.success) {
+              console.error('Failed to save bank account:', saveError || saveData);
+              Alert.alert(
+                'Error',
+                'Bank account was connected but failed to save. Please contact support.'
+              );
+              setIsConnecting(false);
+            } else {
+              console.log('Bank account saved successfully:', saveData);
+              Alert.alert(
+                'Success',
+                'Bank account connected successfully! Your child can now receive payments.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Clean up URL params and sessionStorage
+                      window.history.replaceState({}, document.title, window.location.pathname);
+                      sessionStorage.removeItem('financial_connections_session_id');
+                      sessionStorage.removeItem('financial_connections_customer_id');
+                      router.back();
+                    }
+                  }
+                ]
+              );
+              setIsConnecting(false);
             }
-          ]
-        );
+          } catch (error: any) {
+            console.error('Error saving bank account:', error);
+            Alert.alert('Error', 'Failed to save bank account. Please try again.');
+            setIsConnecting(false);
+          }
+        })();
       }
     }
-  }, []);
+  }, [approvalData, params.token]);
 
   // Validate token and fetch approval data
   useEffect(() => {
@@ -526,70 +558,119 @@ export default function ParentBankSetupScreen() {
         }
       }
       
-      const { data, error } = await supabase.functions.invoke(
-        'create-financial-connections-session',
-        {
-          body: {
-            teen_user_id: approvalData.teen_id,
-            approval_token: params.token,
-            return_url: returnUrl, // Only set if HTTPS
+      let data: any = null;
+      let error: any = null;
+      
+      try {
+        const result = await supabase.functions.invoke(
+          'create-financial-connections-session',
+          {
+            body: {
+              teen_user_id: approvalData.teen_id,
+              approval_token: params.token,
+              return_url: returnUrl, // Only set if HTTPS
+            }
+          }
+        );
+        data = result.data;
+        error = result.error;
+      } catch (invokeError: any) {
+        // Supabase functions.invoke() throws on non-2xx, but we can still get the response
+        console.error('Function invoke threw error:', invokeError);
+        error = invokeError;
+        
+        // Try to extract data from the error if available
+        if (invokeError?.context) {
+          try {
+            if (invokeError.context instanceof Response) {
+              const errorBody = await invokeError.context.clone().json();
+              data = errorBody; // Error response body might contain error details
+              console.error('Extracted error body from context:', errorBody);
+            }
+          } catch (e) {
+            console.error('Could not extract error body:', e);
           }
         }
-      );
+        
+        // Also check if error has data property
+        if (invokeError?.data) {
+          data = invokeError.data;
+        }
+      }
 
       if (error || !data?.session?.client_secret) {
         console.error('Failed to create Financial Connections session:', error || data);
         
         // Try to extract detailed error message
+        // Priority: data.error/details (from edge function response) > error.context > error.message
         let errorMessage = 'Failed to create connection session. Please try again.';
         let errorDetails: any = null;
         
-        if (error) {
-          // Check if error has details in context
+        // First, check if data contains error details (edge function returns errors in response body)
+        if (data) {
+          if (data.error) {
+            errorMessage = data.error;
+            errorDetails = data;
+          }
+          if (data.details) {
+            errorMessage = data.details;
+            errorDetails = data;
+          }
+          if (data.stripe_error?.message) {
+            errorMessage = data.stripe_error.message;
+            errorDetails = data;
+          }
+          if (data.message) {
+            errorMessage = data.message;
+            errorDetails = data;
+          }
+        }
+        
+        // If we didn't get details from data, try to extract from error object
+        if (!errorDetails && error) {
+          // Check if error has details in context (Response object)
           if (error.context instanceof Response) {
             try {
               errorDetails = await error.context.clone().json();
               console.error('Error details from response:', errorDetails);
-              console.error('Error details type:', typeof errorDetails);
-              console.error('Error details keys:', errorDetails ? Object.keys(errorDetails) : 'null');
-              console.error('Full error details object:', JSON.stringify(errorDetails, null, 2));
-              console.error('Error details.error:', errorDetails?.error);
-              console.error('Error details.details:', errorDetails?.details);
-              console.error('Error details.stripe_error:', errorDetails?.stripe_error);
               errorMessage = errorDetails?.error || errorDetails?.details || errorDetails?.message || errorDetails?.stripe_error?.message || errorMessage;
             } catch (e) {
-              console.error('Could not parse error context:', e);
+              console.error('Could not parse error context as JSON:', e);
               // Try to get text instead
               try {
                 const text = await error.context.clone().text();
                 console.error('Error response text:', text);
-                errorMessage = text || errorMessage;
+                // Try to parse as JSON if it looks like JSON
+                try {
+                  errorDetails = JSON.parse(text);
+                  errorMessage = errorDetails?.error || errorDetails?.details || errorDetails?.message || errorMessage;
+                } catch {
+                  errorMessage = text || errorMessage;
+                }
               } catch (e2) {
                 console.error('Could not read error context as text:', e2);
               }
             }
           }
           
-          if (!errorDetails && error.message) {
+          // Fallback to error.message if we still don't have details
+          if (!errorDetails && error.message && error.message !== 'Edge Function returned a non-2xx status code') {
             errorMessage = error.message;
           }
         }
         
-        if (data?.error) {
-          errorMessage = data.error;
-        }
-        if (data?.details) {
-          errorMessage = data.details;
-        }
-        if (data?.stripe_error?.message) {
-          errorMessage = data.stripe_error.message;
-        }
-        
+        console.error('=== ERROR DETAILS ===');
         console.error('Final error message:', errorMessage);
-        console.error('Full error data:', { error, data, errorDetails });
-        console.error('Error object stringified:', JSON.stringify({ error, data, errorDetails }, null, 2));
-        console.error('Error context type:', typeof error?.context);
+        console.error('Error object:', error);
+        console.error('Error type:', error?.constructor?.name);
+        console.error('Error keys:', error ? Object.keys(error) : 'no error');
+        console.error('Error message:', error?.message);
         console.error('Error context:', error?.context);
+        console.error('Error context type:', typeof error?.context);
+        console.error('Data object:', data);
+        console.error('Data keys:', data ? Object.keys(data) : 'no data');
+        console.error('Error details:', errorDetails);
+        console.error('====================');
         
         Alert.alert(
           'Error', 
@@ -704,11 +785,44 @@ export default function ParentBankSetupScreen() {
 
         const { error: sheetError } = await presentFinancialConnectionsSheet({
           clientSecret: data.session.client_secret,
-          onEvent: (event: any) => {
+          onEvent: async (event: any) => {
             console.log('Financial Connections event:', event.name);
             
             if (event.name === 'financialConnectionsSheetCompleted') {
-              // Success! Payment method is already created and attached
+              // Success! Now save the bank account to our database
+              console.log('Financial Connections completed, saving bank account...');
+              
+              // Call edge function to save the bank account
+              const { data: saveData, error: saveError } = await supabase.functions.invoke(
+                'save-financial-connections-account',
+                {
+                  body: {
+                    session_id: data.session.id,
+                    teen_user_id: approvalData.teen_id,
+                    approval_token: params.token,
+                  }
+                }
+              );
+
+              if (saveError || !saveData?.success) {
+                console.error('Failed to save bank account:', saveError || saveData);
+                Alert.alert(
+                  'Error',
+                  'Bank account was connected but failed to save. Please contact support.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        router.back();
+                      }
+                    }
+                  ]
+                );
+                setIsConnecting(false);
+                return;
+              }
+
+              console.log('Bank account saved successfully:', saveData);
               Alert.alert(
                 'Success',
                 'Bank account connected successfully! Your child can now receive payments.',
@@ -851,28 +965,48 @@ export default function ParentBankSetupScreen() {
               </View>
             )}
 
-            {/* Financial Connections Option - Hidden on web, available on native */}
-            {Platform.OS !== 'web' && (
-              <>
-                <View style={[styles.section, cardStyle, { marginBottom: 16 }]}>
-                  <View style={{ marginBottom: 12 }}>
-                    <Ionicons name="shield-checkmark" size={24} color="#73af17" style={{ marginBottom: 8 }} />
-                    <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 4 }]}>
-                      Connect Securely (Recommended)
-                    </Text>
-                    <Text style={[styles.sectionDescription, textStyle, { fontSize: 14 }]}>
-                      Connect your bank account instantly using Stripe's secure authentication. No manual entry required.
-                    </Text>
+            {/* Financial Connections Option - Primary method for all platforms */}
+            <View style={[styles.section, cardStyle, { marginBottom: 16 }]}>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 8 }]}>
+                  Connect Your Bank Account
+                </Text>
+                {teenName && (
+                  <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 12 }]}>
+                    Set up payouts so <Text style={{ fontWeight: '700' }}>{teenName.split(' ')[0]}</Text> can receive earnings instantly after completing gigs.
+                  </Text>
+                )}
+                <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 12 }]}>
+                  Connect your bank account securely using our payment partner, Stripe. You'll log in through your bank's secure portal - we never see or store your banking credentials.
+                </Text>
+                <View style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                    <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Instant verification</Text>
                   </View>
-                  <Button
-                    onPress={handleConnectWithFinancialConnections}
-                    disabled={isConnecting || isSubmitting}
-                    style={{ marginTop: 8 }}
-                  >
-                    {isConnecting ? 'Connecting...' : 'Connect Bank Account Securely'}
-                  </Button>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                    <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Bank-level security and encryption</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                    <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                    <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Used by millions of businesses worldwide</Text>
+                  </View>
                 </View>
+                <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 16, fontStyle: 'italic', color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                  Note: During the connection process, you may see "Foundry360" - this is Ollie's parent company that securely processes payments.
+                </Text>
+              </View>
+              <Button
+                title={isConnecting ? 'Connecting...' : 'Connect Bank Account'}
+                onPress={handleConnectWithFinancialConnections}
+                disabled={isConnecting || isSubmitting}
+              />
+            </View>
 
+            {/* Manual form option - Hidden by default, can be shown if needed */}
+            {false && (
+              <>
                 {/* Divider */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 24 }}>
                   <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
@@ -881,21 +1015,19 @@ export default function ParentBankSetupScreen() {
                   </Text>
                   <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
                 </View>
-              </>
-            )}
 
-            <View style={[styles.section, cardStyle]}>
-              <Text style={[styles.sectionTitle, titleStyle]}>Account Information</Text>
-              <Text style={[styles.sectionDescription, textStyle]}>
-                Your bank account information is encrypted and secure. We use Stripe to process payments.
-              </Text>
+                <View style={[styles.section, cardStyle]}>
+                  <Text style={[styles.sectionTitle, titleStyle]}>Account Information</Text>
+                  <Text style={[styles.sectionDescription, textStyle]}>
+                    Your bank account information is encrypted and secure. We use Stripe to process payments.
+                  </Text>
 
-              {/* Account Type and Bank Name Row */}
-              <View style={Platform.OS === 'web' ? styles.twoColumnContainer : undefined}>
-                {/* Account Type Selector */}
-                <View style={[styles.accountTypeContainer, Platform.OS === 'web' && styles.column]}>
-                  <Text style={[styles.label, textStyle]}>Account Type <Text style={styles.requiredAsterisk}>*</Text></Text>
-                  <Controller
+                  {/* Account Type and Bank Name Row */}
+                  <View style={Platform.OS === 'web' ? styles.twoColumnContainer : undefined}>
+                    {/* Account Type Selector */}
+                    <View style={[styles.accountTypeContainer, Platform.OS === 'web' && styles.column]}>
+                      <Text style={[styles.label, textStyle]}>Account Type <Text style={styles.requiredAsterisk}>*</Text></Text>
+                      <Controller
                     control={control}
                     name="account_type"
                     render={({ field: { onChange, value } }) => (
@@ -983,255 +1115,257 @@ export default function ParentBankSetupScreen() {
                           </>
                         )}
                       </>
+                      )}
+                    />
+                    {errors.account_type && (
+                      <Text style={styles.errorText}>{errors.account_type?.message}</Text>
+                    )}
+                  </View>
+
+                  {/* Bank Name */}
+                  <View style={Platform.OS === 'web' ? styles.column : undefined}>
+                    <Controller
+                      control={control}
+                      name="bank_name"
+                      render={({ field: { onChange, onBlur, value } }) => (
+                        <Input
+                          label="Bank Name"
+                          value={value}
+                          onChangeText={onChange}
+                          onBlur={onBlur}
+                          error={errors.bank_name?.message}
+                          required
+                          placeholder="Chase, Bank of America, etc."
+                          autoCapitalize="words"
+                          forceLightTheme={Platform.OS === 'web'}
+                        />
+                      )}
+                    />
+                  </View>
+                </View>
+
+                {/* Two Column Layout for Web */}
+                <View style={styles.twoColumnContainer}>
+                  {/* Left Column */}
+                  <View style={styles.column}>
+                    {/* Account Holder Name */}
+                    <Controller
+                      control={control}
+                      name="account_holder_name"
+                      render={({ field: { onChange, onBlur, value } }) => (
+                        <Input
+                          label="Account Holder Name"
+                          value={value}
+                          onChangeText={onChange}
+                          onBlur={onBlur}
+                          error={errors.account_holder_name?.message}
+                          required
+                          placeholder="John Doe"
+                          autoCapitalize="words"
+                          forceLightTheme={Platform.OS === 'web'}
+                        />
+                      )}
+                    />
+
+                    {/* Account Number */}
+                    <Controller
+                      control={control}
+                      name="account_number"
+                      render={({ field: { onChange, onBlur, value } }) => (
+                        <View style={styles.inputWithToggle}>
+                          <Input
+                            label="Account Number"
+                            value={value}
+                            onChangeText={(text) => {
+                              const cleaned = text.replace(/\D/g, '').slice(0, 17);
+                              onChange(cleaned);
+                            }}
+                            onBlur={onBlur}
+                            error={errors.account_number?.message}
+                            required
+                            placeholder="Enter account number"
+                            keyboardType="number-pad"
+                            secureTextEntry={!showAccountNumber}
+                            maxLength={17}
+                            forceLightTheme={Platform.OS === 'web'}
+                            style={styles.inputWithIcon}
+                          />
+                          <Pressable
+                            style={styles.eyeIcon}
+                            onPress={() => setShowAccountNumber(!showAccountNumber)}
+                          >
+                            <Ionicons
+                              name={showAccountNumber ? 'eye-outline' : 'eye-off-outline'}
+                              size={20}
+                              color="#6B7280"
+                            />
+                          </Pressable>
+                        </View>
+                      )}
+                    />
+                  </View>
+
+                  {/* Right Column */}
+                  <View style={styles.column}>
+                    {/* Routing Number */}
+                    <Controller
+                      control={control}
+                      name="routing_number"
+                      render={({ field: { onChange, onBlur, value } }) => (
+                        <View style={styles.inputWithToggle}>
+                          <Input
+                            label="Routing Number"
+                            value={value}
+                            onChangeText={(text) => {
+                              const cleaned = text.replace(/\D/g, '').slice(0, 9);
+                              onChange(cleaned);
+                            }}
+                            onBlur={onBlur}
+                            error={errors.routing_number?.message}
+                            required
+                            placeholder="123456789"
+                            keyboardType="number-pad"
+                            secureTextEntry={!showRoutingNumber}
+                            maxLength={9}
+                            forceLightTheme={Platform.OS === 'web'}
+                            style={styles.inputWithIcon}
+                          />
+                          <Pressable
+                            style={styles.eyeIcon}
+                            onPress={() => setShowRoutingNumber(!showRoutingNumber)}
+                          >
+                            <Ionicons
+                              name={showRoutingNumber ? 'eye-outline' : 'eye-off-outline'}
+                              size={20}
+                              color="#6B7280"
+                            />
+                          </Pressable>
+                        </View>
+                      )}
+                    />
+
+                    {/* Confirm Account Number */}
+                    <Controller
+                      control={control}
+                      name="confirm_account_number"
+                      render={({ field: { onChange, onBlur, value } }) => (
+                        <View style={styles.inputWithToggle}>
+                          <Input
+                            label="Confirm Account Number"
+                            value={value}
+                            onChangeText={(text) => {
+                              const cleaned = text.replace(/\D/g, '').slice(0, 17);
+                              onChange(cleaned);
+                            }}
+                            onBlur={onBlur}
+                            error={errors.confirm_account_number?.message}
+                            required
+                            placeholder="Re-enter account number"
+                            keyboardType="number-pad"
+                            secureTextEntry={!showConfirmAccountNumber}
+                            maxLength={17}
+                            forceLightTheme={Platform.OS === 'web'}
+                            style={styles.inputWithIcon}
+                          />
+                          <Pressable
+                            style={styles.eyeIcon}
+                            onPress={() => setShowConfirmAccountNumber(!showConfirmAccountNumber)}
+                          >
+                            <Ionicons
+                              name={showConfirmAccountNumber ? 'eye-outline' : 'eye-off-outline'}
+                              size={20}
+                              color="#6B7280"
+                            />
+                          </Pressable>
+                        </View>
+                      )}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.infoBox}>
+                  <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
+                  <Text style={[styles.infoText, textStyle]}>
+                    After submitting, we'll send two small test deposits to verify the account. This usually takes 1-2 business days.
+                  </Text>
+                </View>
+                </View>
+
+                <View style={[styles.section, cardStyle]}>
+                  <Text style={[styles.sectionTitle, titleStyle]}>Authorization</Text>
+                  <Text style={[styles.sectionDescription, textStyle]}>
+                    Please read and accept the authorization below
+                  </Text>
+                  <Text style={[styles.authorizationText, textStyle]}>
+                    I hereby authorize Ollie to set up the bank account listed above for transactions related to my minor child's Ollie account. I understand that:
+                  </Text>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Text style={styles.bullet}>•</Text>
+                      <Text style={[styles.bulletText, textStyle]}>
+                        I am the parent or guardian of the account holder
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Text style={styles.bullet}>•</Text>
+                      <Text style={[styles.bulletText, textStyle]}>
+                        I have the legal authority to set up this bank account
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Text style={styles.bullet}>•</Text>
+                      <Text style={[styles.bulletText, textStyle]}>
+                        This authorization remains in effect until revoked
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Text style={styles.bullet}>•</Text>
+                      <Text style={[styles.bulletText, textStyle]}>
+                        I can revoke this authorization at any time by contacting Ollie support
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <Controller
+                    control={control}
+                    name="authorization_agreed"
+                    render={({ field: { onChange, value } }) => (
+                      <Pressable
+                        style={styles.checkboxContainer}
+                        onPress={() => onChange(!value)}
+                      >
+                        <View style={[styles.checkbox, value && styles.checkboxChecked]}>
+                          {value && (
+                            <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                          )}
+                        </View>
+                        <Text style={[styles.checkboxLabel, textStyle]}>
+                          I authorize Ollie to set up the bank account listed above for my minor child's account <Text style={styles.requiredAsterisk}>*</Text>
+                        </Text>
+                      </Pressable>
                     )}
                   />
-                  {errors.account_type && (
-                    <Text style={styles.errorText}>{errors.account_type.message}</Text>
+                  {errors.authorization_agreed && (
+                    <Text style={styles.errorText}>{errors.authorization_agreed?.message}</Text>
                   )}
                 </View>
 
-                {/* Bank Name */}
-                <View style={Platform.OS === 'web' ? styles.column : undefined}>
-                  <Controller
-                    control={control}
-                    name="bank_name"
-                    render={({ field: { onChange, onBlur, value } }) => (
-                      <Input
-                        label="Bank Name"
-                        value={value}
-                        onChangeText={onChange}
-                        onBlur={onBlur}
-                        error={errors.bank_name?.message}
-                        required
-                        placeholder="Chase, Bank of America, etc."
-                        autoCapitalize="words"
-                        forceLightTheme={Platform.OS === 'web'}
-                      />
-                    )}
+                <View style={styles.buttonRow}>
+                  <Button
+                    title="Clear Form"
+                    onPress={clearForm}
+                    variant="secondary"
+                    disabled={isSubmitting}
+                  />
+                  <Button
+                    title="Set Up Bank Account"
+                    onPress={handleSubmit(onSubmit)}
+                    loading={isSubmitting}
+                    disabled={isSubmitting || !authorizationAgreed}
                   />
                 </View>
-              </View>
-
-              {/* Two Column Layout for Web */}
-              <View style={styles.twoColumnContainer}>
-                {/* Left Column */}
-                <View style={styles.column}>
-                  {/* Account Holder Name */}
-                  <Controller
-                    control={control}
-                    name="account_holder_name"
-                    render={({ field: { onChange, onBlur, value } }) => (
-                      <Input
-                        label="Account Holder Name"
-                        value={value}
-                        onChangeText={onChange}
-                        onBlur={onBlur}
-                        error={errors.account_holder_name?.message}
-                        required
-                        placeholder="John Doe"
-                        autoCapitalize="words"
-                        forceLightTheme={Platform.OS === 'web'}
-                      />
-                    )}
-                  />
-
-                  {/* Account Number */}
-                  <Controller
-                    control={control}
-                    name="account_number"
-                    render={({ field: { onChange, onBlur, value } }) => (
-                      <View style={styles.inputWithToggle}>
-                        <Input
-                          label="Account Number"
-                          value={value}
-                          onChangeText={(text) => {
-                            const cleaned = text.replace(/\D/g, '').slice(0, 17);
-                            onChange(cleaned);
-                          }}
-                          onBlur={onBlur}
-                          error={errors.account_number?.message}
-                          required
-                          placeholder="Enter account number"
-                          keyboardType="number-pad"
-                          secureTextEntry={!showAccountNumber}
-                          maxLength={17}
-                          forceLightTheme={Platform.OS === 'web'}
-                          style={styles.inputWithIcon}
-                        />
-                        <Pressable
-                          style={styles.eyeIcon}
-                          onPress={() => setShowAccountNumber(!showAccountNumber)}
-                        >
-                          <Ionicons
-                            name={showAccountNumber ? 'eye-outline' : 'eye-off-outline'}
-                            size={20}
-                            color="#6B7280"
-                          />
-                        </Pressable>
-                      </View>
-                    )}
-                  />
-                </View>
-
-                {/* Right Column */}
-                <View style={styles.column}>
-                  {/* Routing Number */}
-                  <Controller
-                    control={control}
-                    name="routing_number"
-                    render={({ field: { onChange, onBlur, value } }) => (
-                      <View style={styles.inputWithToggle}>
-                        <Input
-                          label="Routing Number"
-                          value={value}
-                          onChangeText={(text) => {
-                            const cleaned = text.replace(/\D/g, '').slice(0, 9);
-                            onChange(cleaned);
-                          }}
-                          onBlur={onBlur}
-                          error={errors.routing_number?.message}
-                          required
-                          placeholder="123456789"
-                          keyboardType="number-pad"
-                          secureTextEntry={!showRoutingNumber}
-                          maxLength={9}
-                          forceLightTheme={Platform.OS === 'web'}
-                          style={styles.inputWithIcon}
-                        />
-                        <Pressable
-                          style={styles.eyeIcon}
-                          onPress={() => setShowRoutingNumber(!showRoutingNumber)}
-                        >
-                          <Ionicons
-                            name={showRoutingNumber ? 'eye-outline' : 'eye-off-outline'}
-                            size={20}
-                            color="#6B7280"
-                          />
-                        </Pressable>
-                      </View>
-                    )}
-                  />
-
-                  {/* Confirm Account Number */}
-                  <Controller
-                    control={control}
-                    name="confirm_account_number"
-                    render={({ field: { onChange, onBlur, value } }) => (
-                      <View style={styles.inputWithToggle}>
-                        <Input
-                          label="Confirm Account Number"
-                          value={value}
-                          onChangeText={(text) => {
-                            const cleaned = text.replace(/\D/g, '').slice(0, 17);
-                            onChange(cleaned);
-                          }}
-                          onBlur={onBlur}
-                          error={errors.confirm_account_number?.message}
-                          required
-                          placeholder="Re-enter account number"
-                          keyboardType="number-pad"
-                          secureTextEntry={!showConfirmAccountNumber}
-                          maxLength={17}
-                          forceLightTheme={Platform.OS === 'web'}
-                          style={styles.inputWithIcon}
-                        />
-                        <Pressable
-                          style={styles.eyeIcon}
-                          onPress={() => setShowConfirmAccountNumber(!showConfirmAccountNumber)}
-                        >
-                          <Ionicons
-                            name={showConfirmAccountNumber ? 'eye-outline' : 'eye-off-outline'}
-                            size={20}
-                            color="#6B7280"
-                          />
-                        </Pressable>
-                      </View>
-                    )}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.infoBox}>
-                <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
-                <Text style={[styles.infoText, textStyle]}>
-                  After submitting, we'll send two small test deposits to verify the account. This usually takes 1-2 business days.
-                </Text>
-              </View>
-            </View>
-
-            <View style={[styles.section, cardStyle]}>
-              <Text style={[styles.sectionTitle, titleStyle]}>Authorization</Text>
-              <Text style={[styles.sectionDescription, textStyle]}>
-                Please read and accept the authorization below
-              </Text>
-              <Text style={[styles.authorizationText, textStyle]}>
-                I hereby authorize Ollie to set up the bank account listed above for transactions related to my minor child's Ollie account. I understand that:
-              </Text>
-              <View style={styles.bulletList}>
-                <View style={styles.bulletItem}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={[styles.bulletText, textStyle]}>
-                    I am the parent or guardian of the account holder
-                  </Text>
-                </View>
-                <View style={styles.bulletItem}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={[styles.bulletText, textStyle]}>
-                    I have the legal authority to set up this bank account
-                  </Text>
-                </View>
-                <View style={styles.bulletItem}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={[styles.bulletText, textStyle]}>
-                    This authorization remains in effect until revoked
-                  </Text>
-                </View>
-                <View style={styles.bulletItem}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={[styles.bulletText, textStyle]}>
-                    I can revoke this authorization at any time by contacting Ollie support
-                  </Text>
-                </View>
-              </View>
-              
-              <Controller
-                control={control}
-                name="authorization_agreed"
-                render={({ field: { onChange, value } }) => (
-                  <Pressable
-                    style={styles.checkboxContainer}
-                    onPress={() => onChange(!value)}
-                  >
-                    <View style={[styles.checkbox, value && styles.checkboxChecked]}>
-                      {value && (
-                        <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                      )}
-                    </View>
-                    <Text style={[styles.checkboxLabel, textStyle]}>
-                      I authorize Ollie to set up the bank account listed above for my minor child's account <Text style={styles.requiredAsterisk}>*</Text>
-                    </Text>
-                  </Pressable>
-                )}
-              />
-              {errors.authorization_agreed && (
-                <Text style={styles.errorText}>{errors.authorization_agreed.message}</Text>
-              )}
-            </View>
-
-            <View style={styles.buttonRow}>
-              <Button
-                title="Clear Form"
-                onPress={clearForm}
-                variant="secondary"
-                disabled={isSubmitting}
-              />
-              <Button
-                title="Set Up Bank Account"
-                onPress={handleSubmit(onSubmit)}
-                loading={isSubmitting}
-                disabled={isSubmitting || !authorizationAgreed}
-              />
-            </View>
+              </>
+            )}
           </ScrollView>
         ) : (
           <KeyboardAvoidingView
@@ -1263,33 +1397,55 @@ export default function ParentBankSetupScreen() {
               {/* Financial Connections Option - Available on all platforms */}
               <View style={[styles.section, cardStyle, { marginBottom: 16 }]}>
                 <View style={{ marginBottom: 12 }}>
-                  <Ionicons name="shield-checkmark" size={24} color="#73af17" style={{ marginBottom: 8 }} />
-                  <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 4 }]}>
-                    Connect Securely (Recommended)
+                  <Text style={[styles.sectionTitle, titleStyle, { marginBottom: 8 }]}>
+                    Connect Your Bank Account
                   </Text>
-                  <Text style={[styles.sectionDescription, textStyle, { fontSize: 14 }]}>
-                    Connect your bank account instantly using Stripe's secure authentication. No manual entry required.
+                  {teenName && (
+                    <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 12 }]}>
+                      Set up payouts so <Text style={{ fontWeight: '700' }}>{teenName.split(' ')[0]}</Text> can receive earnings instantly after completing gigs.
+                    </Text>
+                  )}
+                  <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 12 }]}>
+                    Connect your bank account securely using our payment partner, Stripe. You'll log in through your bank's secure portal - we never see or store your banking credentials.
+                  </Text>
+                  <View style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                      <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Instant verification - no waiting for test deposits</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                      <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Bank-level security and encryption</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                      <Text style={{ color: '#73af17', marginRight: 8, fontSize: 16 }}>✓</Text>
+                      <Text style={[textStyle, { fontSize: 14, flex: 1 }]}>Used by millions of businesses worldwide</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.sectionDescription, textStyle, { fontSize: 14, marginBottom: 16, fontStyle: 'italic', color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                    Note: During the connection process, you may see "Foundry360" - this is Ollie's parent company that securely processes payments.
                   </Text>
                 </View>
                 <Button
+                  title={isConnecting ? 'Connecting...' : 'Connect Bank Account'}
                   onPress={handleConnectWithFinancialConnections}
                   disabled={isConnecting || isSubmitting}
-                  style={{ marginTop: 8 }}
-                >
-                  {isConnecting ? 'Connecting...' : 'Connect Bank Account Securely'}
-                </Button>
+                />
               </View>
 
-              {/* Divider */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 24 }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
-                <Text style={[textStyle, { marginHorizontal: 16, fontSize: 14, color: isDark ? '#9CA3AF' : '#6B7280' }]}>
-                  OR
-                </Text>
-                <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
-              </View>
+              {/* Manual form option - Hidden by default, can be shown if needed */}
+              {false && (
+                <>
+                  {/* Divider */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 24 }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
+                    <Text style={[textStyle, { marginHorizontal: 16, fontSize: 14, color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                      OR
+                    </Text>
+                    <View style={{ flex: 1, height: 1, backgroundColor: isDark ? '#374151' : '#E5E7EB' }} />
+                  </View>
 
-              <View style={[styles.section, cardStyle]}>
+                  <View style={[styles.section, cardStyle]}>
                 <Text style={[styles.sectionTitle, titleStyle]}>Account Information</Text>
                 <Text style={[styles.sectionDescription, textStyle]}>
                   Your bank account information is encrypted and secure. We use Stripe to process payments.
@@ -1391,7 +1547,7 @@ export default function ParentBankSetupScreen() {
                       )}
                     />
                     {errors.account_type && (
-                      <Text style={styles.errorText}>{errors.account_type.message}</Text>
+                      <Text style={styles.errorText}>{errors.account_type?.message}</Text>
                     )}
                   </View>
 
@@ -1614,24 +1770,26 @@ export default function ParentBankSetupScreen() {
                   )}
                 />
                 {errors.authorization_agreed && (
-                  <Text style={styles.errorText}>{errors.authorization_agreed.message}</Text>
+                  <Text style={styles.errorText}>{errors.authorization_agreed?.message}</Text>
                 )}
               </View>
 
-            <View style={styles.buttonRow}>
-              <Button
-                title="Clear Form"
-                onPress={clearForm}
-                variant="secondary"
-                disabled={isSubmitting}
-              />
-              <Button
-                title="Set Up Bank Account"
-                onPress={handleSubmit(onSubmit)}
-                loading={isSubmitting}
-                disabled={isSubmitting || !authorizationAgreed}
-              />
-            </View>
+                <View style={styles.buttonRow}>
+                  <Button
+                    title="Clear Form"
+                    onPress={clearForm}
+                    variant="secondary"
+                    disabled={isSubmitting}
+                  />
+                  <Button
+                    title="Set Up Bank Account"
+                    onPress={handleSubmit(onSubmit)}
+                    loading={isSubmitting}
+                    disabled={isSubmitting || !authorizationAgreed}
+                  />
+                </View>
+              </>
+            )}
             </ScrollView>
           </KeyboardAvoidingView>
         )}

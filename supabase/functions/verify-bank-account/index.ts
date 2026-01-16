@@ -133,13 +133,77 @@ serve(async (req: Request) => {
     }
 
     // Get the SetupIntent ID (required for verification)
-    const setupIntentId = bankAccount.stripe_setup_intent_id
+    let setupIntentId = bankAccount.stripe_setup_intent_id
 
+    // If SetupIntent ID is missing, create a new one for the existing payment method
     if (!setupIntentId) {
-      return new Response(
-        JSON.stringify({ error: 'SetupIntent ID not found. Please add a bank account again.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.log('SetupIntent ID missing, creating new SetupIntent for existing payment method:', bankAccount.stripe_external_account_id)
+      
+      if (!bankAccount.stripe_external_account_id || !bankAccount.stripe_customer_id) {
+        return new Response(
+          JSON.stringify({ error: 'Bank account is missing required Stripe information. Please add a bank account again.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Create a new SetupIntent for the existing payment method
+      const setupIntentParams = new URLSearchParams()
+      setupIntentParams.append('customer', bankAccount.stripe_customer_id)
+      setupIntentParams.append('payment_method', bankAccount.stripe_external_account_id)
+      setupIntentParams.append('payment_method_types[]', 'us_bank_account')
+      setupIntentParams.append('usage', 'off_session')
+
+      const createSetupIntentResponse = await fetch('https://api.stripe.com/v1/setup_intents', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${stripeSecretKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: setupIntentParams,
+      })
+
+      const newSetupIntent = await createSetupIntentResponse.json()
+
+      if (!createSetupIntentResponse.ok) {
+        console.error('Failed to create SetupIntent for existing payment method:', newSetupIntent)
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to set up verification. Please add a bank account again.',
+            details: newSetupIntent.error?.message || 'Unknown error'
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      setupIntentId = newSetupIntent.id
+      console.log('Created new SetupIntent for existing payment method:', setupIntentId)
+
+      // Update the bank account with the new SetupIntent ID
+      await supabase
+        .from('bank_accounts')
+        .update({ 
+          stripe_setup_intent_id: setupIntentId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bankAccount.id)
+
+      // Confirm the SetupIntent to trigger micro-deposits if needed
+      if (newSetupIntent.status === 'requires_confirmation') {
+        const confirmParams = new URLSearchParams()
+        confirmParams.append('payment_method', bankAccount.stripe_external_account_id)
+        confirmParams.append('mandate_data[customer_acceptance][type]', 'online')
+        confirmParams.append('mandate_data[customer_acceptance][online][ip_address]', '0.0.0.0')
+        confirmParams.append('mandate_data[customer_acceptance][online][user_agent]', 'Ollie-App/1.0')
+
+        await fetch(`https://api.stripe.com/v1/setup_intents/${setupIntentId}/confirm`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${stripeSecretKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: confirmParams,
+        })
+      }
     }
 
     // Verify the bank account using SetupIntent API with descriptor code

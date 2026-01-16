@@ -661,10 +661,10 @@ export async function createBankAccount(data: CreateBankAccountData): Promise<Cr
 
 /**
  * Verify bank account with micro-deposit code or amounts
- * @param options - Either { descriptorCode: string } or { amount1: string, amount2: string }
+ * @param options - { descriptorCode: string }
  */
 export async function verifyBankAccount(
-  options: { descriptorCode: string } | { amount1: string; amount2: string }
+  options: { descriptorCode: string }
 ): Promise<{
   verified: boolean;
   verified_at: string;
@@ -680,18 +680,88 @@ export async function verifyBankAccount(
   if (!session) throw new Error('User not authenticated');
 
   // Explicitly pass Authorization header
-  const { data, error } = await supabase.functions.invoke('verify-bank-account', {
-    body: options,
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-  });
+  let data: any = null;
+  let error: any = null;
+  
+  try {
+    const result = await supabase.functions.invoke('verify-bank-account', {
+      body: options,
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+    data = result.data;
+    error = result.error;
+  } catch (invokeError: any) {
+    // Supabase functions.invoke() throws on non-2xx, but we can still get the response
+    console.error('Function invoke threw error:', invokeError);
+    error = invokeError;
+    
+    // Try to extract data from the error if available
+    if (invokeError?.context) {
+      try {
+        if (invokeError.context instanceof Response) {
+          const errorBody = await invokeError.context.clone().json();
+          data = errorBody; // Error response body might contain error details
+          console.error('Extracted error body from context:', errorBody);
+        }
+      } catch (e) {
+        console.error('Could not extract error body:', e);
+      }
+    }
+    
+    // Also check if error has data property
+    if (invokeError?.data) {
+      data = invokeError.data;
+    }
+  }
 
   if (error) {
     console.error('Edge Function error:', error);
-    const errorMessage = error.message || 'Unknown error';
-    const errorDetails = (error as any).context?.message || (error as any).details;
-    throw new Error(errorDetails || errorMessage);
+    
+    // Try to extract detailed error message from the response
+    let errorMessage = error.message || 'Unknown error';
+    let errorDetails: any = null;
+    
+    // First, check if data contains error details (edge function returns errors in response body)
+    if (data) {
+      if (data.error) {
+        errorMessage = data.error;
+        errorDetails = data;
+      }
+      if (data.details) {
+        errorMessage = data.details;
+      }
+    }
+    
+    // Check if error has context (Response object)
+    if (!errorDetails && (error as any).context instanceof Response) {
+      try {
+        errorDetails = await (error as any).context.clone().json();
+        console.error('Error details from response:', errorDetails);
+        errorMessage = errorDetails?.error || errorDetails?.details || errorDetails?.message || errorMessage;
+      } catch (e) {
+        console.error('Could not parse error context as JSON:', e);
+        // Try to get text instead
+        try {
+          const text = await (error as any).context.clone().text();
+          console.error('Error response text:', text);
+          try {
+            errorDetails = JSON.parse(text);
+            errorMessage = errorDetails?.error || errorDetails?.details || errorDetails?.message || errorMessage;
+          } catch {
+            errorMessage = text || errorMessage;
+          }
+        } catch (e2) {
+          console.error('Could not read error context as text:', e2);
+        }
+      }
+    }
+    
+    console.error('Final error message:', errorMessage);
+    console.error('Full error data:', { error, data, errorDetails });
+    
+    throw new Error(errorMessage);
   }
 
   if (!data) {

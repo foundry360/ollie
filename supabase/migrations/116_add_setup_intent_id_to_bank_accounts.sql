@@ -8,3 +8,6 @@ ADD COLUMN IF NOT EXISTS stripe_setup_intent_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_bank_accounts_stripe_setup_intent_id 
 ON public.bank_accounts(stripe_setup_intent_id);
 
+
+
+

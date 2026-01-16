@@ -67,6 +67,31 @@ serve(async (req: Request) => {
       )
     }
 
+    // CRITICAL: Check database FIRST for existing verified bank account
+    // This prevents unnecessary Stripe API calls and rate limits
+    const { data: existingBankAccount } = await supabase
+      .from('bank_accounts')
+      .select('id, verification_status, stripe_financial_connections_account_id')
+      .eq('user_id', teenUser.id)
+      .eq('verification_status', 'verified')
+      .limit(1)
+      .maybeSingle()
+
+    if (existingBankAccount && existingBankAccount.verification_status === 'verified') {
+      console.log('User already has verified bank account, skipping session creation')
+      // Return success with already_verified flag instead of error
+      // This allows frontend to handle it gracefully
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          already_verified: true,
+          bank_account_id: existingBankAccount.id,
+          message: 'Bank account already verified'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Get Stripe secret key
     const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY')
     if (!stripeSecretKey) {
@@ -202,6 +227,9 @@ serve(async (req: Request) => {
       )
     }
 
+    // Skip checking Stripe for existing sessions - this causes additional API calls
+    // The idempotency key will handle duplicate prevention
+
     // Create Financial Connections Session
     // Note: Financial Connections Sessions don't accept customer, payment_method_type, or payment_method_collection
     // These are handled separately after the connection is established
@@ -231,11 +259,17 @@ serve(async (req: Request) => {
       customer_id: customerId // Note: customer is not passed to session, but stored for later use
     })
 
+    // Use idempotency key to prevent duplicate session creation
+    // Based on user ID so same user gets same session if they retry quickly
+    // This prevents rate limits from duplicate session creation
+    const idempotencyKey = `fc_session_${teenUser.id}`
+    
     const sessionResponse = await fetch('https://api.stripe.com/v1/financial_connections/sessions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${stripeSecretKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Idempotency-Key': idempotencyKey,
       },
       body: sessionParams,
     })
@@ -249,15 +283,27 @@ serve(async (req: Request) => {
         error: session.error,
         full_response: session
       })
+      
+      // Check for rate limit errors specifically
+      const isRateLimit = session.error?.code === 'rate_limit' || 
+                         sessionResponse.status === 429 ||
+                         session.error?.type === 'rate_limit_error';
+      
+      // Return appropriate status code for rate limits
+      const statusCode = isRateLimit ? 429 : 500;
+      
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to create Financial Connections session',
+          error: isRateLimit 
+            ? 'Rate limit exceeded. Please wait a few minutes before trying again.'
+            : 'Failed to create Financial Connections session',
           details: session.error?.message || 'Unknown error',
           stripe_error: session.error,
           stripe_error_code: session.error?.code,
-          stripe_error_type: session.error?.type
+          stripe_error_type: session.error?.type,
+          is_rate_limit: isRateLimit
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 

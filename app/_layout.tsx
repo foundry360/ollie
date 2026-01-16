@@ -514,6 +514,12 @@ export default function RootLayout() {
 
   const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
   
+  // #region agent log
+  const logLayout = {location:'app/_layout.tsx:518',message:'StripeProvider initialization',data:{hasKey:!!stripePublishableKey,keyLength:stripePublishableKey.length,keyPrefix:stripePublishableKey.substring(0,10),platform:Platform.OS},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+  console.log('[DEBUG]', logLayout);
+  fetch('http://127.0.0.1:7242/ingest/49e84fa0-ab03-4c98-a1bc-096c4cecf811',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logLayout)}).catch(()=>{});
+  // #endregion
+  
   return (
     <StripeProvider 
       publishableKey={stripePublishableKey}

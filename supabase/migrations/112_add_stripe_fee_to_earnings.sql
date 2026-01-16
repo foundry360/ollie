@@ -16,3 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_earnings_stripe_fee_amount ON public.earnings(str
 
 
 
+
+
+
+
